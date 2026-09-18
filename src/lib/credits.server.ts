@@ -33,7 +33,7 @@ function normalizeAddress(value: string) {
 async function loadRow(wallet: string): Promise<CreditRow> {
   const { data } = await supabaseAdmin
     .from("wallet_credits")
-    .select("wallet, chat_credits, room_credits, free_chats_date, free_chats_used")
+    .select("wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used")
     .eq("wallet", wallet)
     .maybeSingle();
   if (data) return data as CreditRow;
@@ -41,6 +41,7 @@ async function loadRow(wallet: string): Promise<CreditRow> {
     wallet,
     chat_credits: 0,
     room_credits: 0,
+    match_keys: 0,
     free_chats_date: today(),
     free_chats_used: 0,
   };
