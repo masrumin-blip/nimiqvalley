@@ -287,6 +287,7 @@ export async function createRoom(
   maxPlayers: number,
   settings: Record<string, string | number | boolean>,
   guest: string | null,
+  entry: "key" | "room" = "key",
 ): Promise<RoomState> {
   await abandonAll(wallet, gameSlug);
   const { data, error } = await supabaseAdmin
@@ -298,7 +299,7 @@ export async function createRoom(
       host_wallet: wallet,
       status: guest && kind === "friend" ? "invited" : "waiting",
       max_players: maxPlayers,
-      settings,
+      settings: { ...settings, __entry: entry },
       turn_wallet: wallet,
     })
     .select(COLUMNS)
