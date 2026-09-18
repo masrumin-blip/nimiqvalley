@@ -91,18 +91,22 @@ export async function signNimiqMessage(message: string): Promise<LoginSignature>
   return { publicKey, signature };
 }
 
-/** Send NIM through the wallet approval dialog. Returns the transaction hash. */
+/** Send NIM through the wallet approval dialog. Returns the wallet receipt. */
 export async function sendNim(recipient: string, nimAmount: number): Promise<string> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
-  const result = (await nimiq.sendBasicTransaction({
-    recipient,
-    value: Math.round(nimAmount * 100_000),
-    fee: 0,
-  })) as unknown;
+  const result = (await withTimeout(
+    nimiq.sendBasicTransaction({
+      recipient,
+      value: Math.round(nimAmount * 100_000),
+      fee: 0,
+    }),
+    WALLET_TIMEOUT_MS,
+    "The wallet did not answer in time. Please try again.",
+  )) as unknown;
   if (isWalletError(result)) throw new Error(walletErrorMessage(result));
   if (typeof result !== "string") throw new Error("The wallet did not confirm the transaction.");
-  return transactionHash(result);
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
