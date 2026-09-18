@@ -80,8 +80,12 @@ function VillagePage() {
   const nim = demo ? demoNimUsd * 250 : (nimBalance.data?.nim ?? 0);
   const nimUsd = demo ? demoNimUsd : nim * (price.data?.usd ?? 0);
   const usdtValue = demo ? demoUsdt : (usdt.data ?? 0);
-  const charTier = useMemo(() => tierForUsd(nimUsd), [nimUsd]);
-  const houseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
+  const realCharTier = useMemo(() => tierForUsd(nimUsd), [nimUsd]);
+  const realHouseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
+  const charTier = demo ? (TIERS[demoTier] ?? realCharTier) : realCharTier;
+  const houseTier = demo ? (TIERS[demoHouseTier] ?? realHouseTier) : realHouseTier;
+  const charIndex = TIERS.findIndex((t) => t.id === charTier.id);
+  const houseIndex = TIERS.findIndex((t) => t.id === houseTier.id);
 
   const onNearbyChange = useCallback((n: Neighbor | null) => {
     setNearby(n);
