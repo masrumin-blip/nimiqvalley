@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { GlobalClickSfx } from "../components/GlobalClickSfx";
 import { AppPreloader } from "../components/AppPreloader";
+import { LoginGate } from "../components/LoginGate";
 
 function NotFoundComponent() {
   return (
