@@ -228,10 +228,11 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     nim: expectedNim,
     chat_credits: chats,
     room_credits: rooms,
+    key_credits: keys,
   });
   if (error) throw new Error("This payment was already used.");
 
-  await grant(input.wallet, chats, rooms);
+  await grant(input.wallet, chats, rooms, keys);
   return getCredits(input.wallet);
 }
 
@@ -241,6 +242,6 @@ export async function claimDaily(wallet: string): Promise<CreditState> {
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
   if (error) throw new Error("You already claimed today's reward. Come back tomorrow.");
-  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms);
+  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms, DAILY_REWARD.keys);
   return getCredits(wallet);
 }
