@@ -226,16 +226,6 @@ type RedeemInput = {
  * The hash is unique in the database, so the same payment can never be used twice.
  */
 export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
-  const hash = input.txHash.trim().toLowerCase();
-  if (hash.length < 8) throw new Error("That payment reference does not look right.");
-
-  const { data: seen } = await supabaseAdmin
-    .from("nim_payments")
-    .select("id")
-    .eq("tx_hash", hash)
-    .maybeSingle();
-  if (seen) throw new Error("This payment was already used.");
-
   let chats = 0;
   let rooms = 0;
   let keys = 0;
