@@ -196,10 +196,15 @@ export class BomberGame {
   winner: string | null = null;
   paused = false;
 
+  online = false;
+  localId = 0;
+
   private time = 0;
   private onHud: (h: HudState) => void;
   private sound: Sound;
   private hidden = new Map<string, PowerType>();
+  private rnd: () => number = Math.random;
+  private seatNames: string[] | null = null;
 
   constructor(opts: GameOptions) {
     this.mode = opts.mode;
@@ -208,12 +213,16 @@ export class BomberGame {
     this.best = opts.best;
     this.onHud = opts.onHud;
     this.sound = opts.sound;
+    this.online = opts.online === true;
+    this.localId = opts.localId ?? 0;
+    this.seatNames = opts.names ?? null;
+    if (opts.seed !== undefined) this.rnd = mulberry32(opts.seed);
     this.buildLevel();
     this.pushHud();
   }
 
   get me() {
-    return this.bombers[0]!;
+    return this.bombers[this.localId] ?? this.bombers[0]!;
   }
 
   private bomberCount() {
