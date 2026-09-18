@@ -960,20 +960,39 @@ export default function SoccerGame() {
                     </div>
                   ) : (
                     <>
+                      <div className="rounded-xl border border-white/20 px-3 py-2 text-center text-xs tracking-wider text-foreground/80">
+                        {matchKeys} MATCH KEY(S) LEFT · 1 KEY PER MATCH
+                      </div>
                       <button
                         onClick={() => online.findMatch.mutate(target)}
-                        disabled={online.findMatch.isPending}
+                        disabled={online.findMatch.isPending || matchKeys <= 0}
                         className="font-display w-full rounded-2xl bg-neon-yellow px-6 py-3 text-base tracking-[0.2em] text-black shadow-[0_0_35px_rgba(255,225,60,0.5)] transition hover:scale-[1.03] disabled:opacity-60"
                       >
-                        QUICK MATCH
+                        QUICK MATCH — 1 KEY
                       </button>
                       <button
                         onClick={() => online.openRoom.mutate(target)}
-                        disabled={online.openRoom.isPending}
+                        disabled={online.openRoom.isPending || matchKeys <= 0}
                         className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold tracking-wider text-foreground/80 transition hover:border-white/50 disabled:opacity-60"
                       >
-                        CREATE ROOM CODE
+                        CREATE ROOM CODE — 1 KEY
                       </button>
+                      {matchKeys <= 0 && (
+                        <button
+                          onClick={() => buyKeys.mutate(1)}
+                          disabled={buyKeys.isPending}
+                          className="w-full rounded-xl border border-neon-yellow/60 px-4 py-2 text-xs font-semibold tracking-wider text-neon-yellow disabled:opacity-60"
+                        >
+                          {buyKeys.isPending
+                            ? "OPENING WALLET…"
+                            : `PAY ${KEY_COST_NIM} NIM FOR 1 MATCH KEY`}
+                        </button>
+                      )}
+                      {buyKeys.isError && (
+                        <p className="text-center text-xs text-neon-red">
+                          {(buyKeys.error as Error).message}
+                        </p>
+                      )}
                       <div className="flex gap-2">
                         <input
                           value={roomCode}
