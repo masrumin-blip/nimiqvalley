@@ -508,6 +508,11 @@ export default function BomberGame() {
                     onClick={() => {
                       setConfirmExit(false);
                       setPaused(false);
+                      if (onlineMode) {
+                        online.leave.mutate();
+                        setOnlineMode(false);
+                        onlineRef.current = false;
+                      }
                       setScreen("start");
                     }}
                     variant="outline"
@@ -544,7 +549,17 @@ export default function BomberGame() {
                 </span>
                 <div className="flex gap-2">
                   <Button
-                    onClick={() => start(mode, difficulty, playerCount)}
+                    onClick={() => {
+                      if (onlineMode) {
+                        online.leave.mutate();
+                        setOnlineMode(false);
+                        onlineRef.current = false;
+                        setScreen("start");
+                        setLobbyOpen(true);
+                        return;
+                      }
+                      start(mode, difficulty, playerCount);
+                    }}
                     variant="outline"
                     className="border-2 border-arcade-highlight bg-arcade-panel font-display text-[9px] text-arcade-highlight"
                   >
