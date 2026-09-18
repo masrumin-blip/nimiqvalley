@@ -181,89 +181,83 @@ function VillagePage() {
       </div>
 
 
-      {/* Status HUD — always on top, same in demo and real mode */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 p-2">
-        <div className="pointer-events-auto mx-auto w-full max-w-md rounded-2xl border border-border/60 bg-card/90 px-3 py-2 shadow-lg backdrop-blur">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-muted/50 px-2.5 py-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* Status panel — original layout, moved to the top-left and scaled to 60% */}
+      <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.6] p-3">
+        <div className="pointer-events-auto w-[430px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Villager
               </p>
-              <p className="truncate text-sm font-bold text-card-foreground">
-                {charTier.characterName}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="text-sm font-semibold text-card-foreground">{charTier.characterName}</p>
+              <p className="text-xs text-muted-foreground">
                 {demo
                   ? `Demo · ${formatUsd(nimUsd)}`
                   : nimAddress
                     ? `${formatNim(nim)} · ${formatUsd(nimUsd)}`
-                    : "Wallet not connected"}
+                    : "Loading balance…"}
               </p>
             </div>
-            <div className="rounded-xl bg-muted/50 px-2.5 py-1.5 text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Home
               </p>
-              <p className="truncate text-sm font-bold text-card-foreground">
-                {houseTier.houseName}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="text-sm font-semibold text-card-foreground">{houseTier.houseName}</p>
+              <p className="text-xs text-muted-foreground">
                 {demo || evmAddress ? `${formatUsd(usdtValue)} USDT` : "Polygon not connected"}
               </p>
             </div>
           </div>
-
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Villager level
-              </p>
-              <div className="mt-1 flex gap-1">
-                {TIERS.map((t, i) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    disabled={!demo}
-                    onClick={() => setDemoTier(i)}
-                    title={t.characterName}
-                    aria-label={`Villager level ${t.characterName}`}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      i <= charIndex ? "bg-primary" : "bg-border"
-                    } ${demo ? "cursor-pointer" : "cursor-default"}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-right text-[10px] uppercase tracking-wide text-muted-foreground">
-                Home level
-              </p>
-              <div className="mt-1 flex gap-1">
-                {TIERS.map((t, i) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    disabled={!demo}
-                    onClick={() => setDemoHouseTier(i)}
-                    title={t.houseName}
-                    aria-label={`Home level ${t.houseName}`}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      i <= houseIndex ? "bg-primary" : "bg-border"
-                    } ${demo ? "cursor-pointer" : "cursor-default"}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
           {demo && (
-            <Button
-              onClick={() => setDemo(false)}
-              className="mt-2 h-8 w-full rounded-lg border border-input bg-background text-[11px] font-semibold text-foreground"
-            >
-              Leave demo mode
-            </Button>
+            <div className="mt-3 space-y-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Demo villager level
+                </p>
+                <div className="mt-1 flex gap-1">
+                  {TIERS.map((t, i) => (
+                    <Button
+                      key={t.id}
+                      onClick={() => setDemoTier(i)}
+                      className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
+                        i === demoTier
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-input bg-background text-foreground"
+                      }`}
+                    >
+                      {t.characterName.split(" ")[0]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Demo home level
+                </p>
+                <div className="mt-1 flex gap-1">
+                  {TIERS.map((t, i) => (
+                    <Button
+                      key={t.id}
+                      onClick={() => setDemoHouseTier(i)}
+                      className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
+                        i === demoHouseTier
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-input bg-background text-foreground"
+                      }`}
+                    >
+                      {t.houseName.split(" ")[0]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
+          <Button
+            onClick={() => setDemo((v) => !v)}
+            className="mt-2 min-h-9 w-full rounded-lg border border-input bg-background text-[11px] font-semibold text-foreground"
+          >
+            {demo ? "Leave demo mode" : "Try demo mode"}
+          </Button>
           {status && <p className="mt-2 text-xs text-card-foreground/80">{status}</p>}
         </div>
       </div>
