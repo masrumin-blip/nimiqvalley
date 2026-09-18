@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   BomberGame as Engine,
   H,
@@ -10,6 +11,12 @@ import {
 } from "./engine";
 import { playSound, primeAudio, type SoundName } from "./sound";
 import { Button } from "@/components/ui/button";
+import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
+import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
+import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { TICK_POLL_MS } from "@/lib/mp/types";
+
+const BOMBER_ROUND_MS = 180_000;
 
 type Screen = "start" | "playing";
 
@@ -86,6 +93,35 @@ export default function BomberGame() {
   const [soundOn, setSoundOn] = useState(true);
   const [best, setBest] = useState(0);
 
+  /* ---------------- online battle ---------------- */
+  const navigate = useNavigate();
+  const [onlineMode, setOnlineMode] = useState(false);
+  const [lobbyOpen, setLobbyOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const seedRef = useRef(Math.floor(Math.random() * 1_000_000_000));
+  const seatRef = useRef(0);
+  const onlineRef = useRef(false);
+  const settings = useMemo(
+    () => ({ seed: seedRef.current, freeTurn: true }),
+    [],
+  );
+  const online = useOnlineRoom({
+    gameSlug: "bomber",
+    active: lobbyOpen || onlineMode,
+    maxPlayers: 4,
+    withTicks: true,
+    settings,
+  });
+  const room = online.room;
+  const seats = useMemo(
+    () => [...(room?.players ?? [])].sort((a, b) => a.seat - b.seat),
+    [room?.players],
+  );
+  const mySeat = Math.max(
+    0,
+    seats.findIndex((p) => p.wallet === online.wallet),
+  );
+
   useEffect(() => {
     try {
       const saved = Number(localStorage.getItem("nimiq-bomber-best") ?? 0);
@@ -111,13 +147,20 @@ export default function BomberGame() {
   }, []);
 
   const start = useCallback(
-    (nextMode: Mode, diff: Difficulty, players: number) => {
+    (
+      nextMode: Mode,
+      diff: Difficulty,
+      players: number,
+      net?: { seed: number; localId: number; names: string[] },
+    ) => {
       primeAudio();
       setMode(nextMode);
       setDifficulty(diff);
       setPlayerCount(players);
       keysRef.current.clear();
       touchRef.current = { x: 0, y: 0 };
+      onlineRef.current = Boolean(net);
+      seatRef.current = net?.localId ?? 0;
       engineRef.current = new Engine({
         mode: nextMode,
         difficulty: diff,
@@ -125,6 +168,9 @@ export default function BomberGame() {
         best: bestRef.current,
         onHud,
         sound,
+        ...(net
+          ? { online: true, seed: net.seed, localId: net.localId, names: net.names }
+          : {}),
       });
       setPaused(false);
       setConfirmExit(false);
@@ -133,7 +179,154 @@ export default function BomberGame() {
     [onHud, sound],
   );
 
-  const humanCount = mode === "multi" ? playerCount : 1;
+  const humanCount = onlineMode ? 1 : mode === "multi" ? playerCount : 1;
+  /** Seat this client drives (always 0 offline). */
+  const seatOf = (i: number) => (onlineRef.current ? seatRef.current : i);
+
+  const dropBomb = useCallback(
+    (seat: number) => {
+      const eng = engineRef.current;
+      if (!eng) return;
+      const b = eng.bombers[seat];
+      if (!b || !b.alive) return;
+      const before = eng.bombs.length;
+      eng.placeBomb(seat);
+      if (!onlineRef.current || eng.bombs.length === before) return;
+      const bomb = eng.bombs[eng.bombs.length - 1]!;
+      online.sendEvent("bomb", {
+        seat,
+        cx: bomb.cx,
+        cy: bomb.cy,
+        range: bomb.range,
+        remote: bomb.remote,
+      });
+    },
+    [online],
+  );
+
+  const triggerDetonate = useCallback(
+    (seat: number) => {
+      engineRef.current?.detonate(seat);
+      if (onlineRef.current) online.sendEvent("det", { seat });
+    },
+    [online],
+  );
+
+  // Every client builds the same map from the room seed once the host starts.
+  useEffect(() => {
+    if (room?.status !== "playing" || onlineMode) return;
+    const seed = Number(room.settings["seed"] ?? 1);
+    const players = Math.max(2, Math.min(4, seats.length));
+    setOnlineMode(true);
+    setLobbyOpen(false);
+    setResultOpen(false);
+    reportedRef.current = false;
+    movesRef.current = 0;
+    start("multi", difficulty, players, {
+      seed,
+      localId: mySeat,
+      names: seats.map((p) => p.name.slice(0, 8)),
+    });
+  }, [room?.status, room?.settings, onlineMode, seats, mySeat, difficulty, start]);
+
+  // Stream my bomber; rivals never block each other.
+  useEffect(() => {
+    if (!onlineMode || room?.status !== "playing") return;
+    const id = window.setInterval(() => {
+      const eng = engineRef.current;
+      const b = eng?.bombers[seatRef.current];
+      if (!eng || !b) return;
+      online.sendTick({
+        x: Number(b.x.toFixed(1)),
+        y: Number(b.y.toFixed(1)),
+        dir: b.facing,
+        score: Math.max(0, Math.round(b.score)),
+        alive: b.alive,
+      });
+    }, TICK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [onlineMode, room?.status, online]);
+
+  // Apply rival positions.
+  useEffect(() => {
+    if (!onlineMode) return;
+    const eng = engineRef.current;
+    if (!eng) return;
+    for (const t of online.ticks) {
+      if (t.wallet === online.wallet) continue;
+      const seat = seats.findIndex((p) => p.wallet === t.wallet);
+      if (seat < 0) continue;
+      eng.setRemoteState(seat, t.x, t.y, t.dir, t.alive, t.score);
+    }
+  }, [onlineMode, online.ticks, online.wallet, seats]);
+
+  // Apply rival bombs and detonations.
+  const movesRef = useRef(0);
+  useEffect(() => {
+    if (!onlineMode) return;
+    const eng = engineRef.current;
+    if (!eng) return;
+    for (let i = movesRef.current; i < online.moves.length; i++) {
+      const mv = online.moves[i]!;
+      if (mv.wallet === online.wallet) continue;
+      const seat = Number(mv.payload["seat"] ?? -1);
+      if (seat < 0) continue;
+      if (mv.kind === "bomb") {
+        eng.remoteBomb(
+          seat,
+          Number(mv.payload["cx"] ?? 0),
+          Number(mv.payload["cy"] ?? 0),
+          Number(mv.payload["range"] ?? 1),
+          Boolean(mv.payload["remote"]),
+        );
+      } else if (mv.kind === "det") {
+        eng.remoteDetonate(seat);
+      }
+    }
+    movesRef.current = online.moves.length;
+  }, [onlineMode, online.moves, online.wallet]);
+
+  // Close the round when one bomber is left (or the 3 minute timer runs out).
+  const reportedRef = useRef(false);
+  useEffect(() => {
+    if (!onlineMode || room?.status !== "playing") return;
+    const mine = hud.bombers[mySeat];
+    if (mine && !mine.alive && !reportedRef.current) {
+      reportedRef.current = true;
+      online.reportStats(mine.score, { kills: 0 });
+    }
+    const alive = hud.bombers.filter((b) => b.alive);
+    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    if (hud.bombers.length > 0 && (alive.length <= 1 || timeUp)) {
+      const best = [...seats].sort((a, b) => b.score - a.score)[0];
+      const winner =
+        alive.length === 1
+          ? (seats[alive[0]!.id]?.wallet ?? null)
+          : (best?.wallet ?? null);
+      online.finish(winner);
+    }
+  }, [onlineMode, room, hud.bombers, mySeat, seats, online]);
+
+  useEffect(() => {
+    if (onlineMode && room?.status === "finished") setResultOpen(true);
+  }, [onlineMode, room?.status]);
+
+  const winnerName =
+    room?.winnerWallet === online.wallet
+      ? "You"
+      : (seats.find((p) => p.wallet === room?.winnerWallet)?.name ?? "Nobody");
+
+  const resultRows: ResultRow[] = [...seats]
+    .sort((a, b) => b.score - a.score)
+    .map((p) => ({
+      wallet: p.wallet,
+      name: p.name,
+      isYou: p.wallet === online.wallet,
+      stats: [
+        { label: "Score", value: String(p.score) },
+        { label: "Status", value: p.wallet === room?.winnerWallet ? "last standing" : "out" },
+      ],
+    }));
 
   // Game loop
   useEffect(() => {
@@ -162,7 +355,7 @@ export default function BomberGame() {
             if (dx === 0) dx = touchRef.current.x;
             if (dy === 0) dy = touchRef.current.y;
           }
-          eng.setInput(i, dx, dy);
+          eng.setInput(seatOf(i), dx, dy);
         }
         eng.update(dt);
         eng.draw(ctx);
@@ -196,11 +389,11 @@ export default function BomberGame() {
       for (let i = 0; i < humanCount; i++) {
         const m = KEYMAPS[i]!;
         if (k === m.bomb) {
-          engineRef.current?.placeBomb(i);
+          dropBomb(seatOf(i));
           return;
         }
         if (k === m.detonate) {
-          engineRef.current?.detonate(i);
+          triggerDetonate(seatOf(i));
           return;
         }
       }
@@ -234,7 +427,7 @@ export default function BomberGame() {
   };
 
   const over = hud.status !== "playing";
-  const me = hud.bombers[0];
+  const me = hud.bombers[onlineMode ? mySeat : 0];
 
   const resultTitle =
     hud.status === "won"
@@ -248,7 +441,7 @@ export default function BomberGame() {
           : "GAME OVER";
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col items-center gap-1">
       {screen === "playing" && (
         <div className="flex w-full max-w-[480px] shrink-0 items-center gap-1">
           <Hud hud={hud} best={best} mode={mode} difficulty={difficulty} />
@@ -286,7 +479,8 @@ export default function BomberGame() {
           setDifficulty={setDifficulty}
           playerCount={playerCount}
           setPlayerCount={setPlayerCount}
-          onStart={start}
+          onStart={(m, d, n) => start(m, d, n)}
+          onOnline={() => setLobbyOpen(true)}
         />
       )}
 
@@ -314,6 +508,11 @@ export default function BomberGame() {
                     onClick={() => {
                       setConfirmExit(false);
                       setPaused(false);
+                      if (onlineMode) {
+                        online.leave.mutate();
+                        setOnlineMode(false);
+                        onlineRef.current = false;
+                      }
                       setScreen("start");
                     }}
                     variant="outline"
@@ -350,7 +549,17 @@ export default function BomberGame() {
                 </span>
                 <div className="flex gap-2">
                   <Button
-                    onClick={() => start(mode, difficulty, playerCount)}
+                    onClick={() => {
+                      if (onlineMode) {
+                        online.leave.mutate();
+                        setOnlineMode(false);
+                        onlineRef.current = false;
+                        setScreen("start");
+                        setLobbyOpen(true);
+                        return;
+                      }
+                      start(mode, difficulty, playerCount);
+                    }}
                     variant="outline"
                     className="border-2 border-arcade-highlight bg-arcade-panel font-display text-[9px] text-arcade-highlight"
                   >
@@ -385,6 +594,47 @@ export default function BomberGame() {
         </div>
       )}
 
+      {lobbyOpen && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-background/95 p-4 backdrop-blur-sm">
+          <h2 className="font-display text-lg uppercase tracking-[0.2em] text-arcade-highlight">
+            Online battle
+          </h2>
+          <p className="max-w-[90%] text-center text-[10px] text-muted-foreground">
+            Up to 4 bombers, one life each, three minute round. Players pass
+            through each other — only the flames hurt. Last bomber standing
+            wins.
+          </p>
+          <div className="w-full max-w-xs">
+            <OnlinePanel
+              online={online}
+              maxPlayers={4}
+              manualStart
+              roundMs={BOMBER_ROUND_MS}
+              onBack={() => setLobbyOpen(false)}
+            />
+          </div>
+          <Button variant="ghost" className="text-xs" onClick={() => setLobbyOpen(false)}>
+            Back
+          </Button>
+        </div>
+      )}
+
+      <MatchResultDialog
+        open={resultOpen}
+        title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
+        subtitle="Battle results"
+        rows={resultRows}
+        onPlayAgain={() => {
+          online.leave.mutate();
+          setOnlineMode(false);
+          onlineRef.current = false;
+          setResultOpen(false);
+          setScreen("start");
+          setLobbyOpen(true);
+        }}
+        onExit={() => navigate({ to: "/games" })}
+      />
+
       {screen === "playing" && !over && !paused && (
         <div className="flex h-[150px] w-full max-w-[480px] shrink-0 select-none items-center justify-between px-2 md:hidden">
           <div className="grid grid-cols-3 grid-rows-3 gap-1 opacity-90">
@@ -402,12 +652,12 @@ export default function BomberGame() {
             {me?.remote && (
               <ActionButton
                 label="X"
-                onPress={() => engineRef.current?.detonate(0)}
+                onPress={() => triggerDetonate(seatOf(0))}
               />
             )}
             <ActionButton
               label="BOMB"
-              onPress={() => engineRef.current?.placeBomb(0)}
+              onPress={() => dropBomb(seatOf(0))}
               primary
             />
           </div>
@@ -423,12 +673,14 @@ function StartMenu({
   playerCount,
   setPlayerCount,
   onStart,
+  onOnline,
 }: {
   difficulty: Difficulty;
   setDifficulty: (d: Difficulty) => void;
   playerCount: number;
   setPlayerCount: (n: number) => void;
   onStart: (mode: Mode, diff: Difficulty, players: number) => void;
+  onOnline: () => void;
 }) {
   return (
     <div className="flex w-full max-w-[480px] flex-col items-center gap-3 overflow-y-auto border-2 border-arcade-frame bg-arcade-panel px-3 py-3 shadow-arcade">
@@ -520,6 +772,17 @@ function StartMenu({
           </Button>
           <p className="text-center text-[8px] leading-relaxed text-arcade-muted">
             {KEY_HINT.slice(0, playerCount).join(" · ")}
+          </p>
+
+          <Button
+            onClick={onOnline}
+            variant="outline"
+            className="mt-2 w-full border-2 border-arcade-highlight bg-arcade-panel py-5 font-display text-xs text-arcade-highlight transition-transform active:scale-95"
+          >
+            ONLINE BATTLE
+          </Button>
+          <p className="text-center text-[8px] leading-relaxed text-arcade-muted">
+            2-4 real players · last bomber standing wins
           </p>
         </div>
       </div>

@@ -169,6 +169,14 @@ export interface GameOptions {
   best: number;
   onHud: (h: HudState) => void;
   sound: Sound;
+  /** Online rooms build the same map on every client from a shared seed. */
+  seed?: number;
+  /** Seat this client controls (0 offline). */
+  localId?: number;
+  /** Online match: remote seats are driven by ticks, not by local physics. */
+  online?: boolean;
+  /** Display names per seat in online matches. */
+  names?: string[];
 }
 
 export class BomberGame {
@@ -188,10 +196,15 @@ export class BomberGame {
   winner: string | null = null;
   paused = false;
 
+  online = false;
+  localId = 0;
+
   private time = 0;
   private onHud: (h: HudState) => void;
   private sound: Sound;
   private hidden = new Map<string, PowerType>();
+  private rnd: () => number = Math.random;
+  private seatNames: string[] | null = null;
 
   constructor(opts: GameOptions) {
     this.mode = opts.mode;
@@ -200,12 +213,16 @@ export class BomberGame {
     this.best = opts.best;
     this.onHud = opts.onHud;
     this.sound = opts.sound;
+    this.online = opts.online === true;
+    this.localId = opts.localId ?? 0;
+    this.seatNames = opts.names ?? null;
+    if (opts.seed !== undefined) this.rnd = mulberry32(opts.seed);
     this.buildLevel();
     this.pushHud();
   }
 
   get me() {
-    return this.bombers[0]!;
+    return this.bombers[this.localId] ?? this.bombers[0]!;
   }
 
   private bomberCount() {
@@ -243,7 +260,7 @@ export class BomberGame {
       for (let x = 1; x < COLS - 1; x++) {
         if (this.grid[y]![x] !== 0) continue;
         if (safe.has(`${x},${y}`)) continue;
-        if (Math.random() < blockRatio) this.grid[y]![x] = 2;
+        if (this.rnd() < blockRatio) this.grid[y]![x] = 2;
       }
     }
 
@@ -251,7 +268,7 @@ export class BomberGame {
     for (let y = 1; y < ROWS - 1; y++)
       for (let x = 1; x < COLS - 1; x++)
         if (this.grid[y]![x] === 2) soft.push([x, y]);
-    shuffle(soft);
+    shuffle(soft, this.rnd);
     const pool: PowerType[] = [
       "fire",
       "fire",
@@ -267,7 +284,7 @@ export class BomberGame {
       "remote",
       "vest",
     ];
-    shuffle(pool);
+    shuffle(pool, this.rnd);
     this.hidden = new Map();
     pool.slice(0, Math.min(pool.length, soft.length)).forEach((type, i) => {
       this.hidden.set(`${soft[i]![0]},${soft[i]![1]}`, type);
@@ -275,13 +292,13 @@ export class BomberGame {
 
     // Bombers
     this.bombers = [];
-    const names = this.mode === "cpu" ? CPU_NAMES : BOMBER_NAMES;
-    const humans = this.mode === "multi" ? this.players : 1;
+    const names = this.seatNames ?? (this.mode === "cpu" ? CPU_NAMES : BOMBER_NAMES);
+    const humans = this.online || this.mode === "multi" ? this.players : 1;
     for (let i = 0; i < count; i++) {
       const [cx, cy] = CORNERS[i]!;
       this.bombers.push({
         id: i,
-        name: names[i]!,
+        name: names[i] ?? BOMBER_NAMES[i] ?? `P${i + 1}`,
         skin: BOMBER_SKINS[i]!,
         cpu: i >= humans,
         x: cx * TILE + TILE / 2,
@@ -314,7 +331,7 @@ export class BomberGame {
       for (let y = 1; y < ROWS - 1; y++)
         for (let x = 1; x < COLS - 1; x++)
           if (this.grid[y]![x] === 0 && x + y > 6) spots.push([x, y]);
-      shuffle(spots);
+      shuffle(spots, this.rnd);
       for (let i = 0; i < cfg.enemies && i < spots.length; i++) {
         const [x, y] = spots[i]!;
         this.enemies.push({
@@ -455,6 +472,45 @@ export class BomberGame {
     if (bomb) bomb.timer = 0;
   }
 
+  /** Online: apply a remote seat's streamed position/state. */
+  setRemoteState(id: number, x: number, y: number, facing: number, alive: boolean, score: number) {
+    const b = this.bombers[id];
+    if (!b || id === this.localId) return;
+    b.x = x;
+    b.y = y;
+    b.facing = facing;
+    b.score = score;
+    if (!alive && b.alive) {
+      b.alive = false;
+      b.lives = 0;
+    }
+  }
+
+  /** Online: a remote player dropped a bomb. */
+  remoteBomb(id: number, cx: number, cy: number, range: number, remote: boolean) {
+    if (id === this.localId) return;
+    if (this.bombs.some((x) => x.cx === cx && x.cy === cy)) return;
+    this.bombs.push({
+      cx,
+      cy,
+      timer: FUSE,
+      range,
+      remote,
+      owner: id,
+      slide: null,
+      px: cx * TILE + TILE / 2,
+      py: cy * TILE + TILE / 2,
+    });
+    this.sound("place");
+  }
+
+  /** Online: a remote player triggered their detonator. */
+  remoteDetonate(id: number) {
+    if (id === this.localId) return;
+    const bomb = this.bombs.find((x) => x.owner === id && x.remote);
+    if (bomb) bomb.timer = 0;
+  }
+
   update(dtRaw: number) {
     if (this.paused || this.status !== "playing") return;
     const dt = Math.min(dtRaw, 0.05);
@@ -464,6 +520,8 @@ export class BomberGame {
     for (const b of this.bombers) {
       if (!b.alive) continue;
       if (b.invuln > 0) b.invuln -= dt;
+      // Online: remote seats are positioned by their own client's ticks.
+      if (this.online && b.id !== this.localId) continue;
       if (b.cpu) this.thinkCpu(b, dt);
       this.moveBomber(b, dt);
     }
@@ -930,6 +988,8 @@ export class BomberGame {
 
     for (const b of this.bombers) {
       if (!b.alive || b.invuln > 0) continue;
+      // Online: each client is the authority for its own bomber only.
+      if (this.online && b.id !== this.localId) continue;
       const cx = Math.floor(b.x / TILE);
       const cy = Math.floor(b.y / TILE);
       if (this.flames.some((f) => f.cx === cx && f.cy === cy)) this.hurt(b);
@@ -952,7 +1012,13 @@ export class BomberGame {
     if (alive.length === 1) {
       const last = alive[0]!;
       this.winner = last.name;
-      this.status = this.mode === "cpu" && last.cpu ? "lost" : "won";
+      this.status = this.online
+        ? last.id === this.localId
+          ? "won"
+          : "lost"
+        : this.mode === "cpu" && last.cpu
+          ? "lost"
+          : "won";
       last.score += 500;
       this.sound(this.status === "won" ? "win" : "hurt");
       this.saveBest();
@@ -1370,9 +1436,19 @@ function itemColor(t: PowerType) {
   }
 }
 
-function shuffle<T>(arr: T[]) {
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle<T>(arr: T[], rnd: () => number = Math.random) {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rnd() * (i + 1));
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
 }

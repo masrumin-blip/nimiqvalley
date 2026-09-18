@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { LobbyState, MoveRecord, PlayerTick, QueueState, RoomState } from "./mp/types";
 
 const idSchema = z.string().uuid();
-const slugSchema = z.enum(["checkers", "carrom", "hexaman"]);
+const slugSchema = z.enum(["checkers", "carrom", "hexaman", "bomber"]);
 const settingsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({});
 const payloadSchema = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
@@ -231,6 +231,23 @@ export const pushTick = createServerFn({ method: "POST" })
     const cloud = await import("./mp/cloud.server");
     const { id, ...tick } = data;
     return cloud.pushTick(wallet, id, tick);
+  });
+
+/** Turn-free event channel used by real-time games such as bomber. */
+export const pushEvent = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: idSchema,
+        kind: z.string().trim().min(1).max(16),
+        payload: payloadSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const cloud = await import("./mp/cloud.server");
+    return cloud.pushEvent(wallet, data.id, data.kind, data.payload);
   });
 
 export const saveStats = createServerFn({ method: "POST" })

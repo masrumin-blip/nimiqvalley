@@ -13,6 +13,7 @@ import {
   leaveQueue,
   leaveRoom,
   pollQueue,
+  pushEvent,
   pushTick,
   respondChallenge,
   saveStats,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/mp/types";
 import { usePlayer } from "@/hooks/usePlayer";
 
-export type GameSlug = "checkers" | "carrom" | "hexaman";
+export type GameSlug = "checkers" | "carrom" | "hexaman" | "bomber";
 
 interface Options {
   gameSlug: GameSlug;
@@ -67,6 +68,7 @@ export function useOnlineRoom({
   const moveFn = useServerFn(submitMove);
   const skipFn = useServerFn(skipTurn);
   const tickFn = useServerFn(pushTick);
+  const eventFn = useServerFn(pushEvent);
   const statsFn = useServerFn(saveStats);
   const finishFn = useServerFn(finishRoom);
   const leaveFn = useServerFn(leaveRoom);
@@ -207,6 +209,15 @@ export function useOnlineRoom({
     [moveFn, roomId],
   );
 
+  /** Fire-and-forget action event (bomb dropped, detonation) with no turn order. */
+  const sendEvent = useCallback(
+    (kind: string, payload: Record<string, number | string | boolean | null>) => {
+      if (!roomId) return;
+      void eventFn({ data: { id: roomId, kind, payload } }).catch(() => {});
+    },
+    [eventFn, roomId],
+  );
+
   const requestSkip = useCallback(
     (turnNo: number) => {
       if (!roomId) return;
@@ -261,6 +272,7 @@ export function useOnlineRoom({
     start,
     leave,
     sendMove,
+    sendEvent,
     requestSkip,
     sendTick,
     reportStats,
