@@ -722,7 +722,31 @@ export function HexamanGame() {
         ctx.restore();
       }
 
+      // rival runners (online only) — drawn as ghosts of other players.
+      // They never collide with anyone; only the viruses are dangerous.
+      for (const rival of rivalsRef.current) {
+        if (!rival.alive) continue;
+        const rx = rival.x * CELL + CELL / 2;
+        const ry = rival.y * CELL + CELL / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.65;
+        ctx.shadowColor = PALETTE.frightenedFlash;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = PALETTE.frightenedFlash;
+        ctx.beginPath();
+        hexagon(rx, ry, CELL * 0.4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = PALETTE.bg;
+        ctx.textAlign = "center";
+        ctx.font = "bold 10px ui-monospace, monospace";
+        ctx.fillText(rival.name.slice(0, 2).toUpperCase(), rx, ry + 3.5);
+        ctx.restore();
+      }
+
       // orange hexagon player with a wedge mouth and a directional eye
+
       const dying = g.status === "dying";
       const px = g.player.c * CELL + CELL / 2;
       const py = g.player.r * CELL + CELL / 2;
