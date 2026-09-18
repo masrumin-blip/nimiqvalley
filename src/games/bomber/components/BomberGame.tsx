@@ -179,7 +179,9 @@ export default function BomberGame() {
     [onHud, sound],
   );
 
-  const humanCount = mode === "multi" ? playerCount : 1;
+  const humanCount = onlineMode ? 1 : mode === "multi" ? playerCount : 1;
+  /** Seat this client drives (always 0 offline). */
+  const seatOf = (i: number) => (onlineRef.current ? seatRef.current : i);
 
   // Game loop
   useEffect(() => {
@@ -208,7 +210,7 @@ export default function BomberGame() {
             if (dx === 0) dx = touchRef.current.x;
             if (dy === 0) dy = touchRef.current.y;
           }
-          eng.setInput(i, dx, dy);
+          eng.setInput(seatOf(i), dx, dy);
         }
         eng.update(dt);
         eng.draw(ctx);
@@ -242,11 +244,11 @@ export default function BomberGame() {
       for (let i = 0; i < humanCount; i++) {
         const m = KEYMAPS[i]!;
         if (k === m.bomb) {
-          engineRef.current?.placeBomb(i);
+          dropBomb(seatOf(i));
           return;
         }
         if (k === m.detonate) {
-          engineRef.current?.detonate(i);
+          triggerDetonate(seatOf(i));
           return;
         }
       }
@@ -280,7 +282,7 @@ export default function BomberGame() {
   };
 
   const over = hud.status !== "playing";
-  const me = hud.bombers[0];
+  const me = hud.bombers[onlineMode ? mySeat : 0];
 
   const resultTitle =
     hud.status === "won"
@@ -448,12 +450,12 @@ export default function BomberGame() {
             {me?.remote && (
               <ActionButton
                 label="X"
-                onPress={() => engineRef.current?.detonate(0)}
+                onPress={() => triggerDetonate(seatOf(0))}
               />
             )}
             <ActionButton
               label="BOMB"
-              onPress={() => engineRef.current?.placeBomb(0)}
+              onPress={() => dropBomb(seatOf(0))}
               primary
             />
           </div>
