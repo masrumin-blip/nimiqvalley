@@ -64,9 +64,15 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
         throw new Error("The signing key does not belong to this wallet.");
       }
-      const prefixed = new TextEncoder().encode(`\u0016Nimiq Signed Message:\n${message.length}${message}`);
-      const plain = new TextEncoder().encode(message);
-      if (!publicKey.verify(signature, prefixed) && !publicKey.verify(signature, plain)) {
+      const encoder = new TextEncoder();
+      const hubPrefixed = encoder.encode(`\u0016Nimiq Signed Message:\n${message}`);
+      const legacyPrefixed = encoder.encode(`\u0016Nimiq Signed Message:\n${message.length}${message}`);
+      const plain = encoder.encode(message);
+      if (
+        !publicKey.verify(signature, hubPrefixed) &&
+        !publicKey.verify(signature, legacyPrefixed) &&
+        !publicKey.verify(signature, plain)
+      ) {
         throw new Error("The wallet signature is invalid.");
       }
     } catch (error) {
