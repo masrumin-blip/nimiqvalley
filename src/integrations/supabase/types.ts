@@ -137,6 +137,27 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_claims: {
+        Row: {
+          claim_date: string
+          created_at: string
+          id: string
+          wallet: string
+        }
+        Insert: {
+          claim_date: string
+          created_at?: string
+          id?: string
+          wallet: string
+        }
+        Update: {
+          claim_date?: string
+          created_at?: string
+          id?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       mp_moves: {
         Row: {
           created_at: string
@@ -174,6 +195,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mp_queue: {
+        Row: {
+          game_slug: string
+          heartbeat_at: string
+          id: string
+          joined_at: string
+          max_players: number
+          rank_hint: number
+          room_id: string | null
+          settings: Json
+          wallet: string
+        }
+        Insert: {
+          game_slug: string
+          heartbeat_at?: string
+          id?: string
+          joined_at?: string
+          max_players?: number
+          rank_hint?: number
+          room_id?: string | null
+          settings?: Json
+          wallet: string
+        }
+        Update: {
+          game_slug?: string
+          heartbeat_at?: string
+          id?: string
+          joined_at?: string
+          max_players?: number
+          rank_hint?: number
+          room_id?: string | null
+          settings?: Json
+          wallet?: string
+        }
+        Relationships: []
       }
       mp_room_players: {
         Row: {
@@ -316,6 +373,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      nim_payments: {
+        Row: {
+          chat_credits: number
+          created_at: string
+          id: string
+          kind: string
+          nim: number
+          room_credits: number
+          tx_hash: string
+          wallet: string
+        }
+        Insert: {
+          chat_credits?: number
+          created_at?: string
+          id?: string
+          kind: string
+          nim: number
+          room_credits?: number
+          tx_hash: string
+          wallet: string
+        }
+        Update: {
+          chat_credits?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          nim?: number
+          room_credits?: number
+          tx_hash?: string
+          wallet?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -461,6 +551,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      wallet_credits: {
+        Row: {
+          chat_credits: number
+          free_chats_date: string | null
+          free_chats_used: number
+          room_credits: number
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          chat_credits?: number
+          free_chats_date?: string | null
+          free_chats_used?: number
+          room_credits?: number
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          chat_credits?: number
+          free_chats_date?: string | null
+          free_chats_used?: number
+          room_credits?: number
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
       }
     }
     Views: {
