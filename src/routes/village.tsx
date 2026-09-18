@@ -183,7 +183,7 @@ function VillagePage() {
       {/* Status panel — original layout, moved to the top-left and scaled to 60% */}
       <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.6] p-3">
         <div className="pointer-events-auto w-[430px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Villager
@@ -204,6 +204,19 @@ function VillagePage() {
               <p className="text-sm font-semibold text-card-foreground">{houseTier.houseName}</p>
               <p className="text-xs text-muted-foreground">
                 {demo || evmAddress ? `${formatUsd(usdtValue)} USDT` : "Polygon not connected"}
+              </p>
+            </div>
+
+            {/* Real token balances */}
+            <div className="rounded-xl border border-orange-400/70 bg-orange-50/90 px-2.5 py-1.5 text-right shadow-sm dark:bg-orange-950/40 dark:border-orange-500/50">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+                Wallet
+              </p>
+              <p className="text-xs font-bold text-foreground">
+                {demo ? "Demo" : nimAddress ? `${nim.toLocaleString()} NIM` : "— NIM"}
+              </p>
+              <p className="text-xs font-bold text-foreground">
+                {demo ? "Demo" : evmAddress ? `${usdtValue.toLocaleString()} USDT` : "— USDT"}
               </p>
             </div>
           </div>
