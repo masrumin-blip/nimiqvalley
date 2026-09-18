@@ -13,6 +13,7 @@ import {
   type Player,
   type Profile,
 } from "./types";
+import { moderateMessage } from "./moderation.server";
 
 const PRESENCE_TTL_MS = 60_000;
 
@@ -54,6 +55,7 @@ export async function listMessages(): Promise<ChatMessage[]> {
 }
 
 export async function appendMessage(wallet: string, text: string) {
+  await moderateMessage(wallet, text);
   const { error } = await supabaseAdmin.from("chat_messages").insert({ wallet, text });
   if (error) throw new Error("Could not send the message");
   return { ok: true };
@@ -201,6 +203,7 @@ export async function listDm(a: string, b: string): Promise<DirectMessage[]> {
 }
 
 export async function appendDm(from: string, to: string, text: string) {
+  await moderateMessage(from, text);
   const { error } = await supabaseAdmin.from("chat_dms").insert({
     pair_key: dmKey(from, to),
     from_wallet: from,
