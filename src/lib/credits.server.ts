@@ -70,6 +70,7 @@ export async function getCredits(wallet: string): Promise<CreditState> {
     wallet,
     chatCredits: row.chat_credits,
     roomCredits: row.room_credits,
+    matchKeys: row.match_keys ?? 0,
     freeChatsLeft: freeLeft(row),
     claimedToday: await claimedToday(wallet),
   };
@@ -108,11 +109,29 @@ export async function spendRoom(wallet: string): Promise<void> {
   await save(wallet, { room_credits: row.room_credits - 1 });
 }
 
-async function grant(wallet: string, chats: number, rooms: number) {
+/** Spends one match key. Every online match entry needs one. */
+export async function spendKey(wallet: string): Promise<void> {
+  const row = await loadRow(wallet);
+  if ((row.match_keys ?? 0) <= 0) {
+    throw new Error(
+      `You need a match key to play online. Claim the daily reward or buy one for ${KEY_COST_NIM} NIM.`,
+    );
+  }
+  await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
+}
+
+/** Gives a match key back, e.g. when a matchmaking search is cancelled. */
+export async function refundKey(wallet: string): Promise<void> {
+  const row = await loadRow(wallet);
+  await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
+}
+
+async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
   const row = await loadRow(wallet);
   await save(wallet, {
     chat_credits: row.chat_credits + chats,
     room_credits: row.room_credits + rooms,
+    match_keys: (row.match_keys ?? 0) + keys,
   });
 }
 
