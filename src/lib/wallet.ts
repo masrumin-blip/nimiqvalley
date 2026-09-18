@@ -9,6 +9,22 @@ export interface EthereumProvider {
   isNimiqPay?: boolean;
 }
 
+type WalletError = { error: { type: string; message: string } };
+export type LoginSignature = { publicKey: string; signature: string };
+
+function isWalletError(value: unknown): value is WalletError {
+  return Boolean(value && typeof value === "object" && "error" in value);
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function transactionHash(serialized: string): Promise<string> {
+  const { Transaction } = await import("@nimiq/core");
+  return Transaction.fromAny(serialized).hash();
+}
+
 export function getEthereum(): EthereumProvider | null {
   if (typeof window === "undefined") return null;
   return (window as unknown as { ethereum?: EthereumProvider }).ethereum ?? null;
@@ -29,19 +45,13 @@ export async function connectNimiq(): Promise<string> {
   return accounts[0];
 }
 
-/** Ask the wallet to sign a login challenge. Returns the signature. */
-export async function signNimiqMessage(message: string): Promise<string> {
+/** Ask Nimiq Pay to sign a login challenge. */
+export async function signNimiqMessage(message: string): Promise<LoginSignature> {
   const { init } = await import("@nimiq/mini-app-sdk");
-  const nimiq = (await init({ timeout: 5000 })) as unknown as {
-    signMessage?: (args: { message: string }) => Promise<unknown>;
-  };
-  if (typeof nimiq.signMessage !== "function")
-    throw new Error("This wallet cannot sign messages.");
-  const result = await nimiq.signMessage({ message });
-  if (typeof result === "string") return result;
-  const sig = (result as { signature?: string })?.signature;
-  if (typeof sig !== "string") throw new Error("The wallet did not return a signature.");
-  return sig;
+  const nimiq = await init({ timeout: 5000 });
+  const result = await nimiq.sign(message);
+  if (isWalletError(result)) throw new Error(result.error.message);
+  return result;
 }
 
 /** Send NIM through the wallet approval dialog. Returns the transaction hash. */
@@ -53,8 +63,9 @@ export async function sendNim(recipient: string, nimAmount: number): Promise<str
     value: Math.round(nimAmount * 100_000),
     fee: 0,
   })) as unknown;
+  if (isWalletError(result)) throw new Error(result.error.message);
   if (typeof result !== "string") throw new Error("The wallet did not confirm the transaction.");
-  return result;
+  return transactionHash(result);
 }
 
 /* ------------------------------------------------------------------ */
@@ -73,7 +84,7 @@ async function hub() {
       appName: string;
       message: string;
       signer?: string;
-    }) => Promise<{ signer: string; signature: { toHex?: () => string } | string }>;
+    }) => Promise<{ signer: string; signerPublicKey: Uint8Array; signature: Uint8Array }>;
     checkout: (o: {
       appName: string;
       recipient: string;
@@ -81,12 +92,6 @@ async function hub() {
       extraData?: string;
     }) => Promise<{ hash: string }>;
   };
-}
-
-function toHex(signature: { toHex?: () => string } | string): string {
-  if (typeof signature === "string") return signature;
-  if (typeof signature?.toHex === "function") return signature.toHex();
-  return JSON.stringify(signature);
 }
 
 export type WalletKind = "pay" | "hub";
@@ -114,7 +119,10 @@ export async function signLoginMessage(
   if (kind === "pay") return signNimiqMessage(message);
   const api = await hub();
   const signed = await api.signMessage({ appName: APP_NAME, message, signer: address });
-  return toHex(signed.signature);
+  return {
+    publicKey: bytesToHex(signed.signerPublicKey),
+    signature: bytesToHex(signed.signature),
+  };
 }
 
 /** Pay NIM with either wallet. Returns the transaction hash. */
@@ -144,10 +152,9 @@ export async function payNim(
       typeof nimiq.sendBasicTransactionWithData === "function"
         ? await nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
         : await nimiq.sendBasicTransaction({ recipient, value, fee: 0 });
-    if (typeof result === "string") return result;
-    const hash = (result as { hash?: string })?.hash;
-    if (typeof hash !== "string") throw new Error("The wallet did not confirm the payment.");
-    return hash;
+    if (isWalletError(result)) throw new Error(result.error.message);
+    if (typeof result !== "string") throw new Error("The wallet did not confirm the payment.");
+    return transactionHash(result);
   }
   const api = await hub();
   const receipt = await api.checkout({
@@ -164,24 +171,33 @@ export async function payNim(
 export async function connectPolygon(): Promise<string> {
   const eth = getEthereum();
   if (!eth) throw new Error("No Ethereum wallet found in this browser.");
+  await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: POLYGON_CHAIN_ID }] });
+  const chainId = await eth.request({ method: "eth_chainId" });
+  if (chainId !== POLYGON_CHAIN_ID) throw new Error("Switch your EVM wallet to Polygon first.");
   const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
   const first = accounts?.[0];
   if (!first) throw new Error("No Ethereum address was shared.");
-  try {
-    await eth.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: POLYGON_CHAIN_ID }],
-    });
-  } catch {
-    // Some wallets stay on their current chain; balance reads below still target Polygon.
-  }
   return first;
+}
+
+/** Return an already-approved Polygon account without opening an approval dialog. */
+export async function getConnectedPolygonAccount(): Promise<string | null> {
+  const eth = getEthereum();
+  if (!eth) return null;
+  const [chainId, accounts] = await Promise.all([
+    eth.request({ method: "eth_chainId" }),
+    eth.request({ method: "eth_accounts" }),
+  ]);
+  if (chainId !== POLYGON_CHAIN_ID || !Array.isArray(accounts)) return null;
+  return typeof accounts[0] === "string" && accounts[0] ? accounts[0] : null;
 }
 
 /** Read the USDT (Polygon) balance for an address, in whole USDT. */
 export async function readUsdtBalance(address: string): Promise<number> {
   const eth = getEthereum();
   if (!eth) throw new Error("No Ethereum wallet found in this browser.");
+  const chainId = await eth.request({ method: "eth_chainId" });
+  if (chainId !== POLYGON_CHAIN_ID) throw new Error("USDT balance requires Polygon.");
   const data = encodeFunctionData({
     abi: erc20Abi,
     functionName: "balanceOf",

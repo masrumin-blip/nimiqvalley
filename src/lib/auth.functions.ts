@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 
 const walletSchema = z
@@ -6,14 +7,34 @@ const walletSchema = z
   .trim()
   .regex(/^NQ[0-9]{2}[ 0-9A-Z]{30,40}$/i, "Not a valid Nimiq address");
 
+const challengeSchema = z.object({ address: walletSchema });
+
 const signInSchema = z.object({
   address: walletSchema,
-  message: z.string().min(1).max(200),
-  signature: z.string().min(8).max(512),
+  challenge: z.string().uuid(),
+  publicKey: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  signature: z.string().regex(/^[0-9a-fA-F]{128}$/),
   displayName: z.string().trim().max(16).optional(),
 });
 
 export type PlayerInfo = { wallet: string; displayName: string | null } | null;
+
+export const createWalletChallenge = createServerFn({ method: "POST" })
+  .inputValidator((data) => challengeSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const wallet = data.address.toUpperCase();
+    const challenge = randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+    const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${challenge}\nThis request does not send a transaction.`;
+    const { error } = await supabaseAdmin.from("wallet_login_challenges").insert({
+      wallet,
+      challenge,
+      expires_at: expiresAt,
+    });
+    if (error) throw new Error("Could not start wallet sign-in.");
+    return { challenge, message };
+  });
 
 /** Store the connected wallet in an httpOnly session cookie and upsert its profile. */
 export const signInWithWallet = createServerFn({ method: "POST" })
@@ -22,6 +43,45 @@ export const signInWithWallet = createServerFn({ method: "POST" })
     const wallet = data.address.toUpperCase();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { playerSession } = await import("./session.server");
+
+    const { data: stored, error: challengeError } = await supabaseAdmin
+      .from("wallet_login_challenges")
+      .select("id, wallet, expires_at, used_at")
+      .eq("challenge", data.challenge)
+      .maybeSingle();
+    if (challengeError || !stored || stored.wallet !== wallet || stored.used_at) {
+      throw new Error("This sign-in request is invalid or was already used.");
+    }
+    if (new Date(stored.expires_at).getTime() <= Date.now()) {
+      throw new Error("This sign-in request expired. Please try again.");
+    }
+
+    const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${data.challenge}\nThis request does not send a transaction.`;
+    try {
+      const { Address, PublicKey, Signature } = await import("@nimiq/core");
+      const publicKey = PublicKey.fromHex(data.publicKey);
+      const signature = Signature.fromHex(data.signature);
+      if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
+        throw new Error("The signing key does not belong to this wallet.");
+      }
+      const prefixed = new TextEncoder().encode(`\u0016Nimiq Signed Message:\n${message.length}${message}`);
+      const plain = new TextEncoder().encode(message);
+      if (!publicKey.verify(signature, prefixed) && !publicKey.verify(signature, plain)) {
+        throw new Error("The wallet signature is invalid.");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("The ")) throw error;
+      throw new Error("The wallet signature is invalid.");
+    }
+
+    const { data: consumed, error: consumeError } = await supabaseAdmin
+      .from("wallet_login_challenges")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", stored.id)
+      .is("used_at", null)
+      .select("id")
+      .maybeSingle();
+    if (consumeError || !consumed) throw new Error("This sign-in request was already used.");
 
     const { data: existing } = await supabaseAdmin
       .from("profiles")

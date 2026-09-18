@@ -15,3 +15,4 @@
 - [x] Preload all games at boot, wallet login gate (Nimiq Pay + browser wallet), English-only UI.
 - [x] NIM payments: chat packs, 25 NIM room passes, daily X-visit reward.
 - [x] Shared matchmaking queue with widening skill window and 60s CPU suggestion.
+- [x] Nimiq Pay compatibility and mini-app security audit remediation.
