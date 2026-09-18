@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { CAR_COLORS } from "@/games/race/lib/colors";
 import { useGame } from "@/games/race/store/game";
 import { CarPreview } from "./CarPreview";

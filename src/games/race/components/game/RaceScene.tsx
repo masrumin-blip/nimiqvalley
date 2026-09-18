@@ -72,7 +72,6 @@ const _look = new THREE.Vector3(0, 1.8, 9);
 const _camPos = new THREE.Vector3();
 const _camLook = new THREE.Vector3();
 const _lookSmooth = new THREE.Vector3();
-const _target = new THREE.Vector3();
 
 export function RaceScene() {
   const laps = useGame((s) => s.laps);
@@ -112,7 +111,7 @@ export function RaceScene() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const clock = useRef({ t: -COUNTDOWN, lapStart: 0, sendAcc: 0, done: false, started: false });
+  const clock = useRef({ t: -COUNTDOWN, lapStart: 0, done: false, started: false });
   const sfxAt = useRef({ collision: -10, engine: -10 });
 
   useEffect(() => {
