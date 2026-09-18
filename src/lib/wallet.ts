@@ -189,21 +189,28 @@ export async function payNim(
         fee: number;
       }) => Promise<unknown>;
     };
-    const result =
+    const result = await withTimeout(
       typeof nimiq.sendBasicTransactionWithData === "function"
-        ? await nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
-        : await nimiq.sendBasicTransaction({ recipient, value, fee: 0 });
+        ? nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
+        : nimiq.sendBasicTransaction({ recipient, value, fee: 0 }),
+      WALLET_TIMEOUT_MS,
+      "The wallet did not answer in time. Please try again.",
+    );
     if (isWalletError(result)) throw new Error(walletErrorMessage(result));
     if (typeof result !== "string") throw new Error("The wallet did not confirm the payment.");
-    return transactionHash(result);
+    return result;
   }
   const api = await hub();
-  const receipt = await api.checkout({
-    appName: APP_NAME,
-    recipient: recipient.replace(/\s+/g, ""),
-    value,
-    extraData: note,
-  });
+  const receipt = await withTimeout(
+    api.checkout({
+      appName: APP_NAME,
+      recipient: recipient.replace(/\s+/g, ""),
+      value,
+      extraData: note,
+    }),
+    WALLET_TIMEOUT_MS,
+    "The wallet did not answer in time. Please try again.",
+  );
   if (!receipt?.hash) throw new Error("The wallet did not confirm the payment.");
   return receipt.hash;
 }
