@@ -44,6 +44,8 @@ export const quickMatch = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
+    const { spendKey } = await import("./credits.server");
+    await spendKey(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.quickMatch(wallet, data.gameSlug, data.maxPlayers, data.settings);
   });
@@ -60,7 +62,8 @@ export const createRoom = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
-    const { spendRoom } = await import("./credits.server");
+    const { spendKey, spendRoom } = await import("./credits.server");
+    await spendKey(wallet);
     await spendRoom(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.createRoom(wallet, data.gameSlug, "room", data.maxPlayers, data.settings, null);
