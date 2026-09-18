@@ -246,21 +246,15 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     expectedNim = count * ROOM_COST_NIM;
   }
 
-  const tx = await lookupTx(hash);
-  if (!tx.ok) throw new Error("The payment could not be verified yet. Please try again shortly.");
-  if (!tx.confirmed) throw new Error("The payment is still pending. Please try again after confirmation.");
-  if (normalizeAddress(tx.sender ?? "") !== normalizeAddress(input.wallet)) {
-    throw new Error("That payment came from a different wallet.");
-  }
-  if (normalizeAddress(tx.recipient ?? "") !== normalizeAddress(PAY_TO_ADDRESS)) {
-    throw new Error("That payment did not go to the NimiqValley address.");
-  }
-  if (tx.nim + 0.001 < expectedNim) {
-    throw new Error(`That payment was only ${tx.nim} NIM; ${expectedNim} NIM is needed.`);
+  const tx = await findRecentPayment(input.wallet, expectedNim);
+  if (!tx) {
+    throw new Error(
+      `We could not find a payment of ${expectedNim} NIM from your wallet yet. If the wallet confirmed it, try again in a moment.`,
+    );
   }
 
   const { error } = await supabaseAdmin.from("nim_payments").insert({
-    tx_hash: hash,
+    tx_hash: tx.hash,
     wallet: input.wallet,
     kind: input.kind,
     nim: expectedNim,
