@@ -4,19 +4,19 @@ import { playSfx } from "@/lib/sfx";
 
 /**
  * CROSSING FOR NIMIQ
- * A polished endless hopper: grass, roads with cars, rivers with logs.
+ * A polished endless hopper: forest clearings, snake trails, rivers with logs.
  * Keyboard: WASD / arrows. Touch: swipe or tap directional buttons.
  */
 
 // ---------- Types ----------
-type LaneType = "grass" | "road" | "river";
+type LaneType = "grass" | "trail" | "river";
 
 interface Obstacle {
   /** world x in cells (float) */
   x: number;
   width: number; // in cells
   speed: number; // cells per second (sign = direction)
-  kind: "car" | "truck" | "log";
+  kind: "snake" | "log";
   hue: number;
 }
 
@@ -71,7 +71,7 @@ function makeLane(index: number): Lane {
   const prevBias = index < 6 ? 0.35 : 0; // gentle ramp
   const r = Math.random();
   let type: LaneType;
-  if (r < 0.4 - prevBias * 0.2) type = "road";
+  if (r < 0.4 - prevBias * 0.2) type = "trail";
   else if (r < 0.65 - prevBias * 0.1) type = "river";
   else type = "grass";
 
@@ -79,7 +79,7 @@ function makeLane(index: number): Lane {
 
   if (type === "grass") {
     lane.trees = scatterTrees();
-  } else if (type === "road") {
+  } else if (type === "trail") {
     const dir = Math.random() < 0.5 ? 1 : -1;
     const speed = dir * rand(2.2, 4.6) * (1 + index * 0.004);
     const baseCount = randInt(2, 4);
@@ -87,13 +87,12 @@ function makeLane(index: number): Lane {
     const count = Array.from({ length: baseCount }, () => Math.random() < 0.4875).filter(Boolean).length;
     const spacing = count > 0 ? Math.max(COLS / count + rand(1, 3), MIN_ROAD_GAP) : 0;
     for (let i = 0; i < count; i++) {
-      const isTruck = Math.random() < 0.25;
       lane.obstacles.push({
         x: i * spacing + rand(-0.6, 0.6),
-        width: isTruck ? 2.6 : 1.6,
+        width: Math.random() < 0.25 ? 2.6 : 1.6,
         speed,
-        kind: isTruck ? "truck" : "car",
-        hue: randInt(0, 359),
+        kind: "snake",
+        hue: randInt(85, 155),
       });
     }
   } else {
@@ -111,8 +110,8 @@ function makeLane(index: number): Lane {
       });
     }
   }
-  // scatter coins on walkable ground (grass without trees, or road)
-  if (index >= 1 && (type === "grass" || type === "road")) {
+  // scatter coins on walkable ground (grass without trees, or forest trail)
+  if (index >= 1 && (type === "grass" || type === "trail")) {
     const n = type === "grass" ? randInt(2, 3) : randInt(1, 2);
     for (let i = 0; i < n; i++) {
       const c = randInt(0, COLS - 1);
@@ -166,7 +165,7 @@ export default function CrossingGame() {
     onLog: null as Obstacle | null,
     logOffset: 0,
 
-    deathCause: "" as "" | "car" | "water",
+    deathCause: "" as "" | "snake" | "water",
   });
 
   const spawnBurst = useCallback((x: number, y: number, color: string, n: number) => {
@@ -206,14 +205,14 @@ export default function CrossingGame() {
   }, []);
 
   const die = useCallback(
-    (cause: "car" | "water") => {
+    (cause: "snake" | "water") => {
       const s = stateRef.current;
       if (s.dead) return;
       s.dead = true;
       s.deathCause = cause;
       s.deadT = 0;
-      spawnBurst(s.player.x, s.player.y, cause === "car" ? "#ff5d5d" : "#4fc3f7", 26);
-      playSfx(cause === "car" ? "collision" : "splash", 0.8);
+      spawnBurst(s.player.x, s.player.y, cause === "snake" ? "#b7e35d" : "#4fc3f7", 26);
+      playSfx(cause === "snake" ? "collision" : "splash", 0.8);
       setBest((b) => {
         const nb = Math.max(b, s.score);
         try {
@@ -412,14 +411,14 @@ export default function CrossingGame() {
         // player lane interactions
         const lane = s.lanes.find((l) => l.index === s.player.y);
         if (lane) {
-          if (lane.type === "road") {
+          if (lane.type === "trail") {
             for (const ob of lane.obstacles) {
-              // require real overlap between the car body and the player body
+              // require real overlap between the snake body and the player body
               const overlap =
                 Math.min(s.player.x + PLAYER_HALF, ob.x + ob.width / 2) -
                 Math.max(s.player.x - PLAYER_HALF, ob.x - ob.width / 2);
               if (overlap > 0.06) {
-                die("car");
+                die("snake");
               }
             }
             s.onLog = null;
@@ -490,42 +489,42 @@ export default function CrossingGame() {
       const toScreenY = (laneIdx: number, frac = 0) =>
         baseY - (laneIdx - s.cameraY + frac) * laneH;
 
-      // sky: dusk gradient
+      // humid forest canopy filtering morning light
       const bg = ctx.createLinearGradient(0, 0, 0, h);
-      bg.addColorStop(0, "#1b1338");
-      bg.addColorStop(0.42, "#3d2a5c");
-      bg.addColorStop(0.72, "#8a5a7a");
-      bg.addColorStop(1, "#e08a6a");
+      bg.addColorStop(0, "#071c19");
+      bg.addColorStop(0.42, "#123d32");
+      bg.addColorStop(0.72, "#397154");
+      bg.addColorStop(1, "#8fbf79");
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, w, h);
 
       const horizon = toScreenY(s.cameraY + h / laneH) || 0;
       const hz = Math.max(0, Math.min(h * 0.55, h * 0.3));
 
-      // sun glow
+      // soft light breaking through the canopy
       const sunY = hz * 0.72;
       const sg = ctx.createRadialGradient(w * 0.7, sunY, 0, w * 0.7, sunY, h * 0.42);
-      sg.addColorStop(0, "rgba(255,200,150,0.55)");
-      sg.addColorStop(1, "rgba(255,180,140,0)");
+      sg.addColorStop(0, "rgba(220,255,179,0.48)");
+      sg.addColorStop(1, "rgba(126,196,112,0)");
       ctx.fillStyle = sg;
       ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = "rgba(255,226,190,0.9)";
+      ctx.fillStyle = "rgba(229,255,189,0.8)";
       circle(ctx, w * 0.7, sunY, h * 0.045);
 
-      // stars (upper sky)
+      // drifting fireflies under the upper canopy
       ctx.save();
       for (let i = 0; i < 46; i++) {
         const sx2 = ((i * 937.3) % 1) * w;
         const sy2 = ((i * 517.7) % 1) * h * 0.32;
         const tw = 0.5 + 0.5 * Math.sin(s.time * 2 + i);
-        ctx.fillStyle = `rgba(255,255,255,${0.3 * tw})`;
+        ctx.fillStyle = `rgba(205,255,125,${0.5 * tw})`;
         ctx.fillRect(sx2, sy2, 2 * dpr, 2 * dpr);
       }
       ctx.restore();
 
-      // distant hills silhouettes
+      // layered distant tree canopy silhouettes
       for (let layer = 0; layer < 2; layer++) {
-        ctx.fillStyle = layer === 0 ? "rgba(52,34,66,0.75)" : "rgba(32,22,48,0.9)";
+        ctx.fillStyle = layer === 0 ? "rgba(18,70,49,0.82)" : "rgba(7,42,33,0.94)";
         ctx.beginPath();
         const baseHill = hz * (1.05 + layer * 0.22);
         ctx.moveTo(0, baseHill + h);
@@ -669,22 +668,18 @@ export default function CrossingGame() {
               "#3ba055",
             );
           }
-        } else if (lane.type === "road") {
-          ctx.fillStyle = "#3a3550";
+        } else if (lane.type === "trail") {
+          ctx.fillStyle = "#3f3825";
           ctx.fillRect(0, yFront - cell * 0.02, w, cell * 0.02 + 1);
-          ctx.fillStyle = "#2b2740";
+          ctx.fillStyle = "#685f3d";
           ctx.fillRect(0, yBack, w, laneH + 1);
-          ctx.fillStyle = "rgba(255,255,255,0.08)";
+          ctx.fillStyle = "rgba(190,221,132,0.12)";
           ctx.fillRect(0, yBack, w, 2 * dpr);
-          // dashed center line, one dash per tile
-          ctx.fillStyle = "rgba(255,240,200,0.28)";
+          // scattered moss and leaf litter along the forest trail
+          ctx.fillStyle = "rgba(108,143,69,0.34)";
           for (let c = 0; c < COLS; c++) {
-            ctx.fillRect(
-              originX + c * cell + cell * 0.3,
-              yBack + laneH / 2 - 1.5 * dpr,
-              cell * 0.4,
-              3 * dpr,
-            );
+            const leafX = originX + c * cell + cell * (0.2 + ((c * 7 + lane.index) % 5) * 0.12);
+            circle(ctx, leafX, yBack + laneH * (0.3 + ((c + lane.index) % 3) * 0.2), cell * 0.045);
           }
           // lane separator at the near edge
           ctx.fillStyle = "rgba(0,0,0,0.25)";
@@ -709,8 +704,8 @@ export default function CrossingGame() {
             }
             ctx.stroke();
           }
-          // sun reflection shimmer
-          ctx.fillStyle = `rgba(255,210,170,${0.06 + 0.03 * Math.sin(s.time * 3)})`;
+          // canopy reflection shimmer
+          ctx.fillStyle = `rgba(166,230,137,${0.06 + 0.03 * Math.sin(s.time * 3)})`;
           ctx.fillRect(w * 0.6, yBack, w * 0.2, laneH);
         }
 
@@ -727,34 +722,34 @@ export default function CrossingGame() {
             const gy = yFront - laneH * 0.08;
             const bw = ow;
             const bd = laneH * 0.7;
-            const bodyH = ob.kind === "truck" ? cell * 0.3 : cell * 0.24;
-            shadow(ox, gy, ow * 0.45);
-            box(
-              ox,
-              gy,
-              bw,
-              bd,
-              bodyH,
-              `oklch(0.72 0.16 ${ob.hue})`,
-              `oklch(0.5 0.16 ${ob.hue})`,
-            );
-            // cabin / roof
-            const cabW = ob.kind === "truck" ? bw * 0.34 : bw * 0.5;
+            const bodyH = cell * 0.15;
+            shadow(ox, gy, ow * 0.46);
             const dir = ob.speed > 0 ? 1 : -1;
-            const cabX = ob.kind === "truck" ? ox + dir * (bw / 2 - cabW / 2) : ox;
-            box(
-              cabX,
-              gy - bodyH,
-              cabW,
-              bd * 0.78,
-              cell * 0.18,
-              `oklch(0.8 0.12 ${ob.hue})`,
-              "rgba(200,230,255,0.75)",
-            );
-            // headlights
-            ctx.fillStyle = "rgba(255,235,180,0.95)";
-            const hx = dir > 0 ? ox + bw / 2 - 5 * dpr : ox - bw / 2;
-            ctx.fillRect(hx, gy - bodyH * 0.75, 5 * dpr, bodyH * 0.3);
+            const segments = Math.max(5, Math.round(ob.width * 4));
+            for (let i = 0; i < segments; i++) {
+              const t = i / Math.max(1, segments - 1);
+              const sx = ox - dir * bw * 0.5 + dir * t * bw;
+              const sy = gy - bodyH - Math.sin(s.time * 7 + t * Math.PI * 3 + ob.x) * laneH * 0.1;
+              const radius = cell * (0.11 + Math.sin(t * Math.PI) * 0.035);
+              ctx.fillStyle = i % 2 === 0 ? `oklch(0.68 0.16 ${ob.hue})` : `oklch(0.48 0.14 ${ob.hue})`;
+              ctx.beginPath();
+              ctx.ellipse(sx, sy, radius, radius * 0.55, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            const headX = ox + dir * bw * 0.52;
+            const headY = gy - bodyH - Math.sin(s.time * 7 + Math.PI * 3 + ob.x) * laneH * 0.1;
+            ctx.fillStyle = `oklch(0.58 0.17 ${ob.hue})`;
+            ctx.beginPath();
+            ctx.ellipse(headX, headY, cell * 0.16, cell * 0.11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#f4df54";
+            circle(ctx, headX + dir * cell * 0.08, headY - cell * 0.04, cell * 0.025);
+            ctx.strokeStyle = "#ef5b64";
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.beginPath();
+            ctx.moveTo(headX + dir * cell * 0.15, headY);
+            ctx.lineTo(headX + dir * cell * 0.26, headY);
+            ctx.stroke();
           }
         }
 
@@ -844,8 +839,8 @@ export default function CrossingGame() {
       // atmospheric haze toward the horizon
       const hazeTop = toScreenY(p.y + 17);
       const hg = ctx.createLinearGradient(0, hazeTop - laneH * 4, 0, hazeTop + h * 0.22);
-      hg.addColorStop(0, "rgba(146,96,126,0.7)");
-      hg.addColorStop(1, "rgba(146,96,126,0)");
+      hg.addColorStop(0, "rgba(65,118,84,0.72)");
+      hg.addColorStop(1, "rgba(65,118,84,0)");
       ctx.fillStyle = hg;
       ctx.fillRect(0, 0, w, hazeTop + h * 0.22);
 
@@ -863,7 +858,7 @@ export default function CrossingGame() {
       // vignette
       const vg = ctx.createRadialGradient(w / 2, h * 0.6, h * 0.32, w / 2, h * 0.6, h * 0.9);
       vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, "rgba(10,4,20,0.5)");
+      vg.addColorStop(1, "rgba(3,24,18,0.56)");
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, w, h);
       void horizon;
@@ -934,7 +929,7 @@ export default function CrossingGame() {
               Crossing for Nimiq
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Guide the brave buffalo across an endless world.
+               Guide the brave buffalo through an endless forest.
             </p>
           </div>
 
@@ -968,8 +963,8 @@ export default function CrossingGame() {
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-lg leading-none">🚗</span>
-                <span>Dodge cars and trucks — one touch and it is over.</span>
+                 <span className="text-lg leading-none">🐍</span>
+                 <span>Dodge the snakes crossing the forest trails — one touch and it is over.</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-lg leading-none">🪵</span>
@@ -991,7 +986,7 @@ export default function CrossingGame() {
       {gameOver && (
         <div className="absolute inset-0 flex animate-fade-in flex-col items-center justify-center gap-5 bg-background/70 px-6 backdrop-blur-md">
           <div className="text-center font-display text-4xl font-extrabold text-destructive sm:text-6xl">
-            {stateRef.current.deathCause === "water" ? "💦 Splash!" : "💥 Crashed!"}
+             {stateRef.current.deathCause === "water" ? "💦 Splash!" : "🐍 Bitten!"}
           </div>
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center gap-2">

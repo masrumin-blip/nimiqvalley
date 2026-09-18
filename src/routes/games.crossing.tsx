@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import CrossingPage from "@/games/crossing/Page";
 import { GameFrame } from "@/components/GameFrame";
 
-const title = "Crossing for Nimiq — Cross Roads and Rivers";
+const title = "Crossing for Nimiq — Forest Adventure";
 const description =
-  "Hop across endless roads and rivers, dodge cars and trucks, ride logs, and collect hexagonal coins.";
+  "Hop through an endless forest, dodge snakes, ride logs across rivers, and collect hexagonal coins.";
 
 export const Route = createFileRoute("/games/crossing")({
   ssr: false,

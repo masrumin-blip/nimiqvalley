@@ -9,7 +9,7 @@ const BIRD_X = 96;
 const BIRD_R = 14;
 const GRAVITY = 1500; // px/s^2
 const FLAP = -430; // px/s
-const PIPE_W = 68;
+const TREE_W = 68;
 const GAP = 165;
 const GAP_MIN = 112;
 const SPEED = 170; // px/s
@@ -30,13 +30,13 @@ function difficultyFor(score: number) {
     speed: SPEED + (SPEED_MAX - SPEED) * e,
     gap: GAP - (GAP - GAP_MIN) * e,
     spawn: SPAWN_EVERY - (SPAWN_EVERY - SPAWN_MIN) * e,
-    wobble: e, // pipa bergerak naik-turun di level tinggi
+    wobble: e, // pohon bergerak naik-turun di level tinggi
   };
 }
 
 type Phase = "ready" | "playing" | "dead";
 
-interface Pipe {
+interface FutureTree {
   x: number;
   gapY: number; // center of gap
   baseY: number;
@@ -96,7 +96,7 @@ export function TappyGame() {
     birdY: H / 2,
     vel: 0,
     rot: 0,
-    pipes: [] as Pipe[],
+    trees: [] as FutureTree[],
     spawnT: 0,
     score: 0,
     time: 0,
@@ -122,7 +122,7 @@ export function TappyGame() {
     g.phase = "playing";
     g.birdY = H / 2;
     g.vel = FLAP * 0.6;
-    g.pipes = [];
+    g.trees = [];
     g.spawnT = 0.9;
     g.score = 0;
     g.flash = 0;
@@ -222,13 +222,13 @@ export function TappyGame() {
         g.birdY += g.vel * dt;
         g.rot = Math.max(-0.5, Math.min(1.3, g.vel / 500));
 
-        // spawn pipes
+        // spawn futuristic trees
         g.spawnT -= dt;
         if (g.spawnT <= 0) {
           const amp = g.score >= 15 ? d.wobble * 42 : 0;
           const baseY = randomGapY(d.gap, amp);
-          g.pipes.push({
-            x: W + PIPE_W,
+          g.trees.push({
+            x: W + TREE_W,
             gapY: baseY,
             baseY,
             gap: d.gap,
@@ -242,18 +242,18 @@ export function TappyGame() {
           g.spawnT = d.spawn;
         }
 
-        // move pipes
-        for (const p of g.pipes) {
+        // move futuristic trees
+        for (const p of g.trees) {
           p.x -= d.speed * dt;
           p.gapY = p.amp > 0 ? p.baseY + Math.sin(g.time * 1.6 + p.phase) * p.amp : p.baseY;
           p.coinY = p.gapY;
         }
-        g.pipes = g.pipes.filter((p) => p.x + PIPE_W > -20);
+        g.trees = g.trees.filter((p) => p.x + TREE_W > -20);
 
         // Coins are the only source of score.
-        for (const p of g.pipes) {
+        for (const p of g.trees) {
           if (p.coinCollected) continue;
-          const coinX = p.x + PIPE_W / 2;
+          const coinX = p.x + TREE_W / 2;
           const dx = BIRD_X - coinX;
           const dy = g.birdY - p.coinY;
           if (dx * dx + dy * dy < (BIRD_R + 15) * (BIRD_R + 15)) {
@@ -281,8 +281,8 @@ export function TappyGame() {
         if (g.birdY + BIRD_R >= H - GROUND_H || g.birdY - BIRD_R <= 0) {
           die();
         } else {
-          for (const p of g.pipes) {
-            const inX = BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + PIPE_W;
+          for (const p of g.trees) {
+            const inX = BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + TREE_W;
             if (inX) {
               const top = p.gapY - p.gap / 2;
               const bottom = p.gapY + p.gap / 2;
@@ -644,13 +644,13 @@ function draw(ctx: CanvasRenderingContext2D, g: typeof importState) {
     }
   }
 
-  // pipes
-  for (const p of g.pipes) {
+  // futuristic trees
+  for (const p of g.trees) {
     const top = p.gapY - p.gap / 2;
     const bottom = p.gapY + p.gap / 2;
     drawObstacle(ctx, p.x, 0, top, true, g.time, p.variant);
     drawObstacle(ctx, p.x, bottom, H - GROUND_H - bottom, false, g.time, p.variant);
-    if (!p.coinCollected) drawCoin(ctx, p.x + PIPE_W / 2, p.coinY, g.time);
+    if (!p.coinCollected) drawCoin(ctx, p.x + TREE_W / 2, p.coinY, g.time);
   }
 
   // particles (behind bird, additive glow)
@@ -806,10 +806,10 @@ function drawObstacle(
   if (h <= 0) return;
 
   const palettes = [
-    { dark: "#07512d", mid: "#16b867", light: "#6effaa", glow: "#39ff88" },
-    { dark: "#173a7a", mid: "#287fd4", light: "#91e7ff", glow: "#44d9ff" },
-    { dark: "#69203b", mid: "#d63864", light: "#ff8a77", glow: "#ff4f72" },
-    { dark: "#4c2885", mid: "#9146d8", light: "#ef9dff", glow: "#d85cff" },
+    { dark: "#123c30", mid: "#1c8057", light: "#83ffc0", glow: "#39ff88" },
+    { dark: "#173b57", mid: "#287b8d", light: "#91f5ff", glow: "#44d9ff" },
+    { dark: "#4d294c", mid: "#a23c77", light: "#ff91c8", glow: "#ff4fa3" },
+    { dark: "#313466", mid: "#6553b5", light: "#c7a6ff", glow: "#9f72ff" },
   ];
   const palette = palettes[variant % palettes.length] ?? {
     dark: "#07512d",
@@ -822,21 +822,27 @@ function drawObstacle(
   ctx.shadowColor = palette.glow;
   ctx.shadowBlur = 14;
 
-  // Each obstacle has its own material and silhouette details.
-  const grad = ctx.createLinearGradient(x, 0, x + PIPE_W, 0);
+  // Organic luminous trunk, deliberately unlike an industrial pipe.
+  const grad = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
   grad.addColorStop(0, palette.dark);
   grad.addColorStop(0.2, palette.mid);
   grad.addColorStop(0.5, palette.light);
   grad.addColorStop(0.8, palette.mid);
   grad.addColorStop(1, palette.dark);
   ctx.fillStyle = grad;
-  ctx.fillRect(x, y, PIPE_W, h);
+  ctx.beginPath();
+  ctx.moveTo(x + 9, y);
+  ctx.bezierCurveTo(x - 1, y + h * 0.25, x + 14, y + h * 0.62, x + 5, y + h);
+  ctx.lineTo(x + TREE_W - 5, y + h);
+  ctx.bezierCurveTo(x + TREE_W - 15, y + h * 0.62, x + TREE_W + 2, y + h * 0.24, x + TREE_W - 9, y);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 
   // Animated surface pattern: diagonal, circuit, armored, or crystal.
   ctx.save();
   ctx.beginPath();
-  ctx.rect(x, y, PIPE_W, h);
+  ctx.rect(x - 8, y, TREE_W + 16, h);
   ctx.clip();
   ctx.fillStyle = "rgba(255,255,255,0.13)";
   const stripeOff = (time * 40) % 26;
@@ -844,8 +850,8 @@ function drawObstacle(
     for (let sy = y - 30 + stripeOff; sy < y + h + 30; sy += 26) {
       ctx.beginPath();
       ctx.moveTo(x, sy);
-      ctx.lineTo(x + PIPE_W, sy - 14);
-      ctx.lineTo(x + PIPE_W, sy - 9);
+      ctx.lineTo(x + TREE_W, sy - 14);
+      ctx.lineTo(x + TREE_W, sy - 9);
       ctx.lineTo(x, sy + 5);
       ctx.closePath();
       ctx.fill();
@@ -858,47 +864,52 @@ function drawObstacle(
       ctx.moveTo(x + 8, sy);
       ctx.lineTo(x + 28, sy);
       ctx.lineTo(x + 36, sy + 9);
-      ctx.lineTo(x + 60, sy + 9);
+      ctx.lineTo(x + TREE_W - 8, sy + 9);
       ctx.stroke();
     }
   } else if (variant % 4 === 2) {
     for (let sy = y + 8; sy < y + h; sy += 30) {
-      roundRect(ctx, x + 7, sy, PIPE_W - 14, 18, 4);
+      roundRect(ctx, x + 7, sy, TREE_W - 14, 18, 9);
       ctx.fill();
     }
   } else {
     for (let sy = y + 10; sy < y + h; sy += 34) {
       ctx.beginPath();
-      ctx.moveTo(x + PIPE_W / 2, sy - 8);
-      ctx.lineTo(x + PIPE_W - 8, sy + 7);
-      ctx.lineTo(x + PIPE_W / 2, sy + 18);
+      ctx.moveTo(x + TREE_W / 2, sy - 8);
+      ctx.lineTo(x + TREE_W - 8, sy + 7);
+      ctx.lineTo(x + TREE_W / 2, sy + 18);
       ctx.lineTo(x + 8, sy + 7);
       ctx.closePath();
       ctx.fill();
     }
   }
   // center highlight
-  const shine = ctx.createLinearGradient(x, 0, x + PIPE_W, 0);
+  const shine = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
   shine.addColorStop(0, "rgba(255,255,255,0)");
   shine.addColorStop(0.5, "rgba(255,255,255,0.16)");
   shine.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = shine;
-  ctx.fillRect(x, y, PIPE_W, h);
+  ctx.fillRect(x + 7, y, TREE_W - 14, h);
   ctx.restore();
 
-  // cap
-  const capH = 24;
-  const capY = isTop ? y + h - capH : y;
+  // glowing crown and branching roots face the flight gap
+  const crownH = 32;
+  const crownY = isTop ? y + h - crownH : y;
   ctx.save();
   ctx.shadowColor = palette.glow;
   ctx.shadowBlur = 18;
-  const capGrad = ctx.createLinearGradient(x, 0, x + PIPE_W, 0);
+  const capGrad = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
   capGrad.addColorStop(0, palette.dark);
   capGrad.addColorStop(0.5, palette.light);
   capGrad.addColorStop(1, palette.dark);
   ctx.fillStyle = capGrad;
-  roundRect(ctx, x - 5, capY, PIPE_W + 10, capH, 5);
-  ctx.fill();
+  for (let i = 0; i < 7; i++) {
+    const cx = x - 8 + i * ((TREE_W + 16) / 6);
+    const cy = isTop ? crownY + crownH - Math.abs(i - 3) * 3 : crownY + Math.abs(i - 3) * 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 13 + (i % 2) * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 
   // neon rim on the gap-facing edge
@@ -907,15 +918,18 @@ function drawObstacle(
   ctx.shadowBlur = 10;
   ctx.fillStyle = palette.light;
   const rimY = isTop ? y + h - 4 : y;
-  ctx.fillRect(x - 5, rimY, PIPE_W + 10, 4);
+  ctx.fillRect(x - 8, rimY, TREE_W + 16, 4);
   ctx.restore();
 
-  // dark outline
-  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  // fine energy veins make each tree feel alive
+  ctx.strokeStyle = palette.light;
+  ctx.globalAlpha = 0.5;
   ctx.lineWidth = 2;
-  roundRect(ctx, x - 5, capY, PIPE_W + 10, capH, 5);
+  ctx.beginPath();
+  ctx.moveTo(x + TREE_W / 2, isTop ? y : y + h);
+  ctx.bezierCurveTo(x + 15, y + h * 0.35, x + TREE_W - 12, y + h * 0.62, x + TREE_W / 2, isTop ? y + h : y);
   ctx.stroke();
-  ctx.strokeRect(x, y, PIPE_W, h);
+  ctx.restore();
 }
 
 function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, time: number) {
@@ -964,7 +978,7 @@ const importState = {
   birdY: 0,
   vel: 0,
   rot: 0,
-  pipes: [] as Pipe[],
+  trees: [] as FutureTree[],
   spawnT: 0,
   score: 0,
   time: 0,
