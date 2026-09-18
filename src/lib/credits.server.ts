@@ -145,7 +145,13 @@ async function lookupTx(hash: string): Promise<TxLookup> {
   }
 }
 
-type RedeemInput = { wallet: string; txHash: string; kind: "chat" | "room"; packId?: string; rooms?: number };
+type RedeemInput = {
+  wallet: string;
+  txHash: string;
+  kind: "chat" | "room";
+  packId?: string | undefined;
+  rooms?: number | undefined;
+};
 
 /**
  * Turns a confirmed NIM transaction into credits.
