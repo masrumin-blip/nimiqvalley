@@ -73,12 +73,16 @@ function ChatRoom() {
     id: character.id,
     messages: greeting,
     transport,
-    onError: (err) =>
-      setError(
-        err.message.includes("402")
-          ? "The valley is out of ink for now. Please try again later."
-          : "The connection to the valley flickered. Please try again.",
-      ),
+    onError: (err) => {
+      const m = err.message;
+      if (m.includes("401") || m.includes("403")) {
+        setError("The valley gate key was refused. Please check the chat service key.");
+      } else if (m.includes("402") || m.includes("429")) {
+        setError("The valley is out of ink for now. Please try again in a moment.");
+      } else {
+        setError("The connection to the valley flickered. Please try again.");
+      }
+    },
   });
 
   const isBusy = status === "submitted" || status === "streaming";

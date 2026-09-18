@@ -1,14 +1,8 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
-import {
-  createLovableAiGatewayRunIdFetch,
-  getLovableAiGatewayResponseHeaders,
-  getLovableAiGatewayRunId,
-  withLovableAiGatewayRunIdHeader,
-} from "@/lib/ai-gateway.server";
 import { getCharacter } from "@/lib/characters";
+import { createGriphubProvider, griphubModelId, GRIPHUB_MAX_TOKENS } from "@/lib/griphub.server";
 
 type ChatRequestBody = { messages?: unknown; characterId?: unknown };
 
@@ -25,17 +19,10 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Unknown character", { status: 400 });
         }
 
-        const key = process.env["LOVABLE_API_KEY"];
-        if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+        const key = process.env["GRIPHUB_API_KEY"];
+        if (!key) return new Response("Missing GRIPHUB_API_KEY", { status: 500 });
 
-        const initialRunId = getLovableAiGatewayRunId(request);
-        const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
-        const lovable = createOpenAI({
-          baseURL: "https://ai.gateway.lovable.dev/v1",
-          apiKey: key,
-          headers: { "Lovable-API-Key": key, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-          fetch: runIdFetch.fetch,
-        });
+        const griphub = createGriphubProvider(key);
 
         const system = [
           character.persona,
@@ -44,31 +31,28 @@ export const Route = createFileRoute("/api/chat")({
           "Keep replies to 1-3 short sentences, conversational, with no markdown headings or bullet lists.",
         ].join("\n\n");
 
-        const result = streamText({
-          model: lovable.responses("openai/gpt-6-astra"),
-          system,
-          messages: await convertToModelMessages(messages as UIMessage[]),
-          abortSignal: request.signal,
-          providerOptions: {
-            openai: {
-              forceReasoning: true,
-              reasoningEffort: "low",
-              reasoningSummary: "auto",
-              store: false,
-              include: ["reasoning.encrypted_content"],
-            },
-          },
-        });
+        try {
+          const result = streamText({
+            model: griphub(griphubModelId()),
+            system,
+            messages: await convertToModelMessages(messages as UIMessage[]),
+            maxOutputTokens: GRIPHUB_MAX_TOKENS,
+            abortSignal: request.signal,
+          });
 
-        return withLovableAiGatewayRunIdHeader(
-          result.toUIMessageStreamResponse({
+          return result.toUIMessageStreamResponse({
             originalMessages: messages as UIMessage[],
-            headers: getLovableAiGatewayResponseHeaders(undefined, {
-              ...(initialRunId ? { "X-Lovable-AIG-Run-ID": initialRunId } : {}),
-            }),
-          }),
-          runIdFetch,
-        );
+          });
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") {
+            return new Response(null, { status: 499 });
+          }
+          const status =
+            typeof (err as { statusCode?: number })?.statusCode === "number"
+              ? (err as { statusCode: number }).statusCode
+              : 502;
+          return new Response("Chat service error", { status });
+        }
       },
     },
   },
