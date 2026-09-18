@@ -37,6 +37,8 @@ export function useOnlineSoccer(active: boolean) {
   const moveFn = useServerFn(submitMove);
   const skipFn = useServerFn(skipTurn);
   const leaveFn = useServerFn(leaveMatch);
+  const finishFn = useServerFn(finishMatch);
+
 
   const [matchId, setMatchId] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchState | null>(null);
@@ -129,6 +131,14 @@ export function useOnlineSoccer(active: boolean) {
     [matchId, skipFn],
   );
 
+  const finish = useCallback(
+    (winner: string) => {
+      if (!matchId) return;
+      void finishFn({ data: { id: matchId, winner } }).catch(() => {});
+    },
+    [finishFn, matchId],
+  );
+
   return {
     wallet,
     lobby: lobby.data ?? null,
@@ -143,6 +153,7 @@ export function useOnlineSoccer(active: boolean) {
     leave,
     sendShot,
     requestSkip,
+    finish,
   };
 }
 
