@@ -54,10 +54,23 @@ export function useCreditActions() {
     onSuccess: settle,
   });
 
+  const buyKeys = useMutation({
+    mutationFn: async (keys: number) => {
+      const hash = await payNim(
+        PAY_TO_ADDRESS,
+        keys * KEY_COST_NIM,
+        `NimiqValley match keys x${keys}`,
+        preferredWallet(),
+      );
+      return redeem({ data: { txHash: hash, kind: "key", keys } });
+    },
+    onSuccess: settle,
+  });
+
   const claimDaily = useMutation({
     mutationFn: () => claim(),
     onSuccess: settle,
   });
 
-  return { buyChatPack, buyRooms, claimDaily };
+  return { buyChatPack, buyRooms, buyKeys, claimDaily };
 }
