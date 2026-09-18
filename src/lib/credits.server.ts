@@ -5,6 +5,7 @@ import {
   CHAT_PACKS,
   DAILY_REWARD,
   FREE_CHATS_PER_DAY,
+  KEY_COST_NIM,
   PAY_TO_ADDRESS,
   ROOM_COST_NIM,
   type CreditState,
@@ -16,6 +17,7 @@ type CreditRow = {
   wallet: string;
   chat_credits: number;
   room_credits: number;
+  match_keys: number;
   free_chats_date: string | null;
   free_chats_used: number;
 };
