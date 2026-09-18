@@ -9,8 +9,10 @@ function useHudTick() {
   const [, force] = useState(0);
   const raf = useRef(0);
   useEffect(() => {
+    let mounted = true;
     let last = 0;
     const loop = (t: number) => {
+      if (!mounted) return;
       if (t - last > 90) {
         last = t;
         force((n) => n + 1);
@@ -18,7 +20,10 @@ function useHudTick() {
       raf.current = requestAnimationFrame(loop);
     };
     raf.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf.current);
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(raf.current);
+    };
   }, []);
 }
 
