@@ -16,6 +16,7 @@ type CreditRow = {
   wallet: string;
   chat_credits: number;
   room_credits: number;
+  nim_balance: number | string;
   free_chats_date: string | null;
   free_chats_used: number;
 };
