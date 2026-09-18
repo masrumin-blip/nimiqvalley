@@ -3,6 +3,8 @@ import { playSfx } from "@/lib/sfx";
 import { reportScore } from "@/lib/report-score";
 import { useOnlineSoccer } from "@/games/soccer/online/useOnlineSoccer";
 import { TURN_TIMEOUT_MS, type MatchMove, type MatchState } from "@/lib/soccer/types";
+import { useCredits, useCreditActions } from "@/hooks/useCredits";
+import { KEY_COST_NIM } from "@/lib/credits";
 
 
 /* ---------------- types & constants ---------------- */
