@@ -97,13 +97,41 @@ export async function listMoves(id: string, since: number): Promise<MatchMove[]>
   }));
 }
 
-/** Leaves any lobby/match the player is still sitting in. */
-export async function abandonAll(wallet: string) {
+/**
+ * Leaves any lobby/match the player is still sitting in.
+ * Returns the entry costs of matches this player opened that nobody ever joined.
+ */
+export async function abandonAll(wallet: string): Promise<Array<"key" | "room">> {
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select("id, kind, status, host_wallet, guest_wallet, entry_cost")
+    .in("status", ["waiting", "invited", "playing"])
+    .or(`host_wallet.eq.${wallet},guest_wallet.eq.${wallet}`);
+  const rows = (data ?? []) as Array<{
+    id: string;
+    status: string;
+    host_wallet: string;
+    guest_wallet: string | null;
+    entry_cost: string | null;
+  }>;
+  if (rows.length === 0) return [];
+
+  const refunds: Array<"key" | "room"> = [];
+  for (const row of rows) {
+    if (row.host_wallet !== wallet) continue;
+    if (row.status === "playing") continue;
+    if (row.guest_wallet && row.status !== "invited") continue;
+    refunds.push(row.entry_cost === "room" ? "room" : "key");
+  }
+
   await supabaseAdmin
     .from("soccer_matches")
     .update({ status: "finished", updated_at: new Date().toISOString() })
-    .in("status", ["waiting", "playing"])
-    .or(`host_wallet.eq.${wallet},guest_wallet.eq.${wallet}`);
+    .in(
+      "id",
+      rows.map((r) => r.id),
+    );
+  return refunds;
 }
 
 export async function createMatch(
@@ -111,6 +139,7 @@ export async function createMatch(
   kind: MatchState["kind"],
   targetGoals: number,
   guest: string | null,
+  entry: "key" | "room" = "key",
 ): Promise<MatchState> {
   await abandonAll(wallet);
   const { data, error } = await supabaseAdmin
@@ -123,6 +152,7 @@ export async function createMatch(
       status: guest && kind === "friend" ? "invited" : "waiting",
       target_goals: targetGoals,
       turn_wallet: wallet,
+      entry_cost: entry,
     })
     .select(COLUMNS)
     .single();
