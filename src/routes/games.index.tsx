@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Trophy } from "lucide-react";
+import { MessagesSquare, Trophy } from "lucide-react";
 import { PlayerBadge } from "@/components/PlayerBadge";
 import { GAMES } from "@/lib/games";
 
@@ -44,13 +44,22 @@ function GameHub() {
         </header>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3">
-          <Link
-            to="/leaderboard"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wide text-primary-foreground transition-transform hover:-translate-y-0.5"
-          >
-            <Trophy className="size-4" aria-hidden="true" />
-            Leaderboard
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/leaderboard"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wide text-primary-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Trophy className="size-4" aria-hidden="true" />
+              Leaderboard
+            </Link>
+            <Link
+              to="/arena"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-black uppercase tracking-wide text-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <MessagesSquare className="size-4" aria-hidden="true" />
+              Arena Chat
+            </Link>
+          </div>
           <PlayerBadge />
         </div>
 
