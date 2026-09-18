@@ -76,13 +76,19 @@ function ChatRoom() {
     transport,
     onError: (err) => {
       const m = err.message;
-      if (m.includes("401") || m.includes("403")) {
+      if (m.includes("402")) {
+        setError("You are out of chat messages. Buy a pack or claim the daily reward.");
+      } else if (m.includes("401") || m.includes("403")) {
         setError("The valley gate key was refused. Please check the chat service key.");
-      } else if (m.includes("402") || m.includes("429")) {
+      } else if (m.includes("429")) {
         setError("The valley is out of ink for now. Please try again in a moment.");
       } else {
         setError("The connection to the valley flickered. Please try again.");
       }
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
+    onFinish: () => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });
 
@@ -96,6 +102,10 @@ function ChatRoom() {
     event.preventDefault();
     const text = draft.trim();
     if (!text || isBusy) return;
+    if (left <= 0) {
+      setError("You are out of chat messages. Buy a pack or claim the daily reward.");
+      return;
+    }
     setError(null);
     setDraft("");
     void sendMessage({ text });
