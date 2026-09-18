@@ -33,6 +33,40 @@ function decodeKeyMaterial(raw: string): Uint8Array {
 
 export type PlayerInfo = { wallet: string; displayName: string | null } | null;
 
+/** Single-line ASCII challenge text: wallets mangle multi-line messages. */
+function loginMessage(challenge: string): string {
+  return `NimiqValley login - nonce: ${challenge}`;
+}
+
+async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer));
+}
+
+/**
+ * Nimiq wallets differ in what exactly they sign: Hub/Keyguard signs
+ * sha256(prefix + byteLength + message), other clients sign the raw message or
+ * a prefixed variant. Try every known payload; the challenge is single-use so
+ * accepting any valid signature over it is safe.
+ */
+async function verifyLoginSignature(
+  publicKey: { verify: (signature: unknown, data: Uint8Array) => boolean },
+  signature: unknown,
+  message: string,
+): Promise<string | null> {
+  const encoder = new TextEncoder();
+  const raw = encoder.encode(message);
+  const candidates: Array<[string, Uint8Array]> = [
+    ["prefix+len", encoder.encode(`\u0016Nimiq Signed Message:\n${raw.length}${message}`)],
+    ["prefix", encoder.encode(`\u0016Nimiq Signed Message:\n${message}`)],
+    ["raw", raw],
+  ];
+  for (const [label, bytes] of candidates) {
+    if (publicKey.verify(signature, await sha256(bytes))) return `sha256(${label})`;
+    if (publicKey.verify(signature, bytes)) return label;
+  }
+  return null;
+}
+
 export const createWalletChallenge = createServerFn({ method: "POST" })
   .inputValidator((data) => challengeSchema.parse(data))
   .handler(async ({ data }) => {
