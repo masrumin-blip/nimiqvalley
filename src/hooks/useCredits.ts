@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 
 import { claimDailyReward, fetchCredits, redeemPayment } from "@/lib/credits.functions";
 import {
@@ -21,50 +22,58 @@ export function useCredits() {
   return { credits: query.data ?? null, isLoading: query.isLoading };
 }
 
+export type PurchasePhase = "idle" | "approving" | "confirming";
+
 export function useCreditActions() {
   const queryClient = useQueryClient();
   const redeem = useServerFn(redeemPayment);
   const claim = useServerFn(claimDailyReward);
+  const [phase, setPhase] = useState<PurchasePhase>("idle");
 
-  const settle = (credits: CreditState) => queryClient.setQueryData(["credits"], credits);
+  const settle = (credits: CreditState) => {
+    setPhase("idle");
+    queryClient.setQueryData(["credits"], credits);
+  };
+
+  const pay = async (nim: number, note: string) => {
+    setPhase("approving");
+    try {
+      const receipt = await payNim(PAY_TO_ADDRESS, nim, note, preferredWallet());
+      setPhase("confirming");
+      return receipt;
+    } catch (error) {
+      setPhase("idle");
+      throw error as Error;
+    }
+  };
+
+  const failed = () => setPhase("idle");
 
   const buyChatPack = useMutation({
     mutationFn: async (pack: ChatPack) => {
-      const hash = await payNim(
-        PAY_TO_ADDRESS,
-        pack.nim,
-        `NimiqValley chat ${pack.id}`,
-        preferredWallet(),
-      );
-      return redeem({ data: { txHash: hash, kind: "chat", packId: pack.id } });
+      const txHash = await pay(pack.nim, `NimiqValley chat ${pack.id}`);
+      return redeem({ data: { txHash, kind: "chat", packId: pack.id } });
     },
     onSuccess: settle,
+    onError: failed,
   });
 
   const buyRooms = useMutation({
     mutationFn: async (rooms: number) => {
-      const hash = await payNim(
-        PAY_TO_ADDRESS,
-        rooms * ROOM_COST_NIM,
-        `NimiqValley rooms x${rooms}`,
-        preferredWallet(),
-      );
-      return redeem({ data: { txHash: hash, kind: "room", rooms } });
+      const txHash = await pay(rooms * ROOM_COST_NIM, `NimiqValley rooms x${rooms}`);
+      return redeem({ data: { txHash, kind: "room", rooms } });
     },
     onSuccess: settle,
+    onError: failed,
   });
 
   const buyKeys = useMutation({
     mutationFn: async (keys: number) => {
-      const hash = await payNim(
-        PAY_TO_ADDRESS,
-        keys * KEY_COST_NIM,
-        `NimiqValley match keys x${keys}`,
-        preferredWallet(),
-      );
-      return redeem({ data: { txHash: hash, kind: "key", keys } });
+      const txHash = await pay(keys * KEY_COST_NIM, `NimiqValley match keys x${keys}`);
+      return redeem({ data: { txHash, kind: "key", keys } });
     },
     onSuccess: settle,
+    onError: failed,
   });
 
   const claimDaily = useMutation({
@@ -72,5 +81,5 @@ export function useCreditActions() {
     onSuccess: settle,
   });
 
-  return { buyChatPack, buyRooms, buyKeys, claimDaily };
+  return { buyChatPack, buyRooms, buyKeys, claimDaily, phase };
 }
