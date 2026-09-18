@@ -831,6 +831,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", resize);
+      ro.disconnect();
     };
   }, [moveRef, onNearbyChange, onViewpointChange, paused]);
 
