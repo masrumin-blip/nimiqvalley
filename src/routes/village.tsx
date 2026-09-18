@@ -10,7 +10,7 @@ import SceneryView from "@/components/SceneryView";
 import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
-import { connectNimiq, connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
+import { connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
 import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForUsd } from "@/lib/tiers";
 import type { Neighbor, RestSpot } from "@/lib/village";
 
@@ -154,7 +154,6 @@ function VillagePage() {
     }
   };
 
-  const connected = Boolean(nimAddress || evmAddress) || demo;
 
   return (
     <GameStage>
