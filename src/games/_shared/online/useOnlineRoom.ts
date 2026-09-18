@@ -150,6 +150,47 @@ export function useOnlineRoom({
     onSuccess: () => adopt(null),
   });
 
+  /* ---------------- quick match queue ---------------- */
+  const [queueing, setQueueing] = useState(false);
+  const [queue, setQueue] = useState<QueueState | null>(null);
+
+  const startQuick = useMutation({
+    mutationFn: () => joinQueueFn({ data: { gameSlug, maxPlayers, settings } }),
+    onSuccess: () => setQueueing(true),
+  });
+
+  const cancelQuick = useMutation({
+    mutationFn: () => leaveQueueFn({ data: { gameSlug } }),
+    onSuccess: () => {
+      setQueueing(false);
+      setQueue(null);
+    },
+  });
+
+  useQuery({
+    queryKey: ["mp-queue", gameSlug],
+    enabled: queueing && Boolean(wallet),
+    refetchInterval: QUEUE_POLL_MS,
+    queryFn: async () => {
+      const state = await pollQueueFn({ data: { gameSlug } });
+      setQueue(state);
+      if (state.room) {
+        setQueueing(false);
+        adopt(state.room);
+      } else if (!state.waiting) {
+        setQueueing(false);
+      }
+      return state;
+    },
+  });
+
+  useEffect(() => {
+    if (!active && queueing) {
+      setQueueing(false);
+      void leaveQueueFn({ data: { gameSlug } }).catch(() => {});
+    }
+  }, [active, gameSlug, leaveQueueFn, queueing]);
+
   const sendMove = useCallback(
     (turnNo: number, kind: string, payload: Record<string, number | string | boolean | null>) => {
       if (!roomId) return;
