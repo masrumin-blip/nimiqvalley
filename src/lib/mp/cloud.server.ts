@@ -404,7 +404,10 @@ export async function submitMove(
 ) {
   const row = await getRow(id);
   if (!row || row.status !== "playing") throw new Error("The match is not running.");
-  if (row.turn_wallet !== wallet) throw new Error("It is not your turn.");
+  // Carrom keeps the turn locally (a valid pocket shoots again), so those
+  // rooms only rely on the move sequence number.
+  const freeTurn = (row.settings as { freeTurn?: boolean } | null)?.freeTurn === true;
+  if (!freeTurn && row.turn_wallet !== wallet) throw new Error("It is not your turn.");
   if (row.turn_no !== turnNo) throw new Error("That turn already happened.");
   const { error } = await supabaseAdmin
     .from("mp_moves")
