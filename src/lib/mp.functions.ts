@@ -2,7 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import type { LobbyState, MoveRecord, PlayerTick, RoomState } from "./mp/types";
+import type { LobbyState, MoveRecord, PlayerTick, QueueState, RoomState } from "./mp/types";
 
 const idSchema = z.string().uuid();
 const slugSchema = z.enum(["checkers", "carrom", "hexaman"]);
