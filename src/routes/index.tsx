@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Gamepad2, Home, MessageCircle, Sparkles } from "lucide-react";
 import valleyBackground from "@/assets/nimiq-valley-menu-bg.jpg";
 import { DailyRewardDialog } from "@/components/DailyRewardDialog";
+import { MatchPassPanel } from "@/components/MatchPassPanel";
 
 const title = "NimiqValley — Village, Games & AI Chat";
 const description =
