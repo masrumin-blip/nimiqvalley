@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Trophy } from "lucide-react";
+import { PlayerBadge } from "@/components/PlayerBadge";
 import { GAMES } from "@/lib/games";
 
 const title = "Game Hub — 15 NimiqValley Games";
@@ -41,7 +43,18 @@ function GameHub() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3">
+          <Link
+            to="/leaderboard"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wide text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            <Trophy className="size-4" aria-hidden="true" />
+            Leaderboard
+          </Link>
+          <PlayerBadge />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {GAMES.map((game) => (
             <Link
               key={game.slug}

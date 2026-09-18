@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as VillageRouteImport } from './routes/village'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatCharacterIdRouteImport } from './routes/chat.$characterId'
@@ -39,6 +40,11 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VillageRoute = VillageRouteImport.update({
@@ -140,6 +146,7 @@ const GamesTappyRoute = GamesTappyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -163,6 +170,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/leaderboard'
     | '/village'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/leaderboard'
     | '/village'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/leaderboard'
     | '/village'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -282,6 +294,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   VillageRoute: typeof VillageRoute
   ChatCharacterIdRoute: typeof ChatCharacterIdRoute
   GamesBomberRoute: typeof GamesBomberRoute
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/village': {
@@ -458,6 +478,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  LeaderboardRoute: LeaderboardRoute,
   VillageRoute: VillageRoute,
   ChatCharacterIdRoute: ChatCharacterIdRoute,
   GamesBomberRoute: GamesBomberRoute,
