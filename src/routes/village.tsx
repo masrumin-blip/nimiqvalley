@@ -10,7 +10,7 @@ import SceneryView from "@/components/SceneryView";
 import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
-import { connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
+import { connectPolygon, getConnectedPolygonAccount, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
 import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForUsd } from "@/lib/tiers";
 import type { Neighbor, RestSpot } from "@/lib/village";
 
@@ -106,12 +106,12 @@ function VillagePage() {
     if (player?.wallet) setNimAddress(player.wallet);
   }, [player?.wallet]);
 
-  // Inside Nimiq Pay the Polygon provider comes bundled, so read USDT silently.
+  // Read only an already-authorized Polygon account; loading the island must not open an approval dialog.
   useEffect(() => {
     if (!nimAddress || evmAddress) return;
     if (!isInsideNimiqPay() || !getEthereum()) return;
     let cancelled = false;
-    void connectPolygon()
+    void getConnectedPolygonAccount()
       .then((addr) => {
         if (!cancelled) setEvmAddress(addr);
       })
@@ -120,6 +120,15 @@ function VillagePage() {
       cancelled = true;
     };
   }, [nimAddress, evmAddress]);
+
+  const handleConnectPolygon = async () => {
+    setStatus(null);
+    try {
+      setEvmAddress(await connectPolygon());
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Polygon was not connected.");
+    }
+  };
 
   const amountNum = Number(amount);
   const wouldLeave = nim - (Number.isFinite(amountNum) ? amountNum : 0);
@@ -205,6 +214,11 @@ function VillagePage() {
               <p className="text-xs text-muted-foreground">
                 {demo || evmAddress ? `${formatUsd(usdtValue)} USDT` : "Polygon not connected"}
               </p>
+              {!demo && !evmAddress && getEthereum() ? (
+                <Button type="button" variant="ghost" onClick={handleConnectPolygon} className="mt-1 min-h-11 px-2 text-xs">
+                  Connect Polygon
+                </Button>
+              ) : null}
             </div>
 
             {/* Real token balances */}

@@ -26,7 +26,7 @@ export function ChatCredits() {
         <Button
           size="sm"
           variant={left === 0 ? "default" : "secondary"}
-          className="h-8 shrink-0 rounded-full px-3 text-[11px] font-bold"
+          className="min-h-11 shrink-0 rounded-full px-3 text-[11px] font-bold"
         >
           <Coins className="size-3.5" />
           {left} left

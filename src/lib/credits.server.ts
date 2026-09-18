@@ -135,7 +135,13 @@ async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
   });
 }
 
-type TxLookup = { ok: boolean; recipient: string | null; nim: number };
+type TxLookup = {
+  ok: boolean;
+  sender: string | null;
+  recipient: string | null;
+  nim: number;
+  confirmed: boolean;
+};
 
 async function lookupTx(hash: string): Promise<TxLookup> {
   try {
@@ -149,21 +155,25 @@ async function lookupTx(hash: string): Promise<TxLookup> {
         params: [hash],
       }),
     });
-    if (!res.ok) return { ok: false, recipient: null, nim: 0 };
+    if (!res.ok) return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
     const json = (await res.json()) as {
-      result?: { data?: { to?: string; recipient?: string; value?: number } } & {
+      result?: { data?: { from?: string; sender?: string; to?: string; recipient?: string; value?: number; blockNumber?: number } } & {
+        from?: string;
+        sender?: string;
         to?: string;
         recipient?: string;
         value?: number;
+        blockNumber?: number;
       };
     };
     const tx = json.result?.data ?? json.result;
-    if (!tx) return { ok: false, recipient: null, nim: 0 };
+    if (!tx) return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
+    const sender = tx.from ?? tx.sender ?? null;
     const recipient = tx.to ?? tx.recipient ?? null;
     const luna = typeof tx.value === "number" ? tx.value : 0;
-    return { ok: true, recipient, nim: luna / 100_000 };
+    return { ok: true, sender, recipient, nim: luna / 100_000, confirmed: typeof tx.blockNumber === "number" };
   } catch {
-    return { ok: false, recipient: null, nim: 0 };
+    return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
   }
 }
 
@@ -212,13 +222,16 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
   }
 
   const tx = await lookupTx(hash);
-  if (tx.ok) {
-    if (tx.recipient && normalizeAddress(tx.recipient) !== normalizeAddress(PAY_TO_ADDRESS)) {
-      throw new Error("That payment did not go to the NimiqValley address.");
-    }
-    if (tx.nim > 0 && tx.nim + 0.001 < expectedNim) {
-      throw new Error(`That payment was only ${tx.nim} NIM; ${expectedNim} NIM is needed.`);
-    }
+  if (!tx.ok) throw new Error("The payment could not be verified yet. Please try again shortly.");
+  if (!tx.confirmed) throw new Error("The payment is still pending. Please try again after confirmation.");
+  if (normalizeAddress(tx.sender ?? "") !== normalizeAddress(input.wallet)) {
+    throw new Error("That payment came from a different wallet.");
+  }
+  if (normalizeAddress(tx.recipient ?? "") !== normalizeAddress(PAY_TO_ADDRESS)) {
+    throw new Error("That payment did not go to the NimiqValley address.");
+  }
+  if (tx.nim + 0.001 < expectedNim) {
+    throw new Error(`That payment was only ${tx.nim} NIM; ${expectedNim} NIM is needed.`);
   }
 
   const { error } = await supabaseAdmin.from("nim_payments").insert({
