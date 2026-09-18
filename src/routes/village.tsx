@@ -84,8 +84,6 @@ function VillagePage() {
   const realHouseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
   const charTier = demo ? (TIERS[demoTier] ?? realCharTier) : realCharTier;
   const houseTier = demo ? (TIERS[demoHouseTier] ?? realHouseTier) : realHouseTier;
-  const charIndex = TIERS.findIndex((t) => t.id === charTier.id);
-  const houseIndex = TIERS.findIndex((t) => t.id === houseTier.id);
 
   const onNearbyChange = useCallback((n: Neighbor | null) => {
     setNearby(n);
@@ -262,40 +260,6 @@ function VillagePage() {
         </div>
       </div>
 
-      {/* Connect overlay */}
-      {!connected && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background p-5">
-          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 text-center shadow-xl">
-            <h2 className="text-xl font-semibold text-card-foreground">Welcome to the village</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your NIM decides how your villager looks. Your USDT on Polygon decides how grand your
-              house is.
-            </p>
-            <div className="mt-5 space-y-2">
-              <Button
-                onClick={handleConnectNimiq}
-                disabled={busy}
-                className="min-h-11 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-              >
-                Connect Nimiq wallet
-              </Button>
-              <Button
-                onClick={() => {
-                  setStatus(null);
-                  setDemo(true);
-                }}
-                className="min-h-11 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm font-semibold text-foreground"
-              >
-                Try the demo — no wallet needed
-              </Button>
-            </div>
-            {status && <p className="mt-3 text-xs text-destructive">{status}</p>}
-            <p className="mt-4 text-xs text-muted-foreground">
-              Works inside Nimiq Pay and in a normal browser with a wallet.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
