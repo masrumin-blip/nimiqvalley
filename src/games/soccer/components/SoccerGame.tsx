@@ -749,6 +749,7 @@ export default function SoccerGame() {
   const { credits } = useCredits();
   const { buyKeys } = useCreditActions();
   const matchKeys = credits?.matchKeys ?? 0;
+  const roomPasses = credits?.roomCredits ?? 0;
 
   const exitToMenu = () => {
     if (cpuTimer.current) window.clearTimeout(cpuTimer.current);
@@ -972,10 +973,10 @@ export default function SoccerGame() {
                       </button>
                       <button
                         onClick={() => online.openRoom.mutate(target)}
-                        disabled={online.openRoom.isPending || matchKeys <= 0}
+                        disabled={online.openRoom.isPending || (matchKeys <= 0 && roomPasses <= 0)}
                         className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold tracking-wider text-foreground/80 transition hover:border-white/50 disabled:opacity-60"
                       >
-                        CREATE ROOM CODE — 1 KEY
+                        CREATE ROOM CODE — 1 KEY OR 1 ROOM PASS
                       </button>
                       {matchKeys <= 0 && (
                         <button
