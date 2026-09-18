@@ -75,8 +75,9 @@ function MainMenu() {
           <p className="mx-auto mt-3 max-w-2xl text-sm font-medium leading-relaxed text-foreground/75 sm:mt-4 sm:text-lg">
             One valley with a village to explore, arcade games to play, and characters ready to chat.
           </p>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
             <DailyRewardDialog />
+            <MatchPassPanel />
           </div>
         </header>
 
