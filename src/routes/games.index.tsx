@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MessagesSquare, Trophy } from "lucide-react";
+import { useState } from "react";
 import { KeyShopDialog } from "@/components/KeyShopDialog";
 import { PlayerBadge } from "@/components/PlayerBadge";
+import { Button } from "@/components/ui/button";
 import { GAMES } from "@/lib/games";
 
 const title = "Game Hub — 15 NimiqValley Games";
@@ -23,6 +25,9 @@ export const Route = createFileRoute("/games/")({
 });
 
 function GameHub() {
+  const [category, setCategory] = useState<"all" | "multiplayer" | "just-for-fun">("all");
+  const visibleGames = category === "all" ? GAMES : GAMES.filter((game) => game.category === category);
+
   return (
     <main className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-5xl">
@@ -65,8 +70,32 @@ function GameHub() {
           <PlayerBadge />
         </div>
 
+        <div
+          className="mb-5 grid grid-cols-3 gap-1 rounded-lg border border-border bg-card p-1"
+          role="group"
+          aria-label="Game categories"
+        >
+          {([
+            ["all", "All Games"],
+            ["multiplayer", "Multiplayer"],
+            ["just-for-fun", "Just for Fun"],
+          ] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              variant={category === value ? "default" : "ghost"}
+              size="sm"
+              aria-pressed={category === value}
+              onClick={() => setCategory(value)}
+              className="h-9 px-1 text-[10px] font-black uppercase sm:text-xs"
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {GAMES.map((game) => (
+          {visibleGames.map((game) => (
             <Link
               key={game.slug}
               to={game.path}

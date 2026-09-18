@@ -22,6 +22,7 @@ export type GameEntry = {
   emoji: string;
   accent: string;
   cover: string;
+  category: "arcade" | "multiplayer" | "just-for-fun";
 };
 
 export const GAMES: GameEntry[] = [
@@ -33,6 +34,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🕹️",
     accent: "oklch(0.82 0.18 195)",
     cover: jumpCover,
+    category: "arcade",
   },
   {
     slug: "race",
@@ -42,6 +44,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🏎️",
     accent: "oklch(0.75 0.19 30)",
     cover: raceCover,
+    category: "arcade",
   },
   {
     slug: "hexaman",
@@ -51,6 +54,7 @@ export const GAMES: GameEntry[] = [
     emoji: "👾",
     accent: "oklch(0.85 0.19 95)",
     cover: hexamanCover,
+    category: "multiplayer",
   },
   {
     slug: "mininja",
@@ -60,6 +64,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🥷",
     accent: "oklch(0.72 0.24 348)",
     cover: mininjaCover,
+    category: "arcade",
   },
   {
     slug: "pet",
@@ -69,6 +74,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🐣",
     accent: "oklch(0.72 0.15 162)",
     cover: petCover,
+    category: "just-for-fun",
   },
   {
     slug: "rooftop",
@@ -78,6 +84,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🏙️",
     accent: "oklch(0.78 0.16 60)",
     cover: rooftopCover,
+    category: "arcade",
   },
   {
     slug: "slide",
@@ -87,6 +94,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🏂",
     accent: "oklch(0.8 0.1 240)",
     cover: slideCover,
+    category: "arcade",
   },
   {
     slug: "soccer",
@@ -96,6 +104,7 @@ export const GAMES: GameEntry[] = [
     emoji: "⚽",
     accent: "oklch(0.82 0.19 150)",
     cover: soccerCover,
+    category: "multiplayer",
   },
   {
     slug: "tappy",
@@ -105,6 +114,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🪙",
     accent: "oklch(0.85 0.18 150)",
     cover: tappyCover,
+    category: "arcade",
   },
   {
     slug: "shooter",
@@ -114,6 +124,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🚀",
     accent: "oklch(0.75 0.2 300)",
     cover: shooterCover,
+    category: "arcade",
   },
   {
     slug: "carrom",
@@ -123,6 +134,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🎯",
     accent: "oklch(0.85 0.16 205)",
     cover: carromCover,
+    category: "multiplayer",
   },
   {
     slug: "checkers",
@@ -132,6 +144,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🔷",
     accent: "oklch(0.89 0.18 100)",
     cover: checkersCover,
+    category: "multiplayer",
   },
   {
     slug: "bomber",
@@ -141,6 +154,7 @@ export const GAMES: GameEntry[] = [
     emoji: "💣",
     accent: "oklch(0.78 0.19 45)",
     cover: bomberCover,
+    category: "multiplayer",
   },
   {
     slug: "ship",
@@ -150,6 +164,7 @@ export const GAMES: GameEntry[] = [
     emoji: "🛸",
     accent: "oklch(0.7 0.29 340)",
     cover: shipCover,
+    category: "arcade",
   },
   {
     slug: "crossing",
@@ -159,5 +174,6 @@ export const GAMES: GameEntry[] = [
     emoji: "🐃",
     accent: "oklch(0.83 0.16 87)",
     cover: crossingCover,
+    category: "arcade",
   },
 ];
