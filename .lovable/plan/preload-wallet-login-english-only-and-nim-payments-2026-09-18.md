@@ -24,17 +24,20 @@ Every visible text in the app becomes English: menus, buttons, dialogs, game ove
 All payments go to `NQ79 MC3X FDQK 6T5S 7T0Q 60TS B1DH BUHV RN2R` through the wallet's own approval dialog. After the transaction is confirmed, credits are added to the player's balance on the server, and each transaction hash can only be used once.
 
 **AI chat**
+
 - 3 free messages per day for everyone (resets daily).
 - Packs: 100 NIM = 10 messages, 250 NIM = 30 messages, 500 NIM = 75 messages.
 - The chat screen shows the remaining balance and offers the packs when it runs out.
 
 **Multiplayer rooms**
+
 - Creating a room (Soccer, Checkers, Carrom, Hexaman) costs 25 NIM.
 - Joining someone else's room stays free, so one payment covers a whole match.
 
 **Daily free claim (main menu)**
-- A "Daily Reward" button on the main menu.
-- The player opens x.com/nimiq and x.com/nimiqvalley (both must be opened), then confirms the claim.
+
+- A "Daily Reward" button on the main menuthen.
+- The player opens x.com/nimiq and x.com/nimiqvalley (both must be opened),  confirms the claim.
 - Reward: 2 free room creations + 3 extra AI messages, once per day per wallet.
 - A countdown shows when the next claim unlocks.
 
