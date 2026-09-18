@@ -71,6 +71,13 @@
       "when": 1789760277531,
       "tag": "0009_create_wallet_login_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789762815568,
+      "tag": "0010_restrict_credits_and_payments_reads",
+      "breakpoints": true
     }
   ]
 }
