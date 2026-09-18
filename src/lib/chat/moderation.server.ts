@@ -60,7 +60,9 @@ function simplify(value: string) {
 }
 
 export function normalizeChatText(value: string) {
-  return simplify(value).replace(/[^a-z0-9]/g, "");
+  return simplify(value)
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/(.)\1+/g, "$1");
 }
 
 export function containsProfanity(value: string) {
