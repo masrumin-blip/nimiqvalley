@@ -482,6 +482,27 @@ export type Database = {
         }
         Relationships: []
       }
+      player_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          token: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          token: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          token?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

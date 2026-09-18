@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { createWalletChallenge, getPlayer, setDisplayName, signInWithWallet, signOutPlayer } from "@/lib/auth.functions";
 import type { PlayerInfo } from "@/lib/auth.functions";
+import { writePlayerToken } from "@/lib/player-token";
 import { connectWallet, preferredWallet, signLoginMessage, type WalletKind } from "@/lib/wallet";
 
 export function usePlayer() {
@@ -27,16 +28,22 @@ export function usePlayerActions() {
       const address = await connectWallet(kind);
       const { challenge, message } = await createChallenge({ data: { address } });
       const signed = await signLoginMessage(kind, message, address);
-      return signIn({ data: { address, challenge, ...signed } });
+      const result = await signIn({ data: { address, challenge, ...signed } });
+      writePlayerToken(result?.token ?? null);
+      return result;
     },
     onSuccess: (player) => {
-      queryClient.setQueryData(["player"], player);
+      queryClient.setQueryData(["player"], player ? { wallet: player.wallet, displayName: player.displayName } : null);
       queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });
 
   const disconnect = useMutation({
-    mutationFn: () => signOut(),
+    mutationFn: async () => {
+      const result = await signOut();
+      writePlayerToken(null);
+      return result;
+    },
     onSuccess: () => {
       queryClient.setQueryData(["player"], null);
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });

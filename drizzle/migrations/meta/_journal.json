@@ -78,6 +78,13 @@
       "when": 1789762815568,
       "tag": "0010_restrict_credits_and_payments_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789764415993,
+      "tag": "0011_create_player_sessions",
+      "breakpoints": true
     }
   ]
 }

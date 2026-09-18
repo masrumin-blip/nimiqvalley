@@ -1,6 +1,10 @@
-import { useSession } from "@tanstack/react-start/server";
+import { getRequestHeader, useSession } from "@tanstack/react-start/server";
+
+import { PLAYER_TOKEN_HEADER } from "./player-token";
 
 export type PlayerSession = { wallet?: string };
+
+const TOKEN_TTL_MS = 60 * 60 * 24 * 60 * 1000;
 
 function sessionConfig() {
   return {
@@ -17,8 +21,48 @@ export async function playerSession() {
   return useSession<PlayerSession>(sessionConfig());
 }
 
+function requestToken(): string | null {
+  try {
+    return getRequestHeader(PLAYER_TOKEN_HEADER) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Issue a long-lived token for clients whose cookies are blocked (WebViews). */
+export async function issuePlayerToken(wallet: string): Promise<string> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const token = crypto.randomUUID();
+  const { error } = await supabaseAdmin.from("player_sessions").insert({
+    token,
+    wallet,
+    expires_at: new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
+  });
+  if (error) throw new Error("Could not start the player session.");
+  return token;
+}
+
+export async function revokeRequestToken() {
+  const token = requestToken();
+  if (!token) return;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  await supabaseAdmin.from("player_sessions").delete().eq("token", token);
+}
+
 /** Wallet address of the signed-in player, or null. */
 export async function currentWallet(): Promise<string | null> {
   const session = await playerSession();
-  return session.data.wallet ?? null;
+  if (session.data.wallet) return session.data.wallet;
+
+  const token = requestToken();
+  if (!token) return null;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin
+    .from("player_sessions")
+    .select("wallet, expires_at")
+    .eq("token", token)
+    .maybeSingle();
+  if (!data) return null;
+  if (new Date(data.expires_at).getTime() <= Date.now()) return null;
+  return data.wallet;
 }

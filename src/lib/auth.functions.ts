@@ -46,7 +46,7 @@ export const createWalletChallenge = createServerFn({ method: "POST" })
 /** Store the connected wallet in an httpOnly session cookie and upsert its profile. */
 export const signInWithWallet = createServerFn({ method: "POST" })
   .inputValidator((data) => signInSchema.parse(data))
-  .handler(async ({ data }): Promise<PlayerInfo> => {
+  .handler(async ({ data }): Promise<{ wallet: string; displayName: string | null; token: string }> => {
     const wallet = data.address.toUpperCase();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { playerSession } = await import("./session.server");
@@ -117,7 +117,9 @@ export const signInWithWallet = createServerFn({ method: "POST" })
 
     const session = await playerSession();
     await session.update({ wallet });
-    return { wallet, displayName };
+    const { issuePlayerToken } = await import("./session.server");
+    const token = await issuePlayerToken(wallet);
+    return { wallet, displayName, token };
   });
 
 /** Current signed-in player, or null. */
@@ -153,8 +155,9 @@ export const setDisplayName = createServerFn({ method: "POST" })
 
 /** Sign the player out. */
 export const signOutPlayer = createServerFn({ method: "POST" }).handler(async () => {
-  const { playerSession } = await import("./session.server");
+  const { playerSession, revokeRequestToken } = await import("./session.server");
   const session = await playerSession();
   await session.clear();
+  await revokeRequestToken();
   return { ok: true };
 });
