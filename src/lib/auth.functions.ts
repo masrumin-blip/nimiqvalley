@@ -64,20 +64,37 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
         throw new Error("The signing key does not belong to this wallet.");
       }
+
       const encoder = new TextEncoder();
-      const hubPrefixed = encoder.encode(`\u0016Nimiq Signed Message:\n${message}`);
-      const legacyPrefixed = encoder.encode(`\u0016Nimiq Signed Message:\n${message.length}${message}`);
-      const plain = encoder.encode(message);
-      if (
-        !publicKey.verify(signature, hubPrefixed) &&
-        !publicKey.verify(signature, legacyPrefixed) &&
-        !publicKey.verify(signature, plain)
-      ) {
-        throw new Error("The wallet signature is invalid.");
-      }
+      const messageBytes = encoder.encode(message);
+      const prefix = "\u0016Nimiq Signed Message:\n";
+      // Nimiq's length prefix counts bytes, not UTF-16 code units.
+      const lengthPrefixed = encoder.encode(`${prefix}${messageBytes.length}${message}`);
+      const hubPrefixed = encoder.encode(`${prefix}${message}`);
+      const sha256 = async (bytes: Uint8Array) =>
+        new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer));
+
+      const candidates: Array<{ label: string; bytes: Uint8Array }> = [
+        { label: "sha256(prefix+len+msg)", bytes: await sha256(lengthPrefixed) },
+        { label: "sha256(prefix+msg)", bytes: await sha256(hubPrefixed) },
+        { label: "sha256(msg)", bytes: await sha256(messageBytes) },
+        { label: "raw(prefix+len+msg)", bytes: lengthPrefixed },
+        { label: "raw(prefix+msg)", bytes: hubPrefixed },
+        { label: "raw(msg)", bytes: messageBytes },
+      ];
+
+      const matched = candidates.find((candidate) => {
+        try {
+          return publicKey.verify(signature, candidate.bytes);
+        } catch {
+          return false;
+        }
+      });
+      if (!matched) throw new Error("The wallet signature could not be verified.");
+      console.info(`[wallet-login] signature verified via ${matched.label}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
-      throw new Error("The wallet signature is invalid.");
+      throw new Error("The wallet signature could not be verified.");
     }
 
     const { data: consumed, error: consumeError } = await supabaseAdmin
