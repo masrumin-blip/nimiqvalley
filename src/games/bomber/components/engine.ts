@@ -169,6 +169,14 @@ export interface GameOptions {
   best: number;
   onHud: (h: HudState) => void;
   sound: Sound;
+  /** Online rooms build the same map on every client from a shared seed. */
+  seed?: number;
+  /** Seat this client controls (0 offline). */
+  localId?: number;
+  /** Online match: remote seats are driven by ticks, not by local physics. */
+  online?: boolean;
+  /** Display names per seat in online matches. */
+  names?: string[];
 }
 
 export class BomberGame {
