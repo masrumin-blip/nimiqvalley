@@ -10,6 +10,7 @@ import {
   type Mode,
 } from "./engine";
 import { playSound, primeAudio, type SoundName } from "./sound";
+import { serverNow } from "@/lib/mp/clock";
 import { Button } from "@/components/ui/button";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";

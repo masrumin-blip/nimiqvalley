@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { serverNow } from "@/lib/mp/clock";
 import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
