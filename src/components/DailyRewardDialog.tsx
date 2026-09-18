@@ -40,7 +40,7 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
         <DialogHeader>
           <DialogTitle>Daily free reward</DialogTitle>
           <DialogDescription>
-            Visit both accounts on X, then claim {DAILY_REWARD.rooms} free multiplayer rooms and{" "}
+            Visit both accounts on X, then claim {DAILY_REWARD.rooms} free match passes (rooms or ranked) and{" "}
             {DAILY_REWARD.chats} extra AI chat messages. Once per day.
           </DialogDescription>
         </DialogHeader>
@@ -85,7 +85,7 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
 
         {credits && (
           <p className="text-center text-[11px] text-muted-foreground">
-            Balance: {credits.roomCredits} rooms · {credits.chatCredits + credits.freeChatsLeft} chat
+            Balance: {credits.roomCredits} passes · {credits.chatCredits + credits.freeChatsLeft} chat
             messages
           </p>
         )}
