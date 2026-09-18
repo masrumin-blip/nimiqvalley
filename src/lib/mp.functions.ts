@@ -145,18 +145,23 @@ export const challengeFriend = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
     if (data.target === wallet) throw new Error("You cannot challenge yourself.");
-    const { spendKey, spendRoom } = await import("./credits.server");
-    await spendKey(wallet);
-    await spendRoom(wallet);
+    const { spendRoomEntry, refundRoomEntry } = await import("./credits.server");
+    const entry = await spendRoomEntry(wallet);
     const cloud = await import("./mp/cloud.server");
-    return cloud.createRoom(
-      wallet,
-      data.gameSlug,
-      "friend",
-      data.maxPlayers,
-      data.settings,
-      data.target,
-    );
+    try {
+      return await cloud.createRoom(
+        wallet,
+        data.gameSlug,
+        "friend",
+        data.maxPlayers,
+        data.settings,
+        data.target,
+        entry,
+      );
+    } catch (error) {
+      await refundRoomEntry(wallet, entry);
+      throw error as Error;
+    }
   });
 
 export const respondChallenge = createServerFn({ method: "POST" })
@@ -293,6 +298,11 @@ export const leaveRoom = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const wallet = await requireWallet();
     const cloud = await import("./mp/cloud.server");
-    await cloud.abandonAll(wallet, data.gameSlug);
+    const refunds = await cloud.abandonAll(wallet, data.gameSlug);
+    // Nobody joined, so the room was never used: give the entry cost back.
+    if (refunds.length > 0) {
+      const { refundRoomEntry } = await import("./credits.server");
+      for (const entry of refunds) await refundRoomEntry(wallet, entry);
+    }
     return { ok: true };
   });
