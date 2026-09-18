@@ -60,6 +60,7 @@ function GameHub() {
               <MessagesSquare className="size-4" aria-hidden="true" />
               Arena Chat
             </Link>
+            <KeyShopDialog />
           </div>
           <PlayerBadge />
         </div>
