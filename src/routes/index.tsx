@@ -81,7 +81,7 @@ function MainMenu() {
             <Link
               key={item.to}
               to={item.to}
-              className={`group relative min-h-44 overflow-hidden rounded-md border border-border/80 bg-card/90 p-4 shadow-lg backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-56 sm:p-6 ${
+              className={`group relative min-h-48 overflow-hidden rounded-md border border-border/80 bg-card/90 p-4 shadow-lg backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-56 sm:p-6 ${
                 index === 2 ? "col-span-2 mx-auto w-[calc(50%-0.375rem)] sm:w-[calc(50%-0.5rem)]" : ""
               }`}
             >
@@ -96,7 +96,7 @@ function MainMenu() {
               <h2 className="mt-4 font-display text-xl font-black leading-tight tracking-normal text-card-foreground sm:mt-5 sm:text-3xl">
                 {item.title}
               </h2>
-              <p className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-muted-foreground sm:mt-3 sm:text-sm">
+              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground sm:mt-3 sm:line-clamp-3 sm:text-sm">
                 {item.copy}
               </p>
               <span className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 font-display text-[11px] font-black uppercase text-primary sm:bottom-6 sm:left-6 sm:text-sm">
