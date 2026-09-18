@@ -441,7 +441,7 @@ export default function BomberGame() {
           : "GAME OVER";
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col items-center gap-1">
       {screen === "playing" && (
         <div className="flex w-full max-w-[480px] shrink-0 items-center gap-1">
           <Hud hud={hud} best={best} mode={mode} difficulty={difficulty} />
@@ -479,7 +479,8 @@ export default function BomberGame() {
           setDifficulty={setDifficulty}
           playerCount={playerCount}
           setPlayerCount={setPlayerCount}
-          onStart={start}
+          onStart={(m, d, n) => start(m, d, n)}
+          onOnline={() => setLobbyOpen(true)}
         />
       )}
 
@@ -578,6 +579,47 @@ export default function BomberGame() {
         </div>
       )}
 
+      {lobbyOpen && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-background/95 p-4 backdrop-blur-sm">
+          <h2 className="font-display text-lg uppercase tracking-[0.2em] text-arcade-highlight">
+            Online battle
+          </h2>
+          <p className="max-w-[90%] text-center text-[10px] text-muted-foreground">
+            Up to 4 bombers, one life each, three minute round. Players pass
+            through each other — only the flames hurt. Last bomber standing
+            wins.
+          </p>
+          <div className="w-full max-w-xs">
+            <OnlinePanel
+              online={online}
+              maxPlayers={4}
+              manualStart
+              roundMs={BOMBER_ROUND_MS}
+              onBack={() => setLobbyOpen(false)}
+            />
+          </div>
+          <Button variant="ghost" className="text-xs" onClick={() => setLobbyOpen(false)}>
+            Back
+          </Button>
+        </div>
+      )}
+
+      <MatchResultDialog
+        open={resultOpen}
+        title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
+        subtitle="Battle results"
+        rows={resultRows}
+        onPlayAgain={() => {
+          online.leave.mutate();
+          setOnlineMode(false);
+          onlineRef.current = false;
+          setResultOpen(false);
+          setScreen("start");
+          setLobbyOpen(true);
+        }}
+        onExit={() => navigate({ to: "/games" })}
+      />
+
       {screen === "playing" && !over && !paused && (
         <div className="flex h-[150px] w-full max-w-[480px] shrink-0 select-none items-center justify-between px-2 md:hidden">
           <div className="grid grid-cols-3 grid-rows-3 gap-1 opacity-90">
@@ -616,12 +658,14 @@ function StartMenu({
   playerCount,
   setPlayerCount,
   onStart,
+  onOnline,
 }: {
   difficulty: Difficulty;
   setDifficulty: (d: Difficulty) => void;
   playerCount: number;
   setPlayerCount: (n: number) => void;
   onStart: (mode: Mode, diff: Difficulty, players: number) => void;
+  onOnline: () => void;
 }) {
   return (
     <div className="flex w-full max-w-[480px] flex-col items-center gap-3 overflow-y-auto border-2 border-arcade-frame bg-arcade-panel px-3 py-3 shadow-arcade">
@@ -713,6 +757,17 @@ function StartMenu({
           </Button>
           <p className="text-center text-[8px] leading-relaxed text-arcade-muted">
             {KEY_HINT.slice(0, playerCount).join(" · ")}
+          </p>
+
+          <Button
+            onClick={onOnline}
+            variant="outline"
+            className="mt-2 w-full border-2 border-arcade-highlight bg-arcade-panel py-5 font-display text-xs text-arcade-highlight transition-transform active:scale-95"
+          >
+            ONLINE BATTLE
+          </Button>
+          <p className="text-center text-[8px] leading-relaxed text-arcade-muted">
+            2-4 real players · last bomber standing wins
           </p>
         </div>
       </div>
