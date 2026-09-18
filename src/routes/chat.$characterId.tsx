@@ -47,6 +47,13 @@ function messageText(message: UIMessage) {
     .trim();
 }
 
+function reasoningText(message: UIMessage) {
+  return message.parts
+    .map((part) => (part.type === "reasoning" ? part.text : ""))
+    .join("")
+    .trim();
+}
+
 function ChatRoom() {
   const character = Route.useLoaderData();
   const [draft, setDraft] = useState("");
@@ -83,14 +90,14 @@ function ChatRoom() {
     transport,
     onError: (err) => {
       const m = err.message;
-      if (m.includes("402")) {
+      if (m.includes("402") || m.toLowerCase().includes("credit")) {
         setError("You are out of chat messages. Buy a pack or claim the daily reward.");
       } else if (m.includes("401") || m.includes("403")) {
-        setError("The valley gate key was refused. Please check the chat service key.");
+        setError(m || "Lovable AI is currently unavailable for this workspace.");
       } else if (m.includes("429")) {
         setError("The valley is out of ink for now. Please try again in a moment.");
       } else {
-        setError("The connection to the valley flickered. Please try again.");
+        setError(m || "The connection to Lovable AI flickered. Please try again.");
       }
       queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
@@ -159,7 +166,8 @@ function ChatRoom() {
 
             {messages.map((message) => {
               const text = messageText(message);
-              if (!text) return null;
+              const reasoning = reasoningText(message);
+              if (!text && !reasoning) return null;
               return (
                 <div
                   key={message.id}
@@ -169,6 +177,12 @@ function ChatRoom() {
                       : "self-end rounded-br-md bg-ember text-primary-foreground"
                   }`}
                 >
+                  {message.role === "assistant" && reasoning && (
+                    <details className="mb-2 text-xs text-ink/50">
+                      <summary className="cursor-pointer font-mono uppercase">Thinking</summary>
+                      <p className="mt-1 whitespace-pre-wrap">{reasoning}</p>
+                    </details>
+                  )}
                   {text}
                 </div>
               );
