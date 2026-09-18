@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Loader2, Swords, Users } from "lucide-react";
+import { Coins, Loader2, Swords, Trophy, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
-import { ROOM_COST_NIM } from "@/lib/credits";
+import { RANKED_PAYOUT_NIM, RANKED_STAKE_NIM, ROOM_COST_NIM, TICKET_PACKS } from "@/lib/credits";
 import type { OnlineRoom } from "./useOnlineRoom";
 
 interface Props {
@@ -17,12 +17,13 @@ interface Props {
   onBack?: () => void;
 }
 
-/** Shared lobby UI: create a room, join by code, or challenge an Arena friend. */
+/** Shared lobby UI: casual or ranked quick match, private room, friend challenge. */
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
   const { credits } = useCredits();
   const { buyRooms } = useCreditActions();
   const rooms = credits?.roomCredits ?? 0;
+  const balance = credits?.nimBalance ?? 0;
   const room = online.room;
   const invites = online.lobby?.invites ?? [];
   const friends = online.lobby?.friends ?? [];
@@ -31,6 +32,7 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
     (online.enterRoom.error as Error | null)?.message ??
     (online.challenge.error as Error | null)?.message ??
     (online.openRoom.error as Error | null)?.message ??
+    (online.startQuick.error as Error | null)?.message ??
     null;
 
   if (!online.wallet) {
