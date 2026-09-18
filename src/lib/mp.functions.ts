@@ -191,7 +191,12 @@ export const fetchRoom = createServerFn({ method: "GET" })
   .handler(
     async ({
       data,
-    }): Promise<{ room: RoomState | null; moves: MoveRecord[]; ticks: PlayerTick[] }> => {
+    }): Promise<{
+      room: RoomState | null;
+      moves: MoveRecord[];
+      ticks: PlayerTick[];
+      serverNow: string;
+    }> => {
       await requireWallet();
       const cloud = await import("./mp/cloud.server");
       const [room, moves, ticks] = await Promise.all([
@@ -199,7 +204,7 @@ export const fetchRoom = createServerFn({ method: "GET" })
         cloud.listMoves(data.id, data.since),
         data.withTicks ? cloud.listTicks(data.id) : Promise.resolve([]),
       ]);
-      return { room, moves, ticks };
+      return { room, moves, ticks, serverNow: new Date().toISOString() };
     },
   );
 
