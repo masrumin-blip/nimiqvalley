@@ -8,6 +8,6 @@ import { z } from "zod";
 export const hashTransaction = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ serialized: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    const { Transaction } = await import("@nimiq/core");
+    const { Transaction } = await import("@nimiq/core/web");
     return { hash: Transaction.fromAny(data.serialized).hash() };
   });
