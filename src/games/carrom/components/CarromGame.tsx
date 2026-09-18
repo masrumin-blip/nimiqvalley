@@ -355,6 +355,9 @@ export default function CarromGame() {
   // Ten seconds per shot: an automatic stroke keeps both boards in sync.
   useEffect(() => {
     if (mode !== "online" || phase !== "aim" || turn !== "you") return;
+    // Anchored to the server turn clock so both boards time out together.
+    const started = room?.turnStartedAt ? Date.parse(room.turnStartedAt) : serverNow();
+    const remaining = Math.max(0, TURN_TIMEOUT_MS - (serverNow() - started));
     const timer = setTimeout(() => {
       if (phaseRef.current !== "aim" || turnRef.current !== "you") return;
       const s = striker();
@@ -377,9 +380,9 @@ export default function CarromGame() {
       setShots((v) => v + 1);
       playSfx("flick", 0.8);
       setPhaseBoth("moving");
-    }, TURN_TIMEOUT_MS);
+    }, remaining);
     return () => clearTimeout(timer);
-  }, [mode, phase, turn, setPhaseBoth, sendShot]);
+  }, [mode, phase, turn, room?.turnStartedAt, setPhaseBoth, sendShot]);
 
   // Publish the winner once the match ends.
   const reportedRef = useRef(false);

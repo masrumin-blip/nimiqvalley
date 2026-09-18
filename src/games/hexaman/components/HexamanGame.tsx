@@ -996,9 +996,8 @@ export function HexamanGame() {
               {hud.status === "over" ? "Reboot" : "Start"}
             </Button>
             <Button
-              variant="outline"
               onClick={() => setLobbyOpen(true)}
-              className="rounded-full px-6 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em]"
+              className="h-11 rounded-full border border-primary/60 bg-primary/10 px-6 font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary transition hover:bg-primary/20 shadow-neon-sm"
             >
               Online
             </Button>
