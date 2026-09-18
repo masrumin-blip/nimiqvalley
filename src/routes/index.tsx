@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Gamepad2, Home, MessageCircle, Sparkles } from "lucide-react";
 import valleyBackground from "@/assets/nimiq-valley-menu-bg.jpg";
 import { DailyRewardDialog } from "@/components/DailyRewardDialog";
-import { MatchPassPanel } from "@/components/MatchPassPanel";
 
 const title = "NimiqValley — Village, Games & AI Chat";
 const description =
@@ -76,9 +75,8 @@ function MainMenu() {
           <p className="mx-auto mt-3 max-w-2xl text-sm font-medium leading-relaxed text-foreground/75 sm:mt-4 sm:text-lg">
             One valley with a village to explore, arcade games to play, and characters ready to chat.
           </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <div className="mt-4 flex justify-center">
             <DailyRewardDialog />
-            <MatchPassPanel />
           </div>
         </header>
 

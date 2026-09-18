@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { RANKED_PAYOUT_NIM } from "@/lib/credits";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
@@ -394,14 +393,6 @@ export default function CarromGame() {
     const rival = room.players.find((p) => p.wallet !== online.wallet)?.wallet ?? null;
     online.finish(phase === "won" ? (online.wallet ?? null) : rival);
   }, [mode, phase, room, online]);
-
-
-  // Ranked quick matches stake one pass each; casual rooms show nothing.
-  const rankedPayout = (() => {
-    const stake = online.room?.stake ?? 0;
-    if (stake <= 0) return null;
-    return phase === "won" ? `+${RANKED_PAYOUT_NIM} NIM` : `-${stake} NIM`;
-  })();
 
   const resultRows: ResultRow[] = (() => {
     const mine = {
@@ -998,7 +989,6 @@ export default function CarromGame() {
           title={phase === "won" ? "You win!" : `${rivalName} wins`}
           subtitle="Final standings"
           rows={resultRows}
-          payout={rankedPayout}
           onPlayAgain={() => {
             online.leave.mutate();
             setPhaseBoth("menu");

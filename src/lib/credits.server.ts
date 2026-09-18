@@ -16,13 +16,9 @@ type CreditRow = {
   wallet: string;
   chat_credits: number;
   room_credits: number;
-  nim_balance: number;
   free_chats_date: string | null;
   free_chats_used: number;
 };
-
-const ROW_COLUMNS =
-  "wallet, chat_credits, room_credits, nim_balance, free_chats_date, free_chats_used";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -35,18 +31,14 @@ function normalizeAddress(value: string) {
 async function loadRow(wallet: string): Promise<CreditRow> {
   const { data } = await supabaseAdmin
     .from("wallet_credits")
-    .select(ROW_COLUMNS)
+    .select("wallet, chat_credits, room_credits, free_chats_date, free_chats_used")
     .eq("wallet", wallet)
     .maybeSingle();
-  if (data) {
-    const row = data as CreditRow;
-    return { ...row, nim_balance: Number(row.nim_balance ?? 0) };
-  }
+  if (data) return data as CreditRow;
   const fresh: CreditRow = {
     wallet,
     chat_credits: 0,
     room_credits: 0,
-    nim_balance: 0,
     free_chats_date: today(),
     free_chats_used: 0,
   };
@@ -75,7 +67,6 @@ export async function getCredits(wallet: string): Promise<CreditState> {
     wallet,
     chatCredits: row.chat_credits,
     roomCredits: row.room_credits,
-    nimBalance: Number(row.nim_balance ?? 0),
     freeChatsLeft: freeLeft(row),
     claimedToday: await claimedToday(wallet),
   };
@@ -86,19 +77,6 @@ async function save(wallet: string, patch: Partial<CreditRow>) {
     .from("wallet_credits")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("wallet", wallet);
-}
-
-/** Append-only record of every pass and NIM movement. */
-async function ledger(
-  wallet: string,
-  delta: number,
-  unit: "pass" | "nim",
-  reason: string,
-  roomId: string | null,
-) {
-  await supabaseAdmin
-    .from("mp_tickets")
-    .insert({ wallet, delta, unit, reason, room_id: roomId });
 }
 
 /** Spends one AI chat message. Throws when the player has nothing left. */
@@ -116,48 +94,15 @@ export async function spendChat(wallet: string): Promise<CreditState> {
   return getCredits(wallet);
 }
 
-/** True when the player still holds at least one match pass. */
-export async function hasPass(wallet: string): Promise<boolean> {
-  const row = await loadRow(wallet);
-  return row.room_credits > 0;
-}
-
-/**
- * Spends one match pass — used both for opening a private room and for
- * entering a ranked quick match.
- */
-export async function spendRoom(
-  wallet: string,
-  reason = "room",
-  roomId: string | null = null,
-): Promise<void> {
+/** Spends one room credit. Throws when the player has none. */
+export async function spendRoom(wallet: string): Promise<void> {
   const row = await loadRow(wallet);
   if (row.room_credits <= 0) {
     throw new Error(
-      `This costs one match pass (${ROOM_COST_NIM} NIM). Buy passes or claim the daily reward.`,
+      `Creating a room costs ${ROOM_COST_NIM} NIM. Buy room credits or claim the daily reward.`,
     );
   }
   await save(wallet, { room_credits: row.room_credits - 1 });
-  await ledger(wallet, -1, "pass", reason, roomId);
-}
-
-/** Gives a match pass back (cancelled or voided match). */
-export async function refundRoom(wallet: string, reason: string, roomId: string | null = null) {
-  const row = await loadRow(wallet);
-  await save(wallet, { room_credits: row.room_credits + 1 });
-  await ledger(wallet, 1, "pass", reason, roomId);
-}
-
-/** Credits match winnings as in-app NIM balance. */
-export async function creditNim(
-  wallet: string,
-  nim: number,
-  reason: string,
-  roomId: string | null = null,
-) {
-  const row = await loadRow(wallet);
-  await save(wallet, { nim_balance: Number(row.nim_balance ?? 0) + nim });
-  await ledger(wallet, nim, "nim", reason, roomId);
 }
 
 async function grant(wallet: string, chats: number, rooms: number) {
@@ -166,7 +111,6 @@ async function grant(wallet: string, chats: number, rooms: number) {
     chat_credits: row.chat_credits + chats,
     room_credits: row.room_credits + rooms,
   });
-  if (rooms > 0) await ledger(wallet, rooms, "pass", "grant", null);
 }
 
 type TxLookup = { ok: boolean; recipient: string | null; nim: number };

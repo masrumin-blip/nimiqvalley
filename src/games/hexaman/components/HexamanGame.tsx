@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { RANKED_PAYOUT_NIM } from "@/lib/credits";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
@@ -331,14 +330,6 @@ export function HexamanGame() {
     room?.winnerWallet === online.wallet
       ? "You"
       : (room?.players.find((p) => p.wallet === room?.winnerWallet)?.name ?? "Nobody");
-
-
-  // Ranked quick matches stake one pass each; casual rooms show nothing.
-  const rankedPayout = (() => {
-    const stake = online.room?.stake ?? 0;
-    if (stake <= 0) return null;
-    return room?.winnerWallet === online.wallet ? `+${RANKED_PAYOUT_NIM} NIM` : `-${stake} NIM`;
-  })();
 
   const resultRows: ResultRow[] = [...(room?.players ?? [])]
     .sort((a, b) => b.score - a.score)
@@ -1039,7 +1030,6 @@ export function HexamanGame() {
           title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
           subtitle="Run results"
           rows={resultRows}
-          payout={rankedPayout}
           onPlayAgain={() => {
             online.leave.mutate();
             setMode("solo");
