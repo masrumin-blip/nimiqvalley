@@ -27,6 +27,7 @@ import {
   TICK_POLL_MS,
   type MoveRecord,
   type PlayerTick,
+  type QueueMode,
   type QueueState,
   type RoomState,
 } from "@/lib/mp/types";
@@ -163,7 +164,8 @@ export function useOnlineRoom({
   const [queue, setQueue] = useState<QueueState | null>(null);
 
   const startQuick = useMutation({
-    mutationFn: () => joinQueueFn({ data: { gameSlug, maxPlayers, settings } }),
+    mutationFn: (mode: QueueMode = "casual") =>
+      joinQueueFn({ data: { gameSlug, maxPlayers, settings, mode } }),
     onSuccess: () => setQueueing(true),
   });
 
