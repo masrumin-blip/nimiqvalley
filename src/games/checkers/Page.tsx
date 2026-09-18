@@ -19,6 +19,7 @@ import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
 import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
+import { RANKED_PAYOUT_NIM } from "@/lib/credits";
 import { NEON_COLORS, OPPONENT_COLORS, type NeonColor } from "@/games/checkers/components/Piece";
 import { chooseMove, type Difficulty } from "@/games/checkers/lib/ai";
 import {
@@ -308,6 +309,14 @@ function CheckersGame() {
               ? "CPU is thinking…"
               : `${rivalName}'s turn`;
 
+
+  // Ranked quick matches stake one pass each; casual rooms show nothing.
+  const rankedPayout = (() => {
+    const stake = online.room?.stake ?? 0;
+    if (stake <= 0) return null;
+    return outcome === mySide ? `+${RANKED_PAYOUT_NIM} NIM` : `-${stake} NIM`;
+  })();
+
   const resultRows: ResultRow[] = useMemo(() => {
     const mine = {
       wallet: online.wallet ?? "you",
@@ -465,6 +474,7 @@ function CheckersGame() {
               title={outcome === "draw" ? "Draw" : outcome === mySide ? "You win!" : `${rivalName} wins`}
               subtitle="Final standings"
               rows={resultRows}
+              payout={rankedPayout}
               onPlayAgain={exitToMenu}
               onExit={() => navigate({ to: "/games" })}
             />

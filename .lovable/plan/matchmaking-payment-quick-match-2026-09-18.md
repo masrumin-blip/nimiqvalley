@@ -6,13 +6,10 @@ Concept matchmaking (shared queue per game, skill window widening every 10s, 60s
 
 One ticket = one quick match, for both players.
 
-- **Casual queue — free.** Unlimited, no ticket, no prize. Keeps the games alive when few players are online.
-- **Ranked queue — 10 NIM entry.** Both players pay one ticket. The winner receives 16 NIM back, the loser nothing; 4 NIM stays with the valley (house fee).
 - Ticket packs (cheaper in bulk), bought with NIM like chat packs:
-  - 10 NIM = 1 ticket
-  - 50 NIM = 6 tickets
-  - 100 NIM = 14 tickets
-- Daily reward also grants **1 free ranked ticket** on top of the current 2 rooms + 3 chats.
+  - 25 NIM = 1 ticket
+  - 250 NIM = 10 tickets
+- Daily reward bisa digunakan untuk room atau matchmaking ubah aturan dibawah mengikuti alur ini
 
 ## Payment rules
 

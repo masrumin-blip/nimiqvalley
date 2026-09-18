@@ -15,3 +15,4 @@
 - [x] Preload all games at boot, wallet login gate (Nimiq Pay + browser wallet), English-only UI.
 - [x] NIM payments: chat packs, 25 NIM room passes, daily X-visit reward.
 - [x] Shared matchmaking queue with widening skill window and 60s CPU suggestion.
+- [x] Matchmaking payment: casual free, ranked stakes 1 match pass (25 NIM), winner gets 40 NIM balance; pass packs 25/250 NIM; ledger + idempotent settlement

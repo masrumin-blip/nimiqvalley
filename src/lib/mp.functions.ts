@@ -73,13 +73,14 @@ export const joinQueue = createServerFn({ method: "POST" })
         gameSlug: slugSchema,
         maxPlayers: z.number().int().min(2).max(4),
         settings: settingsSchema,
+        mode: z.enum(["casual", "ranked"]).default("casual"),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     const wallet = await requireWallet();
     const cloud = await import("./mp/cloud.server");
-    return cloud.joinQueue(wallet, data.gameSlug, data.maxPlayers, data.settings);
+    return cloud.joinQueue(wallet, data.gameSlug, data.maxPlayers, data.settings, data.mode);
   });
 
 export const pollQueue = createServerFn({ method: "POST" })
