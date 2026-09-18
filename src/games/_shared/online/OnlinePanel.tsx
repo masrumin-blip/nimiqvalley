@@ -137,6 +137,24 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
       <p className="-mt-2 text-center text-xs text-muted-foreground">
         {rooms} room pass(es) left. Joining a room is always free.
       </p>
+      {rooms <= 0 ? (
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={buyRooms.isPending}
+          onClick={() => buyRooms.mutate(1)}
+        >
+          {buyRooms.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Pay {ROOM_COST_NIM} NIM for 1 room pass
+        </Button>
+      ) : null}
+      {buyRooms.isError ? (
+        <p className="text-center text-xs text-destructive">
+          {(buyRooms.error as Error).message}
+        </p>
+      ) : null}
+
+
 
 
       <div className="flex gap-2">
