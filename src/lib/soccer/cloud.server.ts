@@ -1,0 +1,259 @@
+/** Online soccer data access — runs on the server with the admin client. */
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+import { resolveNames } from "@/lib/chat/cloud.server";
+import { TURN_TIMEOUT_MS, type MatchMove, type MatchState } from "./types";
+
+type Row = {
+  id: string;
+  code: string | null;
+  kind: string;
+  status: string;
+  host_wallet: string;
+  guest_wallet: string | null;
+  target_goals: number;
+  turn_no: number;
+  turn_wallet: string | null;
+  turn_started_at: string;
+  winner_wallet: string | null;
+};
+
+const COLUMNS =
+  "id, code, kind, status, host_wallet, guest_wallet, target_goals, turn_no, turn_wallet, turn_started_at, winner_wallet";
+
+async function toState(row: Row): Promise<MatchState> {
+  const names = await resolveNames([row.host_wallet, row.guest_wallet ?? ""]);
+  return {
+    id: row.id,
+    code: row.code,
+    kind: (row.kind as MatchState["kind"]) ?? "quick",
+    status: row.status as MatchState["status"],
+    hostWallet: row.host_wallet,
+    guestWallet: row.guest_wallet,
+    hostName: names.get(row.host_wallet) ?? row.host_wallet,
+    guestName: row.guest_wallet ? (names.get(row.guest_wallet) ?? row.guest_wallet) : null,
+    targetGoals: row.target_goals,
+    turnNo: row.turn_no,
+    turnWallet: row.turn_wallet,
+    turnStartedAt: row.turn_started_at,
+    winnerWallet: row.winner_wallet,
+  };
+}
+
+function randomCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 5; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+export async function activeMatch(wallet: string): Promise<MatchState | null> {
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select(COLUMNS)
+    .in("status", ["waiting", "playing"])
+    .or(`host_wallet.eq.${wallet},guest_wallet.eq.${wallet}`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const row = (data ?? [])[0] as Row | undefined;
+  return row ? toState(row) : null;
+}
+
+export async function invitesFor(wallet: string): Promise<MatchState[]> {
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select(COLUMNS)
+    .eq("status", "invited")
+    .eq("guest_wallet", wallet)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  return Promise.all(((data ?? []) as Row[]).map(toState));
+}
+
+export async function getMatchRow(id: string): Promise<Row | null> {
+  const { data } = await supabaseAdmin.from("soccer_matches").select(COLUMNS).eq("id", id).maybeSingle();
+  return (data as Row | null) ?? null;
+}
+
+export async function getMatch(id: string): Promise<MatchState | null> {
+  const row = await getMatchRow(id);
+  return row ? toState(row) : null;
+}
+
+export async function listMoves(id: string, since: number): Promise<MatchMove[]> {
+  const { data } = await supabaseAdmin
+    .from("soccer_moves")
+    .select("turn_no, wallet, kind, piece, vx, vy")
+    .eq("match_id", id)
+    .gt("turn_no", since)
+    .order("turn_no", { ascending: true });
+  return (data ?? []).map((m) => ({
+    turnNo: m.turn_no,
+    wallet: m.wallet,
+    kind: m.kind === "skip" ? "skip" : "shot",
+    piece: m.piece,
+    vx: m.vx,
+    vy: m.vy,
+  }));
+}
+
+/** Leaves any lobby/match the player is still sitting in. */
+export async function abandonAll(wallet: string) {
+  await supabaseAdmin
+    .from("soccer_matches")
+    .update({ status: "finished", updated_at: new Date().toISOString() })
+    .in("status", ["waiting", "playing"])
+    .or(`host_wallet.eq.${wallet},guest_wallet.eq.${wallet}`);
+}
+
+export async function createMatch(
+  wallet: string,
+  kind: MatchState["kind"],
+  targetGoals: number,
+  guest: string | null,
+): Promise<MatchState> {
+  await abandonAll(wallet);
+  const { data, error } = await supabaseAdmin
+    .from("soccer_matches")
+    .insert({
+      kind,
+      code: kind === "room" ? randomCode() : null,
+      host_wallet: wallet,
+      guest_wallet: guest,
+      status: guest && kind === "friend" ? "invited" : "waiting",
+      target_goals: targetGoals,
+      turn_wallet: wallet,
+    })
+    .select(COLUMNS)
+    .single();
+  if (error || !data) throw new Error("Could not create the match.");
+  return toState(data as Row);
+}
+
+async function startAsGuest(row: Row, wallet: string): Promise<MatchState> {
+  const { data, error } = await supabaseAdmin
+    .from("soccer_matches")
+    .update({
+      guest_wallet: wallet,
+      status: "playing",
+      turn_wallet: row.host_wallet,
+      turn_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", row.id)
+    .in("status", ["waiting", "invited"])
+    .select(COLUMNS)
+    .single();
+  if (error || !data) throw new Error("That match is no longer available.");
+  return toState(data as Row);
+}
+
+export async function quickMatch(wallet: string, targetGoals: number): Promise<MatchState> {
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select(COLUMNS)
+    .eq("status", "waiting")
+    .eq("kind", "quick")
+    .neq("host_wallet", wallet)
+    .is("guest_wallet", null)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  const row = (data ?? [])[0] as Row | undefined;
+  if (row) {
+    await abandonAll(wallet);
+    return startAsGuest(row, wallet);
+  }
+  return createMatch(wallet, "quick", targetGoals, null);
+}
+
+export async function joinRoom(wallet: string, code: string): Promise<MatchState> {
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select(COLUMNS)
+    .eq("code", code.toUpperCase())
+    .in("status", ["waiting"])
+    .limit(1);
+  const row = (data ?? [])[0] as Row | undefined;
+  if (!row) throw new Error("No open room with that code.");
+  if (row.host_wallet === wallet) throw new Error("This is your own room.");
+  await abandonAll(wallet);
+  return startAsGuest(row, wallet);
+}
+
+export async function respondInvite(wallet: string, id: string, accept: boolean) {
+  const row = await getMatchRow(id);
+  if (!row || row.guest_wallet !== wallet || row.status !== "invited")
+    throw new Error("That challenge is no longer available.");
+  if (!accept) {
+    await supabaseAdmin
+      .from("soccer_matches")
+      .update({ status: "finished", updated_at: new Date().toISOString() })
+      .eq("id", id);
+    return null;
+  }
+  await abandonAll(wallet);
+  return startAsGuest(row, wallet);
+}
+
+export async function submitMove(
+  wallet: string,
+  id: string,
+  turnNo: number,
+  piece: number,
+  vx: number,
+  vy: number,
+) {
+  const row = await getMatchRow(id);
+  if (!row || row.status !== "playing") throw new Error("The match is not running.");
+  if (row.turn_wallet !== wallet) throw new Error("It is not your turn.");
+  if (row.turn_no !== turnNo) throw new Error("That turn already happened.");
+  const other = row.host_wallet === wallet ? row.guest_wallet : row.host_wallet;
+  const { error } = await supabaseAdmin
+    .from("soccer_moves")
+    .insert({ match_id: id, turn_no: turnNo, wallet, kind: "shot", piece, vx, vy });
+  if (error) throw new Error("That turn already happened.");
+  await supabaseAdmin
+    .from("soccer_matches")
+    .update({
+      turn_no: turnNo + 1,
+      turn_wallet: other,
+      turn_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  return { ok: true };
+}
+
+export async function skipTurn(wallet: string, id: string, turnNo: number) {
+  const row = await getMatchRow(id);
+  if (!row || row.status !== "playing") return { ok: false };
+  if (row.turn_no !== turnNo || !row.turn_wallet) return { ok: false };
+  const elapsed = Date.now() - new Date(row.turn_started_at).getTime();
+  if (elapsed < TURN_TIMEOUT_MS) return { ok: false };
+  const other = row.host_wallet === row.turn_wallet ? row.guest_wallet : row.host_wallet;
+  const { error } = await supabaseAdmin
+    .from("soccer_moves")
+    .insert({ match_id: id, turn_no: turnNo, wallet: row.turn_wallet, kind: "skip" });
+  if (error) return { ok: false };
+  await supabaseAdmin
+    .from("soccer_matches")
+    .update({
+      turn_no: turnNo + 1,
+      turn_wallet: other,
+      turn_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  return { ok: true };
+}
+
+export async function finishMatch(wallet: string, id: string, winnerWallet: string) {
+  const row = await getMatchRow(id);
+  if (!row) return { ok: false };
+  if (row.host_wallet !== wallet && row.guest_wallet !== wallet) return { ok: false };
+  await supabaseAdmin
+    .from("soccer_matches")
+    .update({ status: "finished", winner_wallet: winnerWallet, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  return { ok: true };
+}
