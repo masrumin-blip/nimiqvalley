@@ -418,6 +418,7 @@ export type Database = {
           chat_credits: number
           created_at: string
           id: string
+          key_credits: number
           kind: string
           nim: number
           room_credits: number
@@ -428,6 +429,7 @@ export type Database = {
           chat_credits?: number
           created_at?: string
           id?: string
+          key_credits?: number
           kind: string
           nim: number
           room_credits?: number
@@ -438,6 +440,7 @@ export type Database = {
           chat_credits?: number
           created_at?: string
           id?: string
+          key_credits?: number
           kind?: string
           nim?: number
           room_credits?: number
@@ -596,6 +599,7 @@ export type Database = {
           chat_credits: number
           free_chats_date: string | null
           free_chats_used: number
+          match_keys: number
           nim_balance: number
           room_credits: number
           updated_at: string
@@ -605,6 +609,7 @@ export type Database = {
           chat_credits?: number
           free_chats_date?: string | null
           free_chats_used?: number
+          match_keys?: number
           nim_balance?: number
           room_credits?: number
           updated_at?: string
@@ -614,6 +619,7 @@ export type Database = {
           chat_credits?: number
           free_chats_date?: string | null
           free_chats_used?: number
+          match_keys?: number
           nim_balance?: number
           room_credits?: number
           updated_at?: string
