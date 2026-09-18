@@ -183,6 +183,151 @@ export default function BomberGame() {
   /** Seat this client drives (always 0 offline). */
   const seatOf = (i: number) => (onlineRef.current ? seatRef.current : i);
 
+  const dropBomb = useCallback(
+    (seat: number) => {
+      const eng = engineRef.current;
+      if (!eng) return;
+      const b = eng.bombers[seat];
+      if (!b || !b.alive) return;
+      const before = eng.bombs.length;
+      eng.placeBomb(seat);
+      if (!onlineRef.current || eng.bombs.length === before) return;
+      const bomb = eng.bombs[eng.bombs.length - 1]!;
+      online.sendEvent("bomb", {
+        seat,
+        cx: bomb.cx,
+        cy: bomb.cy,
+        range: bomb.range,
+        remote: bomb.remote,
+      });
+    },
+    [online],
+  );
+
+  const triggerDetonate = useCallback(
+    (seat: number) => {
+      engineRef.current?.detonate(seat);
+      if (onlineRef.current) online.sendEvent("det", { seat });
+    },
+    [online],
+  );
+
+  // Every client builds the same map from the room seed once the host starts.
+  useEffect(() => {
+    if (room?.status !== "playing" || onlineMode) return;
+    const seed = Number(room.settings["seed"] ?? 1);
+    const players = Math.max(2, Math.min(4, seats.length));
+    setOnlineMode(true);
+    setLobbyOpen(false);
+    setResultOpen(false);
+    reportedRef.current = false;
+    movesRef.current = 0;
+    start("multi", difficulty, players, {
+      seed,
+      localId: mySeat,
+      names: seats.map((p) => p.name.slice(0, 8)),
+    });
+  }, [room?.status, room?.settings, onlineMode, seats, mySeat, difficulty, start]);
+
+  // Stream my bomber; rivals never block each other.
+  useEffect(() => {
+    if (!onlineMode || room?.status !== "playing") return;
+    const id = window.setInterval(() => {
+      const eng = engineRef.current;
+      const b = eng?.bombers[seatRef.current];
+      if (!eng || !b) return;
+      online.sendTick({
+        x: Number(b.x.toFixed(1)),
+        y: Number(b.y.toFixed(1)),
+        dir: b.facing,
+        score: Math.max(0, Math.round(b.score)),
+        alive: b.alive,
+      });
+    }, TICK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [onlineMode, room?.status, online]);
+
+  // Apply rival positions.
+  useEffect(() => {
+    if (!onlineMode) return;
+    const eng = engineRef.current;
+    if (!eng) return;
+    for (const t of online.ticks) {
+      if (t.wallet === online.wallet) continue;
+      const seat = seats.findIndex((p) => p.wallet === t.wallet);
+      if (seat < 0) continue;
+      eng.setRemoteState(seat, t.x, t.y, t.dir, t.alive, t.score);
+    }
+  }, [onlineMode, online.ticks, online.wallet, seats]);
+
+  // Apply rival bombs and detonations.
+  const movesRef = useRef(0);
+  useEffect(() => {
+    if (!onlineMode) return;
+    const eng = engineRef.current;
+    if (!eng) return;
+    for (let i = movesRef.current; i < online.moves.length; i++) {
+      const mv = online.moves[i]!;
+      if (mv.wallet === online.wallet) continue;
+      const seat = Number(mv.payload["seat"] ?? -1);
+      if (seat < 0) continue;
+      if (mv.kind === "bomb") {
+        eng.remoteBomb(
+          seat,
+          Number(mv.payload["cx"] ?? 0),
+          Number(mv.payload["cy"] ?? 0),
+          Number(mv.payload["range"] ?? 1),
+          Boolean(mv.payload["remote"]),
+        );
+      } else if (mv.kind === "det") {
+        eng.remoteDetonate(seat);
+      }
+    }
+    movesRef.current = online.moves.length;
+  }, [onlineMode, online.moves, online.wallet]);
+
+  // Close the round when one bomber is left (or the 3 minute timer runs out).
+  const reportedRef = useRef(false);
+  useEffect(() => {
+    if (!onlineMode || room?.status !== "playing") return;
+    const mine = hud.bombers[mySeat];
+    if (mine && !mine.alive && !reportedRef.current) {
+      reportedRef.current = true;
+      online.reportStats(mine.score, { kills: 0 });
+    }
+    const alive = hud.bombers.filter((b) => b.alive);
+    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    if (hud.bombers.length > 0 && (alive.length <= 1 || timeUp)) {
+      const best = [...seats].sort((a, b) => b.score - a.score)[0];
+      const winner =
+        alive.length === 1
+          ? (seats[alive[0]!.id]?.wallet ?? null)
+          : (best?.wallet ?? null);
+      online.finish(winner);
+    }
+  }, [onlineMode, room, hud.bombers, mySeat, seats, online]);
+
+  useEffect(() => {
+    if (onlineMode && room?.status === "finished") setResultOpen(true);
+  }, [onlineMode, room?.status]);
+
+  const winnerName =
+    room?.winnerWallet === online.wallet
+      ? "You"
+      : (seats.find((p) => p.wallet === room?.winnerWallet)?.name ?? "Nobody");
+
+  const resultRows: ResultRow[] = [...seats]
+    .sort((a, b) => b.score - a.score)
+    .map((p) => ({
+      wallet: p.wallet,
+      name: p.name,
+      isYou: p.wallet === online.wallet,
+      stats: [
+        { label: "Score", value: String(p.score) },
+        { label: "Status", value: p.wallet === room?.winnerWallet ? "last standing" : "out" },
+      ],
+    }));
+
   // Game loop
   useEffect(() => {
     if (screen !== "playing") return;
