@@ -17,7 +17,7 @@ import { CHAT_PACKS, FREE_CHATS_PER_DAY, totalChatsLeft } from "@/lib/credits";
 export function ChatCredits() {
   const [open, setOpen] = useState(false);
   const { credits } = useCredits();
-  const { buyChatPack } = useCreditActions();
+  const { buyChatPack, phase } = useCreditActions();
   const left = totalChatsLeft(credits);
 
   return (
@@ -61,7 +61,11 @@ export function ChatCredits() {
         </div>
 
         {buyChatPack.isPending && (
-          <p className="text-center text-xs text-muted-foreground">Waiting for your wallet…</p>
+          <p className="text-center text-xs text-muted-foreground">
+            {phase === "confirming"
+              ? "Confirming payment on the Nimiq network…"
+              : "Approve the payment in your wallet…"}
+          </p>
         )}
         {buyChatPack.isError && (
           <p className="text-center text-xs text-destructive">

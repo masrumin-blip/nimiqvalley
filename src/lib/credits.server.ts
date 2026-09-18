@@ -135,51 +135,87 @@ async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
   });
 }
 
-type TxLookup = {
-  ok: boolean;
-  sender: string | null;
-  recipient: string | null;
-  nim: number;
-  confirmed: boolean;
-};
+type ChainTx = { hash: string; from: string; to: string; nim: number; timestamp: number };
 
-async function lookupTx(hash: string): Promise<TxLookup> {
+async function rpc<T>(method: string, params: unknown[]): Promise<T | null> {
   try {
     const res = await fetch(RPC_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "getTransactionByHash",
-        params: [hash],
-      }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(8_000),
     });
-    if (!res.ok) return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
-    const json = (await res.json()) as {
-      result?: { data?: { from?: string; sender?: string; to?: string; recipient?: string; value?: number; blockNumber?: number } } & {
-        from?: string;
-        sender?: string;
-        to?: string;
-        recipient?: string;
-        value?: number;
-        blockNumber?: number;
-      };
-    };
-    const tx = json.result?.data ?? json.result;
-    if (!tx) return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
-    const sender = tx.from ?? tx.sender ?? null;
-    const recipient = tx.to ?? tx.recipient ?? null;
-    const luna = typeof tx.value === "number" ? tx.value : 0;
-    return { ok: true, sender, recipient, nim: luna / 100_000, confirmed: typeof tx.blockNumber === "number" };
+    if (!res.ok) return null;
+    const json = (await res.json()) as { result?: { data?: T } & T };
+    return (json.result?.data ?? json.result ?? null) as T | null;
   } catch {
-    return { ok: false, sender: null, recipient: null, nim: 0, confirmed: false };
+    return null;
+  }
+}
+
+type RawTx = {
+  hash?: string;
+  from?: string;
+  sender?: string;
+  to?: string;
+  recipient?: string;
+  value?: number;
+  timestamp?: number;
+};
+
+/** Recent transactions sent by a wallet to the NimiqValley address. */
+async function recentPayments(wallet: string): Promise<ChainTx[]> {
+  const raw = await rpc<RawTx[]>("getTransactionsByAddress", [normalizeAddress(wallet), 20]);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((tx) => ({
+      hash: String(tx.hash ?? "").toLowerCase(),
+      from: normalizeAddress(tx.from ?? tx.sender ?? ""),
+      to: normalizeAddress(tx.to ?? tx.recipient ?? ""),
+      nim: (typeof tx.value === "number" ? tx.value : 0) / 100_000,
+      timestamp: typeof tx.timestamp === "number" ? tx.timestamp : 0,
+    }))
+    .filter((tx) => tx.hash.length >= 8);
+}
+
+const PAYMENT_WINDOW_MS = 15 * 60_000;
+const CONFIRM_TIMEOUT_MS = 40_000;
+const CONFIRM_INTERVAL_MS = 2_500;
+
+/** Find a fresh, unused payment from this wallet worth at least `expectedNim`. */
+async function findRecentPayment(wallet: string, expectedNim: number): Promise<ChainTx | null> {
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+  const target = normalizeAddress(PAY_TO_ADDRESS);
+  const sender = normalizeAddress(wallet);
+
+  for (;;) {
+    const list = await recentPayments(wallet);
+    const candidates = list
+      .filter((tx) => tx.to === target && tx.from === sender && tx.nim + 0.001 >= expectedNim)
+      .filter((tx) => {
+        if (!tx.timestamp) return true;
+        const ms = tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp;
+        return Date.now() - ms <= PAYMENT_WINDOW_MS;
+      })
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    for (const tx of candidates) {
+      const { data: seen } = await supabaseAdmin
+        .from("nim_payments")
+        .select("id")
+        .eq("tx_hash", tx.hash)
+        .maybeSingle();
+      if (!seen) return tx;
+    }
+
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, CONFIRM_INTERVAL_MS));
   }
 }
 
 type RedeemInput = {
   wallet: string;
-  txHash: string;
+  txHash?: string | undefined;
   kind: "chat" | "room" | "key";
   packId?: string | undefined;
   rooms?: number | undefined;
@@ -191,16 +227,6 @@ type RedeemInput = {
  * The hash is unique in the database, so the same payment can never be used twice.
  */
 export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
-  const hash = input.txHash.trim().toLowerCase();
-  if (hash.length < 8) throw new Error("That payment reference does not look right.");
-
-  const { data: seen } = await supabaseAdmin
-    .from("nim_payments")
-    .select("id")
-    .eq("tx_hash", hash)
-    .maybeSingle();
-  if (seen) throw new Error("This payment was already used.");
-
   let chats = 0;
   let rooms = 0;
   let keys = 0;
@@ -221,21 +247,15 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     expectedNim = count * ROOM_COST_NIM;
   }
 
-  const tx = await lookupTx(hash);
-  if (!tx.ok) throw new Error("The payment could not be verified yet. Please try again shortly.");
-  if (!tx.confirmed) throw new Error("The payment is still pending. Please try again after confirmation.");
-  if (normalizeAddress(tx.sender ?? "") !== normalizeAddress(input.wallet)) {
-    throw new Error("That payment came from a different wallet.");
-  }
-  if (normalizeAddress(tx.recipient ?? "") !== normalizeAddress(PAY_TO_ADDRESS)) {
-    throw new Error("That payment did not go to the NimiqValley address.");
-  }
-  if (tx.nim + 0.001 < expectedNim) {
-    throw new Error(`That payment was only ${tx.nim} NIM; ${expectedNim} NIM is needed.`);
+  const tx = await findRecentPayment(input.wallet, expectedNim);
+  if (!tx) {
+    throw new Error(
+      `We could not find a payment of ${expectedNim} NIM from your wallet yet. If the wallet confirmed it, try again in a moment.`,
+    );
   }
 
   const { error } = await supabaseAdmin.from("nim_payments").insert({
-    tx_hash: hash,
+    tx_hash: tx.hash,
     wallet: input.wallet,
     kind: input.kind,
     nim: expectedNim,

@@ -25,7 +25,7 @@ const KEY_PACKS: KeyPack[] = [
 export function KeyShopDialog({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const { credits } = useCredits();
-  const { buyKeys } = useCreditActions();
+  const { buyKeys, phase } = useCreditActions();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -83,7 +83,9 @@ export function KeyShopDialog({ className = "" }: { className?: string }) {
         {buyKeys.isPending && (
           <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="size-3 animate-spin" aria-hidden="true" />
-            Waiting for the payment…
+            {phase === "confirming"
+              ? "Confirming payment on the Nimiq network…"
+              : "Approve the payment in your wallet…"}
           </p>
         )}
         {buyKeys.isError && (

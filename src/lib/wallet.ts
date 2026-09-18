@@ -33,11 +33,24 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 
-async function transactionHash(serialized: string): Promise<string> {
-  const { hashTransaction } = await import("./tx.functions");
-  const { hash } = await hashTransaction({ data: { serialized } });
-  return hash;
+/** Reject instead of hanging when a wallet dialog never answers. */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error as Error);
+      },
+    );
+  });
 }
+
+const WALLET_TIMEOUT_MS = 3 * 60_000;
 
 export function getEthereum(): EthereumProvider | null {
   if (typeof window === "undefined") return null;
@@ -78,18 +91,22 @@ export async function signNimiqMessage(message: string): Promise<LoginSignature>
   return { publicKey, signature };
 }
 
-/** Send NIM through the wallet approval dialog. Returns the transaction hash. */
+/** Send NIM through the wallet approval dialog. Returns the wallet receipt. */
 export async function sendNim(recipient: string, nimAmount: number): Promise<string> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
-  const result = (await nimiq.sendBasicTransaction({
-    recipient,
-    value: Math.round(nimAmount * 100_000),
-    fee: 0,
-  })) as unknown;
+  const result = (await withTimeout(
+    nimiq.sendBasicTransaction({
+      recipient,
+      value: Math.round(nimAmount * 100_000),
+      fee: 0,
+    }),
+    WALLET_TIMEOUT_MS,
+    "The wallet did not answer in time. Please try again.",
+  )) as unknown;
   if (isWalletError(result)) throw new Error(walletErrorMessage(result));
   if (typeof result !== "string") throw new Error("The wallet did not confirm the transaction.");
-  return transactionHash(result);
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -172,21 +189,28 @@ export async function payNim(
         fee: number;
       }) => Promise<unknown>;
     };
-    const result =
+    const result = await withTimeout(
       typeof nimiq.sendBasicTransactionWithData === "function"
-        ? await nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
-        : await nimiq.sendBasicTransaction({ recipient, value, fee: 0 });
+        ? nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
+        : nimiq.sendBasicTransaction({ recipient, value, fee: 0 }),
+      WALLET_TIMEOUT_MS,
+      "The wallet did not answer in time. Please try again.",
+    );
     if (isWalletError(result)) throw new Error(walletErrorMessage(result));
     if (typeof result !== "string") throw new Error("The wallet did not confirm the payment.");
-    return transactionHash(result);
+    return result;
   }
   const api = await hub();
-  const receipt = await api.checkout({
-    appName: APP_NAME,
-    recipient: recipient.replace(/\s+/g, ""),
-    value,
-    extraData: note,
-  });
+  const receipt = await withTimeout(
+    api.checkout({
+      appName: APP_NAME,
+      recipient: recipient.replace(/\s+/g, ""),
+      value,
+      extraData: note,
+    }),
+    WALLET_TIMEOUT_MS,
+    "The wallet did not answer in time. Please try again.",
+  );
   if (!receipt?.hash) throw new Error("The wallet did not confirm the payment.");
   return receipt.hash;
 }
