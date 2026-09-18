@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button";
 import { Pause, Play, RotateCcw, Shield, Zap } from "lucide-react";
 import { playSfx } from "@/lib/sfx";
+import { reportScore } from "@/lib/report-score";
 
 const W = 400;
 const H = 720;
@@ -184,6 +185,7 @@ export default function NeonJump() {
       const final = Math.floor(w.score);
       setBest((current) => { const value = Math.max(current, final); window.localStorage.setItem("neon-jump-best", String(value)); return value; });
       setState("over");
+      reportScore("jump", final);
       playSfx("gameover");
       return true;
     };

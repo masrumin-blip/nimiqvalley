@@ -625,6 +625,7 @@ function gameOver(){
   burst(ship.x, ship.y, 50, "#ff2fd0", 7, 50);
   shake = 30; S.dead();
   const s = Math.floor(score), rec = s > best;
+  try { window.parent.postMessage({ type: "nimiq-score", slug: "shooter", value: s }, window.location.origin); } catch (e) {}
   if (rec){ best = s; localStorage.setItem("cosnimiq.best", best); }
   document.getElementById("overTitle").textContent = rec ? "NEW RECORD!" : "GAME OVER";
   document.getElementById("fScore").textContent = s;

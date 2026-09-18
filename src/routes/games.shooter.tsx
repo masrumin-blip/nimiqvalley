@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { GameFrame } from "@/components/GameFrame";
+import { reportScore } from "@/lib/report-score";
 
 const title = "CosNimiq Shooter — Space Arcade Shooter";
 const description =
@@ -21,6 +23,18 @@ export const Route = createFileRoute("/games/shooter")({
 });
 
 function ShooterRoute() {
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; slug?: string; value?: number };
+      if (data?.type === "nimiq-score" && data.slug === "shooter" && typeof data.value === "number") {
+        reportScore("shooter", data.value);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   return (
     <GameFrame slug="shooter" name="CosNimiq Shooter">
       <iframe

@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Trophy } from "lucide-react";
+import { PlayerBadge } from "@/components/PlayerBadge";
 import { GAMES } from "@/lib/games";
 
 const title = "Game Hub — 15 NimiqValley Games";
@@ -41,12 +43,23 @@ function GameHub() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3">
+          <Link
+            to="/leaderboard"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-black uppercase tracking-wide text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            <Trophy className="size-4" aria-hidden="true" />
+            Leaderboard
+          </Link>
+          <PlayerBadge />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {GAMES.map((game) => (
             <Link
               key={game.slug}
               to={game.path}
-              className="group relative aspect-[4/3] overflow-hidden rounded-md border border-border bg-card shadow-lg transition-transform duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-card shadow-lg transition-transform duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:aspect-[4/3]"
             >
               <img
                 src={game.cover}
@@ -59,19 +72,19 @@ function GameHub() {
                 style={{ background: game.accent }}
                 aria-hidden="true"
               />
-              <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-                <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase text-foreground/80">
-                  <span className="text-base" aria-hidden="true">{game.emoji}</span>
+              <div className="absolute inset-x-0 bottom-0 p-3 sm:p-5">
+                <div className="mb-1 flex items-center gap-1.5 text-[9px] font-bold uppercase text-foreground/70">
+                  <span className="text-sm" aria-hidden="true">{game.emoji}</span>
                   Arcade original
                 </div>
                 <h2
-                  className="font-display text-2xl font-black uppercase leading-none text-foreground drop-shadow-[0_2px_0_var(--background)] sm:text-3xl"
+                  className="font-display line-clamp-2 text-base font-black uppercase leading-tight text-foreground sm:text-2xl"
                   style={{ textShadow: `0 2px 0 var(--background), 0 0 18px ${game.accent}` }}
                 >
                   {game.name}
                 </h2>
-                <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground/80 sm:text-sm">{game.tagline}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase text-foreground transition-transform group-hover:translate-x-1">
+                <p className="mt-1 line-clamp-2 text-[11px] font-medium text-foreground/75 sm:text-sm">{game.tagline}</p>
+                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black uppercase text-foreground transition-transform group-hover:translate-x-1 sm:text-xs">
                   Play now <span aria-hidden="true">→</span>
                 </span>
               </div>

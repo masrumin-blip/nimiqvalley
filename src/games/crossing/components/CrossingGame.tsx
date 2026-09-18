@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { playSfx } from "@/lib/sfx";
+import { reportScore } from "@/lib/report-score";
 
 /**
  * CROSSING FOR NIMIQ
@@ -213,6 +214,7 @@ export default function CrossingGame() {
       s.deadT = 0;
       spawnBurst(s.player.x, s.player.y, cause === "snake" ? "#b7e35d" : "#4fc3f7", 26);
       playSfx(cause === "snake" ? "collision" : "splash", 0.8);
+      reportScore("crossing", s.score);
       setBest((b) => {
         const nb = Math.max(b, s.score);
         try {

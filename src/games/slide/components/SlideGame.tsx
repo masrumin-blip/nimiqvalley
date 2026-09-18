@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
+import { reportScore } from "@/lib/report-score";
 
 // ---------- Palette (dusk pastel) ----------
 const SKY_STOPS: [string, string, string][] = [
@@ -229,6 +230,7 @@ export default function SlideGame() {
       }
       setHud({ score: Math.floor(score), dist: Math.floor(scroll / 10), best, effects: { shield: 0, magnet: 0, boost: 0 } });
       setState("over");
+      reportScore("slide", Math.floor(score));
     };
 
     const isProtected = () => runTime < shieldUntil || runTime < boostUntil || runTime < protectedGraceUntil;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
+import { reportScore } from "@/lib/report-score";
 
 /* ---------------- types & constants ---------------- */
 
@@ -371,6 +372,11 @@ export default function SoccerGame() {
         setBanner(who === "player" ? "YOU WIN!" : "CPU WINS");
         playSfx(who === "player" ? "win" : "lose", 0.9);
         setPhaseBoth("over");
+        if (who === "player") {
+          const wins = Number(localStorage.getItem("nimiq-soccer-wins") ?? 0) + 1;
+          localStorage.setItem("nimiq-soccer-wins", String(wins));
+          reportScore("soccer", wins);
+        }
         return;
       }
       setBanner("GOAL!");
