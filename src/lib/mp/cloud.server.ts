@@ -549,9 +549,11 @@ type QueueRow = {
   settings: unknown;
   room_id: string | null;
   joined_at: string;
+  mode: string;
 };
 
-const QUEUE_COLUMNS = "id, wallet, game_slug, max_players, rank_hint, settings, room_id, joined_at";
+const QUEUE_COLUMNS =
+  "id, wallet, game_slug, max_players, rank_hint, settings, room_id, joined_at, mode";
 const STALE_MS = 90_000;
 
 /** Leaderboard value for this game, used as a rough skill hint. */
@@ -580,7 +582,17 @@ export async function joinQueue(
   gameSlug: string,
   maxPlayers: number,
   settings: Record<string, string | number | boolean>,
+  mode: QueueMode = "casual",
 ) {
+  // Ranked needs a pass, but nothing is charged until two players are paired.
+  if (mode === "ranked") {
+    const { hasPass } = await import("@/lib/credits.server");
+    if (!(await hasPass(wallet))) {
+      throw new Error(
+        `Ranked needs one match pass (${RANKED_STAKE_NIM} NIM). Buy a pass or claim the daily reward.`,
+      );
+    }
+  }
   await clearStale(gameSlug);
   const now = new Date().toISOString();
   await supabaseAdmin.from("mp_queue").upsert(
@@ -589,6 +601,7 @@ export async function joinQueue(
       wallet,
       max_players: maxPlayers,
       settings,
+      mode,
       rank_hint: await rankHint(wallet, gameSlug),
       room_id: null,
       joined_at: now,
@@ -608,6 +621,7 @@ export async function leaveQueue(wallet: string, gameSlug: string) {
  * Heartbeat + pairing step.
  * The player who has waited longest creates the room; the other one picks it
  * up on its next poll, so a pair never ends up in two different rooms.
+ * Ranked pairs are charged here — one pass each — the moment the match exists.
  */
 export async function pollQueue(wallet: string, gameSlug: string): Promise<QueueState> {
   await clearStale(gameSlug);
@@ -620,13 +634,23 @@ export async function pollQueue(wallet: string, gameSlug: string): Promise<Queue
     .eq("wallet", wallet)
     .maybeSingle();
   const mine = mineRow as QueueRow | null;
-  if (!mine) return { waiting: false, waitedMs: 0, queueSize: 0, room: null, suggestCpu: false };
+  if (!mine) {
+    return {
+      waiting: false,
+      waitedMs: 0,
+      queueSize: 0,
+      room: null,
+      suggestCpu: false,
+      mode: "casual",
+    };
+  }
+  const mode = (mine.mode as QueueMode) ?? "casual";
 
   // Someone already paired us up.
   if (mine.room_id) {
     const room = await getRoom(mine.room_id);
     await leaveQueue(wallet, gameSlug);
-    return { waiting: false, waitedMs: 0, queueSize: 0, room, suggestCpu: false };
+    return { waiting: false, waitedMs: 0, queueSize: 0, room, suggestCpu: false, mode };
   }
 
   await supabaseAdmin
@@ -643,42 +667,67 @@ export async function pollQueue(wallet: string, gameSlug: string): Promise<Queue
     .is("room_id", null)
     .neq("wallet", wallet)
     .eq("max_players", mine.max_players)
+    .eq("mode", mode)
     .order("joined_at", { ascending: true })
     .limit(20);
   const pool = (others ?? []) as QueueRow[];
+
+  const stillWaiting = (notice?: string): QueueState => ({
+    waiting: true,
+    waitedMs,
+    queueSize: pool.length + 1,
+    room: null,
+    suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
+    mode,
+    notice: notice ?? null,
+  });
 
   // Rank window widens every 10 seconds and disappears after the wait cap.
   const steps = Math.floor(waitedMs / 10_000);
   const window = waitedMs >= QUEUE_WAIT_CAP_MS ? Infinity : 500 * (steps + 1);
   const candidate = pool.find((row) => Math.abs(row.rank_hint - mine.rank_hint) <= window);
-
-  if (!candidate) {
-    return {
-      waiting: true,
-      waitedMs,
-      queueSize: pool.length + 1,
-      room: null,
-      suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
-    };
-  }
+  if (!candidate) return stillWaiting();
 
   const candidateWaited = now - new Date(candidate.joined_at).getTime();
   const iCreate = candidateWaited < waitedMs || (candidateWaited === waitedMs && wallet < candidate.wallet);
-  if (!iCreate) {
-    return {
-      waiting: true,
-      waitedMs,
-      queueSize: pool.length + 1,
-      room: null,
-      suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
-    };
+  if (!iCreate) return stillWaiting();
+
+  const credits = await import("@/lib/credits.server");
+  const stake = mode === "ranked" ? RANKED_STAKE_NIM : 0;
+
+  if (mode === "ranked") {
+    // Charge the opponent first: if they cannot pay, drop them and keep waiting.
+    try {
+      await credits.spendRoom(candidate.wallet, "ranked-entry", null);
+    } catch {
+      await supabaseAdmin.from("mp_queue").delete().eq("id", candidate.id);
+      return stillWaiting("An opponent ran out of passes — still searching.");
+    }
+    try {
+      await credits.spendRoom(wallet, "ranked-entry", null);
+    } catch {
+      await credits.refundRoom(candidate.wallet, "ranked-refund", null);
+      await leaveQueue(wallet, gameSlug);
+      return {
+        waiting: false,
+        waitedMs,
+        queueSize: 0,
+        room: null,
+        suggestCpu: false,
+        mode,
+        notice: `Ranked needs one match pass (${RANKED_STAKE_NIM} NIM).`,
+      };
+    }
   }
 
   const settings = (mine.settings as Record<string, string | number | boolean>) ?? {};
-  const created = await createRoom(wallet, gameSlug, "quick", mine.max_players, settings, null);
+  const created = await createRoom(wallet, gameSlug, "quick", mine.max_players, settings, null, {
+    charge: false,
+    stake,
+  });
   const row = await getRow(created.id);
   const room = row ? await joinExisting(row, candidate.wallet) : created;
   await supabaseAdmin.from("mp_queue").update({ room_id: room.id }).eq("id", candidate.id);
   await leaveQueue(wallet, gameSlug);
-  return { waiting: false, waitedMs, queueSize: 0, room, suggestCpu: false };
+  return { waiting: false, waitedMs, queueSize: 0, room, suggestCpu: false, mode };
 }
