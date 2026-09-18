@@ -57,6 +57,13 @@
       "when": 1789759776585,
       "tag": "0007_add_chat_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789759835381,
+      "tag": "0008_harden_chat_spam_limits",
+      "breakpoints": true
     }
   ]
 }

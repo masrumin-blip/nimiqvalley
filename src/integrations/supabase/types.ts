@@ -91,22 +91,31 @@ export type Database = {
       }
       chat_moderation: {
         Row: {
+          last_message_at: string | null
+          last_normalized_text: string | null
           muted_until: string | null
           profanity_count: number
+          submission_times: string[]
           updated_at: string
           wallet: string
           warning_window_started_at: string | null
         }
         Insert: {
+          last_message_at?: string | null
+          last_normalized_text?: string | null
           muted_until?: string | null
           profanity_count?: number
+          submission_times?: string[]
           updated_at?: string
           wallet: string
           warning_window_started_at?: string | null
         }
         Update: {
+          last_message_at?: string | null
+          last_normalized_text?: string | null
           muted_until?: string | null
           profanity_count?: number
+          submission_times?: string[]
           updated_at?: string
           wallet?: string
           warning_window_started_at?: string | null
