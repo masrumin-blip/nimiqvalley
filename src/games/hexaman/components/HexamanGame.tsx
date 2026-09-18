@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { serverNow } from "@/lib/mp/clock";
 import { HEXAMAN_ROUND_MS, TICK_POLL_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
@@ -314,7 +315,7 @@ export function HexamanGame() {
       ...online.ticks.filter((t) => t.wallet !== online.wallet && t.alive),
       ...(meAlive ? [{ wallet: online.wallet ?? "me" }] : []),
     ];
-    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    const timeUp = room.endsAt ? serverNow() > Date.parse(room.endsAt) : false;
     if (alive.length <= 1 || timeUp) {
       const best = [...room.players].sort((a, b) => b.score - a.score)[0];
       const winner = alive.length === 1 ? (alive[0]?.wallet ?? null) : (best?.wallet ?? null);
@@ -995,9 +996,8 @@ export function HexamanGame() {
               {hud.status === "over" ? "Reboot" : "Start"}
             </Button>
             <Button
-              variant="outline"
               onClick={() => setLobbyOpen(true)}
-              className="rounded-full px-6 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em]"
+              className="h-11 rounded-full border border-primary/60 bg-primary/10 px-6 font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary transition hover:bg-primary/20 shadow-neon-sm"
             >
               Online
             </Button>

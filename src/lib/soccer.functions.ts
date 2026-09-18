@@ -99,15 +99,19 @@ export const fetchMatch = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ id: idSchema, since: z.number().int().min(-1) }).parse(input),
   )
-  .handler(async ({ data }): Promise<{ match: MatchState | null; moves: MatchMove[] }> => {
-    await requireWallet();
-    const cloud = await import("./soccer/cloud.server");
-    const [match, moves] = await Promise.all([
-      cloud.getMatch(data.id),
-      cloud.listMoves(data.id, data.since),
-    ]);
-    return { match, moves };
-  });
+  .handler(
+    async ({
+      data,
+    }): Promise<{ match: MatchState | null; moves: MatchMove[]; serverNow: string }> => {
+      await requireWallet();
+      const cloud = await import("./soccer/cloud.server");
+      const [match, moves] = await Promise.all([
+        cloud.getMatch(data.id),
+        cloud.listMoves(data.id, data.since),
+      ]);
+      return { match, moves, serverNow: new Date().toISOString() };
+    },
+  );
 
 export const submitMove = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>

@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { serverNow } from "@/lib/mp/clock";
 import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
@@ -354,6 +355,9 @@ export default function CarromGame() {
   // Ten seconds per shot: an automatic stroke keeps both boards in sync.
   useEffect(() => {
     if (mode !== "online" || phase !== "aim" || turn !== "you") return;
+    // Anchored to the server turn clock so both boards time out together.
+    const started = room?.turnStartedAt ? Date.parse(room.turnStartedAt) : serverNow();
+    const remaining = Math.max(0, TURN_TIMEOUT_MS - (serverNow() - started));
     const timer = setTimeout(() => {
       if (phaseRef.current !== "aim" || turnRef.current !== "you") return;
       const s = striker();
@@ -376,9 +380,9 @@ export default function CarromGame() {
       setShots((v) => v + 1);
       playSfx("flick", 0.8);
       setPhaseBoth("moving");
-    }, TURN_TIMEOUT_MS);
+    }, remaining);
     return () => clearTimeout(timer);
-  }, [mode, phase, turn, setPhaseBoth, sendShot]);
+  }, [mode, phase, turn, room?.turnStartedAt, setPhaseBoth, sendShot]);
 
   // Publish the winner once the match ends.
   const reportedRef = useRef(false);

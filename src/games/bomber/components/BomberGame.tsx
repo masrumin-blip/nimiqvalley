@@ -10,6 +10,7 @@ import {
   type Mode,
 } from "./engine";
 import { playSound, primeAudio, type SoundName } from "./sound";
+import { serverNow } from "@/lib/mp/clock";
 import { Button } from "@/components/ui/button";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
@@ -296,7 +297,7 @@ export default function BomberGame() {
       online.reportStats(mine.score, { kills: 0 });
     }
     const alive = hud.bombers.filter((b) => b.alive);
-    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    const timeUp = room.endsAt ? serverNow() > Date.parse(room.endsAt) : false;
     if (hud.bombers.length > 0 && (alive.length <= 1 || timeUp)) {
       const best = [...seats].sort((a, b) => b.score - a.score)[0];
       const winner =
