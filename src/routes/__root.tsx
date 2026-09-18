@@ -128,8 +128,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <GlobalClickSfx />
       <AppPreloader>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <LoginGate>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </LoginGate>
       </AppPreloader>
     </QueryClientProvider>
   );
