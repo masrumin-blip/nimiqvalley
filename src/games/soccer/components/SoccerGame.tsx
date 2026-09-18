@@ -186,6 +186,8 @@ function predictPath(
 
 /* ---------------- component ---------------- */
 
+type Mode = "cpu" | "online";
+
 export default function SoccerGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -198,6 +200,10 @@ export default function SoccerGame() {
   const [turn, setTurn] = useState<Team>("player");
   const [banner, setBanner] = useState<string | null>(null);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [mode, setMode] = useState<Mode>("cpu");
+  const [menuTab, setMenuTab] = useState<Mode>("cpu");
+  const [roomCode, setRoomCode] = useState("");
+  const [turnLeft, setTurnLeft] = useState(Math.round(TURN_TIMEOUT_MS / 1000));
 
   const bodies = useRef<Body[]>(makeBodies());
   const sparks = useRef<Spark[]>([]);
@@ -212,6 +218,20 @@ export default function SoccerGame() {
   const cpuTimer = useRef<number | null>(null);
   const flash = useRef(0);
 
+  const modeRef = useRef<Mode>("cpu");
+  const myTeamRef = useRef<Team>("player");
+  const flipRef = useRef(false);
+  const localTurnRef = useRef(0);
+  const turnStartRef = useRef(0);
+  const finishedRef = useRef(false);
+  const startedMatchRef = useRef<string | null>(null);
+  const movesRef = useRef<MatchMove[]>([]);
+
+  const online = useOnlineSoccer(menuTab === "online" || mode === "online");
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  movesRef.current = online.moves;
+
   const setPhaseBoth = (p: Phase) => {
     phaseRef.current = p;
     setPhase(p);
@@ -219,6 +239,7 @@ export default function SoccerGame() {
   const setTurnBoth = (t: Team) => {
     turnRef.current = t;
     setTurn(t);
+    turnStartRef.current = Date.now();
   };
 
   const burst = (x: number, y: number, hue: string, n = 10) => {
@@ -242,6 +263,10 @@ export default function SoccerGame() {
     targetRef.current = target;
     diffRef.current = difficulty;
     playerColorRef.current = playerColor;
+    modeRef.current = "cpu";
+    setMode("cpu");
+    myTeamRef.current = "player";
+    flipRef.current = false;
     setTurnBoth("player");
     setConfirmExit(false);
     setBanner("YOUR TURN");
@@ -250,10 +275,99 @@ export default function SoccerGame() {
     setPhaseBoth("aim");
   }, [difficulty, playerColor, resetPositions, target]);
 
+  const startOnlineMatch = useCallback(
+    (match: MatchState) => {
+      const host = match.hostWallet === onlineRef.current.wallet;
+      resetPositions();
+      scoreRef.current = { player: 0, cpu: 0 };
+      setScore({ player: 0, cpu: 0 });
+      targetRef.current = match.targetGoals;
+      setTarget(match.targetGoals);
+      playerColorRef.current = playerColor;
+      modeRef.current = "online";
+      setMode("online");
+      myTeamRef.current = host ? "player" : "cpu";
+      flipRef.current = !host;
+      localTurnRef.current = 0;
+      finishedRef.current = false;
+      setConfirmExit(false);
+      setTurnBoth("player");
+      setBanner(host ? "YOUR TURN" : "RIVAL TURN");
+      playSfx("start", 0.8);
+      setTimeout(() => setBanner(null), 1200);
+      setPhaseBoth("aim");
+    },
+    [playerColor, resetPositions],
+  );
+
   const choosePlayerColor = (color: PlayerColor) => {
     playerColorRef.current = color;
     setPlayerColor(color);
   };
+
+  /* ---------- online sync ---------- */
+
+  useEffect(() => {
+    const match = online.match;
+    if (!match || match.status !== "playing") return;
+    if (startedMatchRef.current === match.id) return;
+    startedMatchRef.current = match.id;
+    startOnlineMatch(match);
+  }, [online.match, startOnlineMatch]);
+
+  // Apply the opponent's shots, skipped turns, and the 10s turn timeout.
+  useEffect(() => {
+    if (mode !== "online") return;
+    const id = window.setInterval(() => {
+      if (phaseRef.current !== "aim") return;
+      const move = movesRef.current.find((m) => m.turnNo === localTurnRef.current);
+      if (move) {
+        if (move.kind === "skip") {
+          localTurnRef.current += 1;
+          setTurnBoth(turnRef.current === "player" ? "cpu" : "player");
+          setBanner("TURN SKIPPED");
+          window.setTimeout(() => setBanner(null), 900);
+          return;
+        }
+        if (move.wallet !== onlineRef.current.wallet) {
+          const b = bodies.current[move.piece];
+          if (b) {
+            b.vx = move.vx;
+            b.vy = move.vy;
+            burst(b.x, b.y, "255,70,90", 12);
+            playSfx("kick", 0.75);
+          }
+          localTurnRef.current += 1;
+          setPhaseBoth("sim");
+        }
+        return;
+      }
+      if (Date.now() - turnStartRef.current > TURN_TIMEOUT_MS + 400) {
+        onlineRef.current.requestSkip(localTurnRef.current);
+      }
+    }, 150);
+    return () => window.clearInterval(id);
+  }, [mode]);
+
+  // Turn countdown for the scoreboard.
+  useEffect(() => {
+    if (mode !== "online" || phase !== "aim") return;
+    const id = window.setInterval(() => {
+      const left = Math.ceil((TURN_TIMEOUT_MS - (Date.now() - turnStartRef.current)) / 1000);
+      setTurnLeft(Math.max(0, left));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [mode, phase, turn]);
+
+  // The rival closed the match.
+  useEffect(() => {
+    if (mode !== "online") return;
+    if (!online.match || online.match.status !== "finished") return;
+    if (finishedRef.current || phase === "over" || phase === "menu") return;
+    finishedRef.current = true;
+    setBanner("RIVAL LEFT");
+    setPhaseBoth("over");
+  }, [mode, online.match, phase]);
 
   /* ---------- cpu ---------- */
 
@@ -358,6 +472,8 @@ export default function SoccerGame() {
     const ro = new ResizeObserver(resize);
     if (wrapRef.current) ro.observe(wrapRef.current);
 
+    const mineTeam = () => (modeRef.current === "online" ? myTeamRef.current : "player");
+
     const scoreGoal = (who: Team) => {
       const s = { ...scoreRef.current };
       s[who] += 1;
@@ -368,17 +484,24 @@ export default function SoccerGame() {
        burst(
          W / 2,
          who === "player" ? WALL : H - WALL,
-         who === "player" ? PLAYER_COLORS[playerColorRef.current].rgb : "255,70,90",
+         who === mineTeam() ? PLAYER_COLORS[playerColorRef.current].rgb : "255,70,90",
          40,
        );
       if (s[who] >= targetRef.current) {
-        setBanner(who === "player" ? "YOU WIN!" : "CPU WINS");
-        playSfx(who === "player" ? "win" : "lose", 0.9);
+        const mine = who === mineTeam();
+        setBanner(mine ? "YOU WIN!" : modeRef.current === "online" ? "RIVAL WINS" : "CPU WINS");
+        playSfx(mine ? "win" : "lose", 0.9);
         setPhaseBoth("over");
-        if (who === "player") {
+        if (mine) {
           const wins = Number(localStorage.getItem("nimiq-soccer-wins") ?? 0) + 1;
           localStorage.setItem("nimiq-soccer-wins", String(wins));
           reportScore("soccer", wins);
+        }
+        if (modeRef.current === "online" && !finishedRef.current) {
+          finishedRef.current = true;
+          const match = onlineRef.current.match;
+          const winner = who === "player" ? match?.hostWallet : match?.guestWallet;
+          if (winner) onlineRef.current.finish(winner);
         }
         return;
       }
@@ -386,11 +509,12 @@ export default function SoccerGame() {
       setPhaseBoth("goal");
       window.setTimeout(() => {
         resetPositions();
-        setTurnBoth(who === "player" ? "cpu" : "player");
-        setBanner(who === "player" ? "CPU TURN" : "YOUR TURN");
+        const next: Team = who === "player" ? "cpu" : "player";
+        setTurnBoth(next);
+        setBanner(next === mineTeam() ? "YOUR TURN" : modeRef.current === "online" ? "RIVAL TURN" : "CPU TURN");
         window.setTimeout(() => setBanner(null), 900);
         setPhaseBoth("aim");
-        if (who === "player") {
+        if (modeRef.current === "cpu" && next === "cpu") {
           cpuTimer.current = window.setTimeout(() => {
             if (phaseRef.current === "aim" && turnRef.current === "cpu") cpuShoot();
           }, 900);
@@ -480,8 +604,6 @@ export default function SoccerGame() {
 
         if (phaseRef.current === "sim") {
           // Goal counts once the ball's centre crosses the goal line.
-          // (Pieces can't enter the goal mouth, so requiring the whole
-          // ball past the line could strand the ball on the line forever.)
           if (inGoalBand(ball.x)) {
             if (ball.y < WALL) scoreGoal("player");
             else if (ball.y > H - WALL) scoreGoal("cpu");
@@ -504,7 +626,7 @@ export default function SoccerGame() {
           const next: Team = turnRef.current === "player" ? "cpu" : "player";
           setTurnBoth(next);
           setPhaseBoth("aim");
-          if (next === "cpu") {
+          if (modeRef.current === "cpu" && next === "cpu") {
             cpuTimer.current = window.setTimeout(() => {
               if (phaseRef.current === "aim" && turnRef.current === "cpu") cpuShoot();
             }, 700);
@@ -522,6 +644,11 @@ export default function SoccerGame() {
       }
       flash.current = Math.max(0, flash.current - 0.02);
 
+      ctx.save();
+      if (flipRef.current) {
+        ctx.translate(W, H);
+        ctx.rotate(Math.PI);
+      }
       draw(
         ctx,
         list,
@@ -532,6 +659,7 @@ export default function SoccerGame() {
         phaseRef.current,
         PLAYER_COLORS[playerColorRef.current].rgb,
       );
+      ctx.restore();
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
@@ -551,16 +679,19 @@ export default function SoccerGame() {
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const s = scaleRef.current;
-    return { x: (e.clientX - rect.left) / s, y: (e.clientY - rect.top) / s };
+    const x = (e.clientX - rect.left) / s;
+    const y = (e.clientY - rect.top) / s;
+    return flipRef.current ? { x: W - x, y: H - y } : { x, y };
   };
 
   const onDown = (e: React.PointerEvent) => {
-    if (phaseRef.current !== "aim" || turnRef.current !== "player") return;
+    const mine = myTeamRef.current;
+    if (phaseRef.current !== "aim" || turnRef.current !== mine) return;
     const p = toLocal(e);
     const list = bodies.current;
     for (let i = 0; i < list.length; i++) {
       const b = list[i]!;
-      if (b.team !== "player") continue;
+      if (b.team !== mine) continue;
       if (Math.hypot(b.x - p.x, b.y - p.y) <= b.r + 18) {
         drag.current = { i, x: p.x, y: p.y };
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -578,7 +709,7 @@ export default function SoccerGame() {
   const onUp = () => {
     const d = drag.current;
     drag.current = null;
-    if (!d || phaseRef.current !== "aim" || turnRef.current !== "player") return;
+    if (!d || phaseRef.current !== "aim" || turnRef.current !== myTeamRef.current) return;
     const b = bodies.current[d.i];
     if (!b) return;
     let dx = b.x - d.x;
@@ -590,6 +721,10 @@ export default function SoccerGame() {
     dy = (dy / len) * clamped;
     b.vx = dx * POWER;
     b.vy = dy * POWER;
+    if (modeRef.current === "online") {
+      onlineRef.current.sendShot(localTurnRef.current, d.i, b.vx, b.vy);
+      localTurnRef.current += 1;
+    }
     burst(b.x, b.y, PLAYER_COLORS[playerColorRef.current].rgb, 12);
     playSfx("kick", 0.9);
     setPhaseBoth("sim");
@@ -599,11 +734,29 @@ export default function SoccerGame() {
 
   const inMatch = phase === "aim" || phase === "sim" || phase === "goal" || phase === "over";
   const activeColor = PLAYER_COLORS[playerColor];
+  const myTeam: Team = mode === "online" ? (online.isHost ? "player" : "cpu") : "player";
+  const myScore = myTeam === "player" ? score.player : score.cpu;
+  const rivalScore = myTeam === "player" ? score.cpu : score.player;
+  const myTurn = turn === myTeam;
+  const rivalName =
+    mode === "online"
+      ? (online.isHost ? online.match?.guestName : online.match?.hostName) ?? "RIVAL"
+      : "CPU";
+  const lobby = online.lobby;
+  const waiting = online.match && online.match.status === "waiting" ? online.match : null;
 
   const exitToMenu = () => {
     if (cpuTimer.current) window.clearTimeout(cpuTimer.current);
+    if (modeRef.current === "online") {
+      startedMatchRef.current = null;
+      online.leave.mutate();
+    }
     drag.current = null;
     resetPositions();
+    modeRef.current = "cpu";
+    setMode("cpu");
+    myTeamRef.current = "player";
+    flipRef.current = false;
     setConfirmExit(false);
     setBanner(null);
     setScore({ player: 0, cpu: 0 });
@@ -632,23 +785,26 @@ export default function SoccerGame() {
         <div className="mt-1 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1 backdrop-blur">
           <div className="text-center">
             <div className={`text-[9px] tracking-widest ${activeColor.textClass}`}>YOU</div>
-            <div className={`font-display text-lg leading-tight ${activeColor.textClass}`}>{score.player}</div>
+            <div className={`font-display text-lg leading-tight ${activeColor.textClass}`}>{myScore}</div>
           </div>
           <div className="min-w-0 text-center">
             <div className="truncate text-[9px] tracking-widest text-muted-foreground">
-              FIRST TO {target} · {difficulty.toUpperCase()}
+              FIRST TO {target} · {mode === "online" ? "ONLINE" : difficulty.toUpperCase()}
             </div>
             <div
               className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wider ${
-                turn === "player" ? activeColor.surfaceClass : "bg-neon-red/20 text-neon-red"
+                myTurn ? activeColor.surfaceClass : "bg-neon-red/20 text-neon-red"
               }`}
             >
-              {turn === "player" ? "YOUR TURN" : "CPU TURN"}
+              {myTurn ? "YOUR TURN" : `${rivalName.toUpperCase()} TURN`}
+              {mode === "online" && phase === "aim" ? ` · ${turnLeft}s` : ""}
             </div>
           </div>
           <div className="text-center">
-            <div className="text-[9px] tracking-widest text-neon-red">CPU</div>
-            <div className="font-display text-lg leading-tight text-neon-red">{score.cpu}</div>
+            <div className="max-w-16 truncate text-[9px] tracking-widest text-neon-red">
+              {rivalName.toUpperCase()}
+            </div>
+            <div className="font-display text-lg leading-tight text-neon-red">{rivalScore}</div>
           </div>
         </div>
       )}
@@ -673,7 +829,25 @@ export default function SoccerGame() {
           )}
 
           {phase === "menu" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 overflow-y-auto bg-background/85 px-5 py-6 backdrop-blur-sm">
+            <div className="absolute inset-0 flex flex-col items-center gap-4 overflow-y-auto bg-background/85 px-5 py-6 backdrop-blur-sm">
+              <div className="flex w-full max-w-xs gap-2" role="tablist" aria-label="Game mode">
+                {(["cpu", "online"] as Mode[]).map((m) => (
+                  <button
+                    key={m}
+                    role="tab"
+                    aria-selected={menuTab === m}
+                    onClick={() => setMenuTab(m)}
+                    className={`flex-1 rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-widest transition ${
+                      menuTab === m
+                        ? "border-neon-yellow bg-neon-yellow/15 text-neon-yellow"
+                        : "border-white/15 text-foreground/70 hover:border-white/40"
+                    }`}
+                  >
+                    {m === "cpu" ? "VS CPU" : "Online"}
+                  </button>
+                ))}
+              </div>
+
               <div className="w-full max-w-xs text-center">
                 <div className="mb-2 text-xs tracking-widest text-muted-foreground">FIRST TO</div>
                 <div className="flex justify-center gap-2">
@@ -724,39 +898,163 @@ export default function SoccerGame() {
                 </div>
               </div>
 
-              <div className="w-full max-w-xs text-center">
-                <div className="mb-2 text-xs tracking-widest text-muted-foreground">DIFFICULTY</div>
-                <div className="flex justify-center gap-2">
-                  {(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => setDifficulty(d)}
-                      className={`flex-1 rounded-xl border px-2 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                        difficulty === d
-                          ? "border-neon-red bg-neon-red/15 text-neon-red shadow-[0_0_20px_rgba(255,70,90,0.35)]"
-                          : "border-white/15 text-foreground/70 hover:border-white/40"
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {menuTab === "cpu" ? (
+                <>
+                  <div className="w-full max-w-xs text-center">
+                    <div className="mb-2 text-xs tracking-widest text-muted-foreground">DIFFICULTY</div>
+                    <div className="flex justify-center gap-2">
+                      {(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDifficulty(d)}
+                          className={`flex-1 rounded-xl border px-2 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                            difficulty === d
+                              ? "border-neon-red bg-neon-red/15 text-neon-red shadow-[0_0_20px_rgba(255,70,90,0.35)]"
+                              : "border-white/15 text-foreground/70 hover:border-white/40"
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              <div className="flex w-full max-w-xs flex-col items-center gap-2">
-                <button
-                  onClick={() => setPhaseBoth("tutorial")}
-                  className="font-display w-full rounded-2xl bg-neon-yellow px-10 py-3 text-lg tracking-[0.2em] text-black shadow-[0_0_35px_rgba(255,225,60,0.5)] transition hover:scale-[1.03]"
-                >
-                  PLAY
-                </button>
-                <button
-                  onClick={startMatch}
-                  className="w-full rounded-xl border border-white/20 px-6 py-2 text-sm font-semibold tracking-wider text-foreground/80 transition hover:border-white/50"
-                >
-                  SKIP TUTORIAL
-                </button>
-              </div>
+                  <div className="flex w-full max-w-xs flex-col items-center gap-2">
+                    <button
+                      onClick={() => setPhaseBoth("tutorial")}
+                      className="font-display w-full rounded-2xl bg-neon-yellow px-10 py-3 text-lg tracking-[0.2em] text-black shadow-[0_0_35px_rgba(255,225,60,0.5)] transition hover:scale-[1.03]"
+                    >
+                      PLAY
+                    </button>
+                    <button
+                      onClick={startMatch}
+                      className="w-full rounded-xl border border-white/20 px-6 py-2 text-sm font-semibold tracking-wider text-foreground/80 transition hover:border-white/50"
+                    >
+                      SKIP TUTORIAL
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex w-full max-w-xs flex-col gap-3 pb-2">
+                  {waiting ? (
+                    <div className="rounded-2xl border border-neon-yellow/40 bg-neon-yellow/10 p-4 text-center">
+                      <div className="text-xs tracking-widest text-neon-yellow">
+                        WAITING FOR A RIVAL…
+                      </div>
+                      {waiting.code && (
+                        <div className="font-display mt-2 text-2xl tracking-[0.35em] text-foreground">
+                          {waiting.code}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => online.leave.mutate()}
+                        className="mt-3 w-full rounded-xl border border-white/20 px-4 py-2 text-xs font-semibold tracking-wider text-foreground/80"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => online.findMatch.mutate(target)}
+                        disabled={online.findMatch.isPending}
+                        className="font-display w-full rounded-2xl bg-neon-yellow px-6 py-3 text-base tracking-[0.2em] text-black shadow-[0_0_35px_rgba(255,225,60,0.5)] transition hover:scale-[1.03] disabled:opacity-60"
+                      >
+                        QUICK MATCH
+                      </button>
+                      <button
+                        onClick={() => online.openRoom.mutate(target)}
+                        disabled={online.openRoom.isPending}
+                        className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold tracking-wider text-foreground/80 transition hover:border-white/50 disabled:opacity-60"
+                      >
+                        CREATE ROOM CODE
+                      </button>
+                      <div className="flex gap-2">
+                        <input
+                          value={roomCode}
+                          onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                          placeholder="ROOM CODE"
+                          aria-label="Room code"
+                          maxLength={8}
+                          className="min-w-0 flex-1 rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm tracking-[0.2em] text-foreground placeholder:text-foreground/30"
+                        />
+                        <button
+                          onClick={() => online.enterRoom.mutate(roomCode)}
+                          disabled={roomCode.trim().length < 4 || online.enterRoom.isPending}
+                          className="rounded-xl border border-white/20 px-3 py-2 text-xs font-semibold tracking-wider text-foreground/80 disabled:opacity-40"
+                        >
+                          JOIN
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {(online.findMatch.error || online.enterRoom.error || online.challenge.error) && (
+                    <p className="text-center text-xs text-neon-red">
+                      {
+                        ((online.findMatch.error ?? online.enterRoom.error ?? online.challenge.error) as Error)
+                          .message
+                      }
+                    </p>
+                  )}
+
+                  {lobby && lobby.invites.length > 0 && (
+                    <div className="rounded-2xl border border-white/15 bg-white/5 p-3">
+                      <div className="mb-2 text-[10px] tracking-widest text-muted-foreground">
+                        CHALLENGES
+                      </div>
+                      {lobby.invites.map((inv) => (
+                        <div key={inv.id} className="flex items-center gap-2 py-1">
+                          <span className="min-w-0 flex-1 truncate text-xs text-foreground/85">
+                            {inv.hostName}
+                          </span>
+                          <button
+                            onClick={() => online.answerChallenge.mutate({ id: inv.id, accept: true })}
+                            className="rounded-lg bg-neon-yellow px-2 py-1 text-[10px] font-bold text-black"
+                          >
+                            ACCEPT
+                          </button>
+                          <button
+                            onClick={() => online.answerChallenge.mutate({ id: inv.id, accept: false })}
+                            className="rounded-lg border border-white/20 px-2 py-1 text-[10px] font-semibold text-foreground/70"
+                          >
+                            NO
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {lobby && (
+                    <div className="rounded-2xl border border-white/15 bg-white/5 p-3">
+                      <div className="mb-2 text-[10px] tracking-widest text-muted-foreground">
+                        FRIENDS
+                      </div>
+                      {lobby.friends.length === 0 ? (
+                        <p className="text-[11px] text-foreground/60">
+                          Add friends in Arena Chat to challenge them here.
+                        </p>
+                      ) : (
+                        lobby.friends.map((f) => (
+                          <div key={f.wallet} className="flex items-center gap-2 py-1">
+                            <span className="min-w-0 flex-1 truncate text-xs text-foreground/85">
+                              {f.name}
+                            </span>
+                            <button
+                              onClick={() =>
+                                online.challenge.mutate({ target: f.wallet, targetGoals: target })
+                              }
+                              className="rounded-lg border border-white/20 px-2 py-1 text-[10px] font-semibold text-foreground/80"
+                            >
+                              CHALLENGE
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -780,7 +1078,7 @@ export default function SoccerGame() {
                 </li>
                 <li className="flex gap-3">
                   <span className={`font-display ${activeColor.textClass}`}>4</span>
-                  <span>Turns alternate with the CPU. First team to reach the goal target wins.</span>
+                  <span>Turns alternate with your rival. First team to reach the goal target wins.</span>
                 </li>
               </ol>
               <div className="flex w-full max-w-xs flex-col items-center gap-2">
@@ -804,21 +1102,23 @@ export default function SoccerGame() {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/85 px-4 backdrop-blur-sm">
               <div
                 className={`font-display text-center text-2xl tracking-[0.2em] sm:text-4xl ${
-                  score.player > score.cpu ? activeColor.textClass : "text-neon-red"
+                  myScore > rivalScore ? activeColor.textClass : "text-neon-red"
                 }`}
               >
-                {score.player > score.cpu ? "YOU WIN!" : "CPU WINS"}
+                {myScore > rivalScore ? "YOU WIN!" : mode === "online" ? "RIVAL WINS" : "CPU WINS"}
               </div>
               <div className="text-lg text-muted-foreground">
-                {score.player} — {score.cpu}
+                {myScore} — {rivalScore}
               </div>
               <div className="flex flex-wrap justify-center gap-3">
-                <button
-                  onClick={startMatch}
-                  className="rounded-xl bg-neon-yellow px-6 py-2 font-semibold text-black shadow-[0_0_25px_rgba(255,225,60,0.4)]"
-                >
-                  Play Again
-                </button>
+                {mode === "cpu" && (
+                  <button
+                    onClick={startMatch}
+                    className="rounded-xl bg-neon-yellow px-6 py-2 font-semibold text-black shadow-[0_0_25px_rgba(255,225,60,0.4)]"
+                  >
+                    Play Again
+                  </button>
+                )}
                 <button
                   onClick={exitToMenu}
                   className="rounded-xl border border-white/20 px-6 py-2 font-semibold text-foreground/80"

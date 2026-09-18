@@ -81,7 +81,7 @@ export const respondChallenge = createServerFn({ method: "POST" })
 
 export const fetchMatch = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
-    z.object({ id: idSchema, since: z.number().int().min(0) }).parse(input),
+    z.object({ id: idSchema, since: z.number().int().min(-1) }).parse(input),
   )
   .handler(async ({ data }): Promise<{ match: MatchState | null; moves: MatchMove[] }> => {
     await requireWallet();
