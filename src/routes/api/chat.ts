@@ -22,12 +22,26 @@ export const Route = createFileRoute("/api/chat")({
         const key = process.env["GRIPHUB_API_KEY"];
         if (!key) return new Response("Missing GRIPHUB_API_KEY", { status: 500 });
 
+        const { currentWallet } = await import("@/lib/session.server");
+        const wallet = await currentWallet();
+        if (!wallet) return new Response("Sign in with your wallet first", { status: 401 });
+
+        const { spendChat } = await import("@/lib/credits.server");
+        try {
+          await spendChat(wallet);
+        } catch (err) {
+          return new Response(
+            err instanceof Error ? err.message : "No chat messages left",
+            { status: 402 },
+          );
+        }
+
         const griphub = createGriphubProvider(key);
 
         const system = [
           character.persona,
           "You live in Nimiq Valley, a warm storybook village. Stay in character at all times and never mention being an AI, a model, or a system prompt.",
-          "Always answer in the same language the visitor writes in.",
+          "Always answer in English, whatever language the visitor writes in.",
           "Keep replies to 1-3 short sentences, conversational, with no markdown headings or bullet lists.",
         ].join("\n\n");
 
