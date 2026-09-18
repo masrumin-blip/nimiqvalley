@@ -20,6 +20,9 @@ interface Props {
 /** Shared lobby UI: create a room, join by code, or challenge an Arena friend. */
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
+  const { credits } = useCredits();
+  const { buyRooms } = useCreditActions();
+  const rooms = credits?.roomCredits ?? 0;
   const room = online.room;
   const invites = online.lobby?.invites ?? [];
   const friends = online.lobby?.friends ?? [];
