@@ -19,6 +19,15 @@ function isWalletError(value: unknown): value is WalletError {
   return Boolean(value && typeof value === "object" && "error" in value);
 }
 
+/** Turn wallet provider errors into friendly English messages. */
+function walletErrorMessage(err: WalletError): string {
+  const { type, message } = err.error;
+  if (/permissiondenied|denied|reject/i.test(`${type} ${message}`)) {
+    return "You declined the wallet request.";
+  }
+  return message || "The wallet request failed.";
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
