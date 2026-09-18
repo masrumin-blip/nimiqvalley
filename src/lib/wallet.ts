@@ -33,11 +33,24 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 
-async function transactionHash(serialized: string): Promise<string> {
-  const { hashTransaction } = await import("./tx.functions");
-  const { hash } = await hashTransaction({ data: { serialized } });
-  return hash;
+/** Reject instead of hanging when a wallet dialog never answers. */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error as Error);
+      },
+    );
+  });
 }
+
+const WALLET_TIMEOUT_MS = 3 * 60_000;
 
 export function getEthereum(): EthereumProvider | null {
   if (typeof window === "undefined") return null;
