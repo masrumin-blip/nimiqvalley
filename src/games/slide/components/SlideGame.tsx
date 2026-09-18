@@ -42,6 +42,7 @@ type PowerUp = { kind: PowerUpKind; x: number; y: number; taken: boolean };
 type Effects = { shield: number; magnet: number; boost: number };
 
 const ZOOM = 0.32; // kamera 50% lebih jauh
+const POWERUP_SCALE = 0.7;
 
 function pointToSegmentDistance(
   px: number,
@@ -391,7 +392,7 @@ export default function SlideGame() {
 
         // Item bantuan sementara.
         for (const item of powerUps) {
-          if (item.taken || !touchesPlayer(item.x, item.y, 31)) continue;
+          if (item.taken || !touchesPlayer(item.x, item.y, 31 * POWERUP_SCALE)) continue;
           item.taken = true;
           if (item.kind === "shield") shieldUntil = runTime + 6;
           else if (item.kind === "magnet") magnetUntil = runTime + 7;
@@ -595,11 +596,12 @@ export default function SlideGame() {
       // item: perisai, magnet, dan boost
       for (const item of powerUps) {
         if (item.taken) continue;
-        const ix = toSX(item.x);
+          const ix = toSX(item.x);
         if (ix < -30 || ix > W + 30) continue;
         const iy = toSY(item.y) + Math.sin(now / 260 + item.x) * 5;
         ctx.save();
         ctx.translate(ix, iy);
+          ctx.scale(POWERUP_SCALE, POWERUP_SCALE);
         ctx.fillStyle = item.kind === "shield" ? "#4ecdc4" : item.kind === "magnet" ? "#f26d85" : "#ffd447";
         ctx.beginPath();
         for (let side = 0; side < 6; side++) {
@@ -820,15 +822,15 @@ export default function SlideGame() {
         </div>
 
         {(hud.effects.shield > 0 || hud.effects.magnet > 0 || hud.effects.boost > 0) && (
-          <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 gap-2 font-display text-[11px] font-bold text-[#2a2135]">
+          <div className="pointer-events-none absolute left-1/2 top-5 flex -translate-x-1/2 gap-1.5 font-display text-[8px] font-bold text-[#2a2135]">
             {hud.effects.shield > 0 && (
-              <span className="rounded-full bg-[#4ecdc4]/90 px-3 py-1.5 shadow">Shield {hud.effects.shield.toFixed(1)}s</span>
+              <span className="rounded-full bg-[#4ecdc4]/90 px-2.5 py-1 shadow">Shield {hud.effects.shield.toFixed(1)}s</span>
             )}
             {hud.effects.magnet > 0 && (
-              <span className="rounded-full bg-[#f26d85]/90 px-3 py-1.5 shadow">Magnet {hud.effects.magnet.toFixed(1)}s</span>
+              <span className="rounded-full bg-[#f26d85]/90 px-2.5 py-1 shadow">Magnet {hud.effects.magnet.toFixed(1)}s</span>
             )}
             {hud.effects.boost > 0 && (
-              <span className="rounded-full bg-[#ffd447]/90 px-3 py-1.5 shadow">Boost {hud.effects.boost.toFixed(1)}s</span>
+              <span className="rounded-full bg-[#ffd447]/90 px-2.5 py-1 shadow">Boost {hud.effects.boost.toFixed(1)}s</span>
             )}
           </div>
         )}

@@ -13,21 +13,21 @@ export function StatBars({ className }: { className?: string }) {
   const { state } = useGame();
 
   return (
-    <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-4", className)}>
+    <div className={cn("grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2", className)}>
       {BARS.map(({ key, label, icon: Icon, color }) => {
         const value = Math.round(state[key]);
         const low = value < 25;
         return (
           <div
             key={key}
-            className="rounded-2xl border border-border/60 bg-card/80 px-3 py-2 shadow-sm backdrop-blur"
+            className="rounded-xl border border-border/60 bg-card/80 px-2.5 py-1.5 shadow-sm backdrop-blur sm:rounded-2xl sm:px-3 sm:py-2"
           >
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <Icon className="size-3.5" style={{ color }} />
+            <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:gap-1.5 sm:text-[11px]">
+              <Icon className="size-3 sm:size-3.5" style={{ color }} />
               {label}
               <span className={cn("ml-auto tabular-nums", low && "text-destructive")}>{value}</span>
             </div>
-            <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-muted">
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted sm:mt-1.5 sm:h-2.5">
               <div
                 className={cn("h-full rounded-full transition-all duration-500", low && "animate-pulse")}
                 style={{ width: `${value}%`, background: color }}
