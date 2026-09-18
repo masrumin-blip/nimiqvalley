@@ -597,7 +597,7 @@ function BadgeIcon({ badge }: { badge: AchievementBadge }) {
   return <Gamepad2 className="size-4" />;
 }
 
-function AchievementCollection({ summary, loading = false }: { summary?: AchievementSummary; loading?: boolean }) {
+function AchievementCollection({ summary, loading = false }: { summary: AchievementSummary | undefined; loading?: boolean }) {
   return (
     <section aria-label="Achievements" className="space-y-3 border-y border-border py-4">
       <div className="flex items-center gap-2">
