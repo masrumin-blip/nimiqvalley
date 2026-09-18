@@ -190,6 +190,98 @@ export type Database = {
           },
         ]
       }
+      soccer_matches: {
+        Row: {
+          code: string | null
+          created_at: string
+          guest_wallet: string | null
+          host_wallet: string
+          id: string
+          kind: string
+          status: string
+          target_goals: number
+          turn_no: number
+          turn_started_at: string
+          turn_wallet: string | null
+          updated_at: string
+          winner_wallet: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          guest_wallet?: string | null
+          host_wallet: string
+          id?: string
+          kind?: string
+          status?: string
+          target_goals?: number
+          turn_no?: number
+          turn_started_at?: string
+          turn_wallet?: string | null
+          updated_at?: string
+          winner_wallet?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          guest_wallet?: string | null
+          host_wallet?: string
+          id?: string
+          kind?: string
+          status?: string
+          target_goals?: number
+          turn_no?: number
+          turn_started_at?: string
+          turn_wallet?: string | null
+          updated_at?: string
+          winner_wallet?: string | null
+        }
+        Relationships: []
+      }
+      soccer_moves: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          match_id: string
+          piece: number
+          turn_no: number
+          vx: number
+          vy: number
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          match_id: string
+          piece?: number
+          turn_no: number
+          vx?: number
+          vy?: number
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          match_id?: string
+          piece?: number
+          turn_no?: number
+          vx?: number
+          vy?: number
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soccer_moves_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "soccer_matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
