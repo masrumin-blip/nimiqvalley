@@ -10,3 +10,4 @@
 - [x] Real AI chat through Griphub personas.
 - [x] Arena Chat (global, DM, friends, profile).
 - [x] Nimiq Soccer online multiplayer (quick match, room code, friend challenge, 10s turn timer).
+- [x] Online multiplayer for Checkers, Carrom, and Hexaman (no player-vs-player collision; last runner standing ends the Hexaman round with a stats popup).
