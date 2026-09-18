@@ -9,8 +9,11 @@ export const FREE_CHATS_PER_DAY = 3;
 /** Cost of creating one online multiplayer room. */
 export const ROOM_COST_NIM = 25;
 
+/** Cost of one match key (needed to enter online matchmaking). */
+export const KEY_COST_NIM = 20;
+
 /** Extra rewards for the daily Twitter visit. */
-export const DAILY_REWARD = { rooms: 2, chats: 3 } as const;
+export const DAILY_REWARD = { rooms: 2, chats: 3, keys: 2 } as const;
 
 export type ChatPack = { id: string; nim: number; chats: number; label: string };
 
@@ -26,6 +29,7 @@ export type CreditState = {
   wallet: string;
   chatCredits: number;
   roomCredits: number;
+  matchKeys: number;
   freeChatsLeft: number;
   claimedToday: boolean;
 };
