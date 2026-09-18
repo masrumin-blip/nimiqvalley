@@ -92,14 +92,25 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
 
   if (online.queueing) {
     const waited = Math.floor((online.queue?.waitedMs ?? 0) / 1000);
+    const ranked = online.queue?.mode === "ranked";
     return (
       <div className="space-y-3 text-center">
         <Loader2 className="mx-auto size-6 animate-spin text-primary" />
-        <p className="text-sm">Searching for an opponent… {waited}s</p>
+        <p className="text-sm">
+          Searching for a {ranked ? "ranked" : "casual"} opponent… {waited}s
+        </p>
         <p className="text-xs text-muted-foreground">
           {online.queue?.queueSize ?? 1} player(s) in the queue. The skill range widens every 10
           seconds.
         </p>
+        {ranked ? (
+          <p className="text-xs text-muted-foreground">
+            Your pass is only taken once an opponent is found.
+          </p>
+        ) : null}
+        {online.queue?.notice ? (
+          <p className="text-xs text-destructive">{online.queue.notice}</p>
+        ) : null}
         {online.queue?.suggestCpu ? (
           <p className="text-xs text-muted-foreground">
             Nobody nearby yet — try a private room or play the CPU.
@@ -114,14 +125,35 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-xs">
+        <span className="text-muted-foreground">Match passes</span>
+        <span className="font-mono">
+          {rooms} · {balance.toFixed(0)} NIM won
+        </span>
+      </div>
+
       <Button
         className="w-full"
         disabled={busy || online.startQuick.isPending}
-        onClick={() => online.startQuick.mutate()}
+        onClick={() => online.startQuick.mutate("casual")}
       >
         <Swords className="mr-2 size-4" />
-        Quick match (free)
+        Casual match — free
       </Button>
+
+      <Button
+        variant="secondary"
+        className="w-full"
+        disabled={busy || online.startQuick.isPending}
+        onClick={() => online.startQuick.mutate("ranked")}
+      >
+        <Trophy className="mr-2 size-4" />
+        Ranked match — 1 pass
+      </Button>
+      <p className="-mt-2 text-center text-xs text-muted-foreground">
+        Ranked stakes {RANKED_STAKE_NIM} NIM each; the winner gets {RANKED_PAYOUT_NIM} NIM. Nothing
+        is charged if no opponent shows up.
+      </p>
 
       <Button
         variant="secondary"
@@ -134,22 +166,30 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
         ) : (
           <Users className="mr-2 size-4" />
         )}
-        Create room ({maxPlayers} players) — {ROOM_COST_NIM} NIM
+        Create room ({maxPlayers} players) — 1 pass
       </Button>
       <p className="-mt-2 text-center text-xs text-muted-foreground">
-        {rooms} room pass(es) left. Joining a room is always free.
+        {rooms} match pass(es) left. Joining a room is always free.
       </p>
-      {rooms <= 0 ? (
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={buyRooms.isPending}
-          onClick={() => buyRooms.mutate(1)}
-        >
-          {buyRooms.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-          Pay {ROOM_COST_NIM} NIM for 1 room pass
-        </Button>
-      ) : null}
+
+      <div className="flex gap-2">
+        {TICKET_PACKS.map((pack) => (
+          <Button
+            key={pack.id}
+            variant="outline"
+            className="flex-1"
+            disabled={buyRooms.isPending}
+            onClick={() => buyRooms.mutate(pack.passes)}
+          >
+            {buyRooms.isPending ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Coins className="mr-2 size-4" />
+            )}
+            {pack.passes} for {pack.nim} NIM
+          </Button>
+        ))}
+      </div>
       {buyRooms.isError ? (
         <p className="text-center text-xs text-destructive">
           {(buyRooms.error as Error).message}
