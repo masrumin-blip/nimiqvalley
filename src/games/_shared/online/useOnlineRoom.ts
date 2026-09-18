@@ -157,7 +157,11 @@ export function useOnlineRoom({
   });
   const leave = useMutation({
     mutationFn: () => leaveFn({ data: { gameSlug } }),
-    onSuccess: () => adopt(null),
+    onSuccess: () => {
+      adopt(null);
+      // An unused room gives its key or room pass back.
+      void queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
   });
 
   /* ---------------- quick match queue ---------------- */

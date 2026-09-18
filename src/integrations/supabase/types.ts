@@ -560,6 +560,7 @@ export type Database = {
         Row: {
           code: string | null
           created_at: string
+          entry_cost: string
           guest_wallet: string | null
           host_wallet: string
           id: string
@@ -575,6 +576,7 @@ export type Database = {
         Insert: {
           code?: string | null
           created_at?: string
+          entry_cost?: string
           guest_wallet?: string | null
           host_wallet: string
           id?: string
@@ -590,6 +592,7 @@ export type Database = {
         Update: {
           code?: string | null
           created_at?: string
+          entry_cost?: string
           guest_wallet?: string | null
           host_wallet?: string
           id?: string

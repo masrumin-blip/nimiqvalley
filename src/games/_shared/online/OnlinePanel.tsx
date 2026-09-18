@@ -133,7 +133,7 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
       <Button
         variant="secondary"
         className="w-full"
-        disabled={busy || keys <= 0}
+        disabled={busy || (keys <= 0 && rooms <= 0)}
         onClick={() => online.openRoom.mutate()}
       >
         {online.openRoom.isPending ? (
@@ -141,10 +141,11 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
         ) : (
           <Users className="mr-2 size-4" />
         )}
-        Create room ({maxPlayers} players) — 1 key + {ROOM_COST_NIM} NIM
+        Create room ({maxPlayers} players) — 1 key or 1 room pass
       </Button>
       <p className="-mt-2 text-center text-xs text-muted-foreground">
-        {rooms} room pass(es) left. Joining a room by code is free.
+        {rooms} room pass(es) left ({ROOM_COST_NIM} NIM each). Joining a room by code is free, and
+        the cost comes back if nobody joins your room.
       </p>
       {keys <= 0 ? (
         <Button

@@ -126,6 +126,36 @@ export async function refundKey(wallet: string): Promise<void> {
   await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
 }
 
+/** Gives a room pass back when the room was never actually played. */
+export async function refundRoom(wallet: string): Promise<void> {
+  const row = await loadRow(wallet);
+  await save(wallet, { room_credits: row.room_credits + 1 });
+}
+
+export type RoomEntry = "key" | "room";
+
+/** Opening a room costs one match key OR one room pass — whichever the player has. */
+export async function spendRoomEntry(wallet: string): Promise<RoomEntry> {
+  const row = await loadRow(wallet);
+  if ((row.match_keys ?? 0) > 0) {
+    await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
+    return "key";
+  }
+  if (row.room_credits > 0) {
+    await save(wallet, { room_credits: row.room_credits - 1 });
+    return "room";
+  }
+  throw new Error(
+    `Opening a room needs a match key or a room pass. Claim the daily reward, or buy one for ${KEY_COST_NIM} NIM (key) or ${ROOM_COST_NIM} NIM (room pass).`,
+  );
+}
+
+/** Gives back whatever was spent to open a room. */
+export async function refundRoomEntry(wallet: string, entry: RoomEntry): Promise<void> {
+  if (entry === "key") await refundKey(wallet);
+  else await refundRoom(wallet);
+}
+
 async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
   const row = await loadRow(wallet);
   await save(wallet, {
