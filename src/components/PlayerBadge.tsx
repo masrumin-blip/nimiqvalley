@@ -86,7 +86,7 @@ export function PlayerBadge({ className = "" }: { className?: string }) {
           size="sm"
           variant="ghost"
           className="w-full text-destructive"
-          onClick={() => disconnect.mutate(preferredWallet())}
+          onClick={() => disconnect.mutate()}
           disabled={disconnect.isPending}
         >
           <LogOut className="size-4" />
