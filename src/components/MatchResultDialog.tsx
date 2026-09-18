@@ -23,6 +23,8 @@ interface Props {
   title: string;
   subtitle?: string;
   rows: ResultRow[];
+  /** Ranked matches show what the result did to the player's NIM, e.g. "+40 NIM". */
+  payout?: string | null;
   onPlayAgain?: () => void;
   onExit: () => void;
 }
@@ -33,6 +35,7 @@ export function MatchResultDialog({
   title,
   subtitle,
   rows,
+  payout,
   onPlayAgain,
   onExit,
 }: Props) {
@@ -46,6 +49,18 @@ export function MatchResultDialog({
           </DialogTitle>
           {subtitle ? <DialogDescription>{subtitle}</DialogDescription> : null}
         </DialogHeader>
+
+        {payout ? (
+          <p
+            className={`rounded-lg border px-3 py-2 text-center text-sm font-semibold ${
+              payout.startsWith("+")
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-border/60 bg-card/60 text-muted-foreground"
+            }`}
+          >
+            Ranked stake: {payout}
+          </p>
+        ) : null}
 
         <ol className="space-y-2">
           {rows.map((row, i) => (
