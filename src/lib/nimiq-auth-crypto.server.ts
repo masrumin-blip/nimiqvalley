@@ -54,7 +54,7 @@ function equalBytes(first: Uint8Array, second: Uint8Array): boolean {
   if (first.length !== second.length) return false;
   let difference = 0;
   for (let index = 0; index < first.length; index += 1) {
-    difference |= first[index] ^ second[index];
+    difference |= (first[index] ?? 0) ^ (second[index] ?? 0);
   }
   return difference === 0;
 }
