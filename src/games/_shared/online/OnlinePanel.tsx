@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Loader2, Swords, Users } from "lucide-react";
+import { KeyRound, Loader2, Swords, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
-import { ROOM_COST_NIM } from "@/lib/credits";
+import { KEY_COST_NIM, ROOM_COST_NIM } from "@/lib/credits";
 import type { OnlineRoom } from "./useOnlineRoom";
 
 interface Props {
@@ -21,8 +21,9 @@ interface Props {
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
   const { credits } = useCredits();
-  const { buyRooms } = useCreditActions();
+  const { buyRooms, buyKeys } = useCreditActions();
   const rooms = credits?.roomCredits ?? 0;
+  const keys = credits?.matchKeys ?? 0;
   const room = online.room;
   const invites = online.lobby?.invites ?? [];
   const friends = online.lobby?.friends ?? [];
