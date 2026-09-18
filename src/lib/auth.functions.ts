@@ -73,30 +73,29 @@ export const signInWithWallet = createServerFn({ method: "POST" })
     const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${data.challenge}\nThis request does not send a transaction.`;
     try {
       const { Address, PublicKey, Signature } = await import("@nimiq/core/web");
-      const publicKey = PublicKey.fromHex(data.publicKey);
-      const signature = Signature.fromHex(data.signature);
+      const publicKey = new PublicKey(decodeKeyMaterial(data.publicKey));
+      const signature = Signature.deserialize(decodeKeyMaterial(data.signature));
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
-        console.warn(`[wallet-login] rejected ${data.scheme}: public-key mismatch`);
+        console.warn("[wallet-login] rejected: public-key mismatch");
         throw new Error("The signing key does not belong to this wallet.");
       }
 
       const encoder = new TextEncoder();
       const messageBytes = encoder.encode(message);
-      const sha256 = async (bytes: Uint8Array) =>
-        new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer));
+      const prefixed = encoder.encode(
+        `\u0016Nimiq Signed Message:\n${messageBytes.length}${message}`,
+      );
+      const digest = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", prefixed as unknown as ArrayBuffer),
+      );
 
-      const signedBytes = data.scheme === "pay-hex-v1"
-        ? await sha256(messageBytes)
-        : await sha256(encoder.encode(`\u0016Nimiq Signed Message:\n${messageBytes.length}${message}`));
-
-      if (!publicKey.verify(signature, signedBytes)) {
-        console.warn(`[wallet-login] rejected ${data.scheme}: signature mismatch`);
+      if (!publicKey.verify(signature, digest)) {
+        console.warn("[wallet-login] rejected: signature mismatch");
         throw new Error("The wallet signature could not be verified.");
       }
-      console.info(`[wallet-login] verified ${data.scheme}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
-      console.warn(`[wallet-login] rejected ${data.scheme}: invalid response format`);
+      console.warn("[wallet-login] rejected: invalid response format", error);
       throw new Error("The wallet signature could not be verified.");
     }
 
