@@ -6,7 +6,7 @@ Catatan penting: kunci API tadi kamu tulis langsung di chat, jadi sebaiknya dian
 
 ## Yang dipakai
 
-- Alamat layanan: https://griphubrouter.web.id/v1
+- Alamat layanan: [https://griphubrouter.web.id/v1](https://griphubrouter.web.id/v1)
 - Model: grok-4.6
 - Kunci API: disimpan di penyimpanan rahasia proyek (tidak ditulis di kode, tidak pernah dikirim ke browser)
 
@@ -27,3 +27,4 @@ Catatan penting: kunci API tadi kamu tulis langsung di chat, jadi sebaiknya dian
 - `src/routes/chat.$characterId.tsx`: hanya penyesuaian pemetaan pesan error (401 kunci, 402/429 kuota, 5xx sibuk). Tidak ada perubahan tampilan.
 - Paket `@ai-sdk/openai-compatible` ditambahkan bila belum ada.
 - Verifikasi: skrip Playwright di /tmp/browser/griphub/ — buka /chat/elvar, kirim satu pesan, pastikan balasan muncul dan konsol bersih.
+- buat max token per percakapan 25000
