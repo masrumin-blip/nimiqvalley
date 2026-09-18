@@ -51,7 +51,7 @@ const CELL = 64; // px, scaled by dpr & zoom
 const HOP_TIME = 0.12;
 // Minimum center-to-center distance between vehicles so a gap is always passable
 const MIN_ROAD_GAP = 4.6;
-// Player hitbox half-width in cells (tight: car must really touch the player)
+// Player hitbox half-width in cells (tight: a snake must really touch the player)
 const PLAYER_HALF = 0.28;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
