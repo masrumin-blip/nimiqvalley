@@ -13,7 +13,6 @@ type WalletError = { error: { type: string; message: string } };
 export type LoginSignature = {
   publicKey: string;
   signature: string;
-  scheme: "pay-hex-v1" | "hub-v1";
 };
 
 function isWalletError(value: unknown): value is WalletError {
@@ -24,10 +23,6 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function sha256Hex(message: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message));
-  return bytesToHex(new Uint8Array(digest));
-}
 
 async function transactionHash(serialized: string): Promise<string> {
   const { hashTransaction } = await import("./tx.functions");
@@ -56,15 +51,22 @@ export async function connectNimiq(): Promise<string> {
   return accounts[0];
 }
 
-/** Ask Nimiq Pay to sign a login challenge. */
+/** Ask Nimiq Pay to sign a login challenge (plain text, wallet applies the Nimiq prefix). */
 export async function signNimiqMessage(message: string): Promise<LoginSignature> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
-  // Nimiq Pay can sign explicit hex bytes. Supplying a fixed 32-byte digest
-  // removes any ambiguity about wallet-side text encoding or Hub prefixes.
-  const result = await nimiq.sign({ message: await sha256Hex(message), isHex: true });
+  const result = (await nimiq.sign(message)) as unknown;
   if (isWalletError(result)) throw new Error(result.error.message);
-  return { ...result, scheme: "pay-hex-v1" };
+  if (
+    !result ||
+    typeof result !== "object" ||
+    !("signature" in result) ||
+    !("publicKey" in result)
+  ) {
+    throw new Error("The sign request was rejected.");
+  }
+  const { publicKey, signature } = result as { publicKey: string; signature: string };
+  return { publicKey, signature };
 }
 
 /** Send NIM through the wallet approval dialog. Returns the transaction hash. */
@@ -135,7 +137,6 @@ export async function signLoginMessage(
   return {
     publicKey: bytesToHex(signed.signerPublicKey),
     signature: bytesToHex(signed.signature),
-    scheme: "hub-v1",
   };
 }
 
