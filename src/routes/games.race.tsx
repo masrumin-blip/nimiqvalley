@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import GamePage from "@/games/race/Page";
 import { GameFrame } from "@/components/GameFrame";
 
-const title = "Nimiq Car Race — 3D Bot Racing";
+const title = "Nimiq Car Race — Solo 3D Racing";
 const description =
-  "Race through a low-poly 3D world against competitive bot drivers.";
+  "Race through a low-poly 3D world against competitive bot drivers in solo mode.";
 
 export const Route = createFileRoute("/games/race")({
   ssr: false,

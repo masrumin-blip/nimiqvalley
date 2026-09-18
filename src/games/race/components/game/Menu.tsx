@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { CAR_COLORS } from "@/games/race/lib/colors";
 import { useGame } from "@/games/race/store/game";
-import { makeRoomCode, normalizeRoomCode, setRoomInUrl } from "@/games/race/lib/room";
 import { CarPreview } from "./CarPreview";
 import { Button } from "@/components/ui/button";
 
@@ -16,23 +14,7 @@ export function Menu() {
     setLaps,
     setDifficulty,
     startSingle,
-    openLobby,
   } = useGame();
-  const [joinCode, setJoinCode] = useState("");
-  const [showJoin, setShowJoin] = useState(false);
-
-  const createRoom = () => {
-    const code = makeRoomCode();
-    setRoomInUrl(code);
-    openLobby(code);
-  };
-
-  const joinRoom = () => {
-    const code = normalizeRoomCode(joinCode);
-    if (code.length < 4) return;
-    setRoomInUrl(code);
-    openLobby(code);
-  };
 
   return (
     <main className="min-h-dvh bg-sky px-4 pb-10 pt-6">
@@ -139,40 +121,9 @@ export function Menu() {
             Start Solo Race
           </Button>
 
-          <Button
-            type="button"
-            onClick={createRoom}
-            className="w-full rounded-sm bg-secondary py-4 font-display text-xl uppercase text-secondary-foreground shadow-pop transition active:translate-y-1 active:shadow-none"
-          >
-            Create Local Room
-          </Button>
-
-          {!showJoin ? (
-            <Button
-              type="button"
-              onClick={() => setShowJoin(true)}
-              className="w-full rounded-sm border border-border bg-card/80 py-3 text-base font-bold uppercase text-foreground"
-            >
-              Join with room code
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                value={joinCode}
-                onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
-              placeholder="CODE"
-                maxLength={4}
-                className="w-full rounded-sm border border-border bg-background px-4 py-3 text-center font-display text-2xl tracking-[0.4em] outline-none focus:border-primary"
-              />
-              <Button
-                type="button"
-                onClick={joinRoom}
-                className="shrink-0 rounded-sm bg-accent px-5 font-display text-lg uppercase text-accent-foreground shadow-pop"
-              >
-                Join
-              </Button>
-            </div>
-          )}
+          <p className="rounded-sm border border-border bg-card/80 px-4 py-3 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Solo racing only
+          </p>
         </div>
 
         <p className="mt-6 text-center text-xs text-foreground/60">

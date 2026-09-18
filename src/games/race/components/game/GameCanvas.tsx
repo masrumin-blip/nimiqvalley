@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Environment, Lightformer, Sky, Stars } from "@react-three/drei";
+import { Sky, Stars } from "@react-three/drei";
 import { RaceScene } from "./RaceScene";
 
 export function GameCanvas() {
@@ -38,30 +38,6 @@ export function GameCanvas() {
         shadow-camera-bottom={-125}
         shadow-camera-far={380}
       />
-
-      <Environment>
-        <Lightformer
-          intensity={2.2}
-          color="#d7f5ff"
-          position={[0, 12, 0]}
-          scale={[24, 24, 1]}
-          rotation-x={Math.PI / 2}
-        />
-        <Lightformer
-          intensity={2.4}
-          color="#00dffc"
-          position={[-14, 4, -6]}
-          rotation-y={Math.PI / 2}
-          scale={[30, 4, 1]}
-        />
-        <Lightformer
-          intensity={1.9}
-          color="#ff7b23"
-          position={[16, 6, 4]}
-          rotation-y={-Math.PI / 2}
-          scale={[24, 3, 1]}
-        />
-      </Environment>
 
       <Suspense fallback={null}>
         <RaceScene />
