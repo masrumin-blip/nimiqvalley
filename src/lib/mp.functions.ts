@@ -233,6 +233,23 @@ export const pushTick = createServerFn({ method: "POST" })
     return cloud.pushTick(wallet, id, tick);
   });
 
+/** Turn-free event channel used by real-time games such as bomber. */
+export const pushEvent = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: idSchema,
+        kind: z.string().trim().min(1).max(16),
+        payload: payloadSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const cloud = await import("./mp/cloud.server");
+    return cloud.pushEvent(wallet, data.id, data.kind, data.payload);
+  });
+
 export const saveStats = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
