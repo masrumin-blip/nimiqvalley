@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { GameFrame } from "@/components/GameFrame";
+import { reportScore } from "@/lib/report-score";
 
 const title = "CosNimiq Shooter — Space Arcade Shooter";
 const description =
