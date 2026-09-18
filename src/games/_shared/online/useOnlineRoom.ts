@@ -209,6 +209,15 @@ export function useOnlineRoom({
     [moveFn, roomId],
   );
 
+  /** Fire-and-forget action event (bomb dropped, detonation) with no turn order. */
+  const sendEvent = useCallback(
+    (kind: string, payload: Record<string, number | string | boolean | null>) => {
+      if (!roomId) return;
+      void eventFn({ data: { id: roomId, kind, payload } }).catch(() => {});
+    },
+    [eventFn, roomId],
+  );
+
   const requestSkip = useCallback(
     (turnNo: number) => {
       if (!roomId) return;
@@ -263,6 +272,7 @@ export function useOnlineRoom({
     start,
     leave,
     sendMove,
+    sendEvent,
     requestSkip,
     sendTick,
     reportStats,
