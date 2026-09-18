@@ -36,6 +36,8 @@ export const quickMatch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ targetGoals: targetSchema }).parse(input))
   .handler(async ({ data }): Promise<MatchState> => {
     const wallet = await requireWallet();
+    const { spendKey } = await import("./credits.server");
+    await spendKey(wallet);
     const cloud = await import("./soccer/cloud.server");
     return cloud.quickMatch(wallet, data.targetGoals);
   });
@@ -44,7 +46,8 @@ export const createRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ targetGoals: targetSchema }).parse(input))
   .handler(async ({ data }): Promise<MatchState> => {
     const wallet = await requireWallet();
-    const { spendRoom } = await import("./credits.server");
+    const { spendKey, spendRoom } = await import("./credits.server");
+    await spendKey(wallet);
     await spendRoom(wallet);
     const cloud = await import("./soccer/cloud.server");
     return cloud.createMatch(wallet, "room", data.targetGoals, null);
@@ -67,7 +70,8 @@ export const challengeFriend = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<MatchState> => {
     const wallet = await requireWallet();
     if (data.target === wallet) throw new Error("You cannot challenge yourself.");
-    const { spendRoom } = await import("./credits.server");
+    const { spendKey, spendRoom } = await import("./credits.server");
+    await spendKey(wallet);
     await spendRoom(wallet);
     const cloud = await import("./soccer/cloud.server");
     return cloud.createMatch(wallet, "friend", data.targetGoals, data.target);

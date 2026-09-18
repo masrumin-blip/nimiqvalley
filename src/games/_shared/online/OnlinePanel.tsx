@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Loader2, Swords, Users } from "lucide-react";
+import { KeyRound, Loader2, Swords, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
-import { ROOM_COST_NIM } from "@/lib/credits";
+import { KEY_COST_NIM, ROOM_COST_NIM } from "@/lib/credits";
 import type { OnlineRoom } from "./useOnlineRoom";
 
 interface Props {
@@ -21,8 +21,9 @@ interface Props {
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
   const { credits } = useCredits();
-  const { buyRooms } = useCreditActions();
+  const { buyRooms, buyKeys } = useCreditActions();
   const rooms = credits?.roomCredits ?? 0;
+  const keys = credits?.matchKeys ?? 0;
   const room = online.room;
   const invites = online.lobby?.invites ?? [];
   const friends = online.lobby?.friends ?? [];
@@ -112,19 +113,27 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-sm">
+        <span className="flex items-center gap-2 font-semibold">
+          <KeyRound className="size-4 text-primary" />
+          {keys} match key(s) left
+        </span>
+        <span className="text-xs text-muted-foreground">1 key per match</span>
+      </div>
+
       <Button
         className="w-full"
-        disabled={busy || online.startQuick.isPending}
+        disabled={busy || online.startQuick.isPending || keys <= 0}
         onClick={() => online.startQuick.mutate()}
       >
         <Swords className="mr-2 size-4" />
-        Quick match (free)
+        Quick match — 1 key
       </Button>
 
       <Button
         variant="secondary"
         className="w-full"
-        disabled={busy}
+        disabled={busy || keys <= 0}
         onClick={() => online.openRoom.mutate()}
       >
         {online.openRoom.isPending ? (
@@ -132,11 +141,28 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
         ) : (
           <Users className="mr-2 size-4" />
         )}
-        Create room ({maxPlayers} players) — {ROOM_COST_NIM} NIM
+        Create room ({maxPlayers} players) — 1 key + {ROOM_COST_NIM} NIM
       </Button>
       <p className="-mt-2 text-center text-xs text-muted-foreground">
-        {rooms} room pass(es) left. Joining a room is always free.
+        {rooms} room pass(es) left. Joining a room by code is free.
       </p>
+      {keys <= 0 ? (
+        <Button
+          className="w-full"
+          disabled={buyKeys.isPending}
+          onClick={() => buyKeys.mutate(1)}
+        >
+          {buyKeys.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : (
+            <KeyRound className="mr-2 size-4" />
+          )}
+          Pay {KEY_COST_NIM} NIM for 1 match key
+        </Button>
+      ) : null}
+      {buyKeys.isError ? (
+        <p className="text-center text-xs text-destructive">
+          {(buyKeys.error as Error).message}
+        </p>
+      ) : null}
       {rooms <= 0 ? (
         <Button
           variant="outline"

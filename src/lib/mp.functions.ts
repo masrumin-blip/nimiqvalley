@@ -44,6 +44,8 @@ export const quickMatch = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
+    const { spendKey } = await import("./credits.server");
+    await spendKey(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.quickMatch(wallet, data.gameSlug, data.maxPlayers, data.settings);
   });
@@ -60,7 +62,8 @@ export const createRoom = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
-    const { spendRoom } = await import("./credits.server");
+    const { spendKey, spendRoom } = await import("./credits.server");
+    await spendKey(wallet);
     await spendRoom(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.createRoom(wallet, data.gameSlug, "room", data.maxPlayers, data.settings, null);
@@ -78,6 +81,8 @@ export const joinQueue = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const wallet = await requireWallet();
+    const { spendKey } = await import("./credits.server");
+    await spendKey(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.joinQueue(wallet, data.gameSlug, data.maxPlayers, data.settings);
   });
@@ -95,7 +100,13 @@ export const leaveQueue = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const wallet = await requireWallet();
     const cloud = await import("./mp/cloud.server");
-    return cloud.leaveQueue(wallet, data.gameSlug);
+    const result = await cloud.leaveQueue(wallet, data.gameSlug);
+    // The search never found an opponent, so the key goes back.
+    if (result.wasWaiting) {
+      const { refundKey } = await import("./credits.server");
+      await refundKey(wallet);
+    }
+    return { ok: true };
   });
 
 export const joinRoom = createServerFn({ method: "POST" })
@@ -122,7 +133,8 @@ export const challengeFriend = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
     if (data.target === wallet) throw new Error("You cannot challenge yourself.");
-    const { spendRoom } = await import("./credits.server");
+    const { spendKey, spendRoom } = await import("./credits.server");
+    await spendKey(wallet);
     await spendRoom(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.createRoom(

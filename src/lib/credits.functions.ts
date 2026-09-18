@@ -26,9 +26,10 @@ export const redeemPayment = createServerFn({ method: "POST" })
     z
       .object({
         txHash: z.string().trim().min(8).max(128),
-        kind: z.enum(["chat", "room"]),
+        kind: z.enum(["chat", "room", "key"]),
         packId: z.string().trim().max(32).optional(),
         rooms: z.number().int().min(1).max(10).optional(),
+        keys: z.number().int().min(1).max(10).optional(),
       })
       .parse(input),
   )

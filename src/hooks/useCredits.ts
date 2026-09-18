@@ -2,7 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
 import { claimDailyReward, fetchCredits, redeemPayment } from "@/lib/credits.functions";
-import { PAY_TO_ADDRESS, ROOM_COST_NIM, type ChatPack, type CreditState } from "@/lib/credits";
+import {
+  KEY_COST_NIM,
+  PAY_TO_ADDRESS,
+  ROOM_COST_NIM,
+  type ChatPack,
+  type CreditState,
+} from "@/lib/credits";
 import { payNim, preferredWallet } from "@/lib/wallet";
 
 export function useCredits() {
@@ -48,10 +54,23 @@ export function useCreditActions() {
     onSuccess: settle,
   });
 
+  const buyKeys = useMutation({
+    mutationFn: async (keys: number) => {
+      const hash = await payNim(
+        PAY_TO_ADDRESS,
+        keys * KEY_COST_NIM,
+        `NimiqValley match keys x${keys}`,
+        preferredWallet(),
+      );
+      return redeem({ data: { txHash: hash, kind: "key", keys } });
+    },
+    onSuccess: settle,
+  });
+
   const claimDaily = useMutation({
     mutationFn: () => claim(),
     onSuccess: settle,
   });
 
-  return { buyChatPack, buyRooms, claimDaily };
+  return { buyChatPack, buyRooms, buyKeys, claimDaily };
 }

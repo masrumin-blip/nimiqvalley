@@ -5,6 +5,7 @@ import {
   CHAT_PACKS,
   DAILY_REWARD,
   FREE_CHATS_PER_DAY,
+  KEY_COST_NIM,
   PAY_TO_ADDRESS,
   ROOM_COST_NIM,
   type CreditState,
@@ -16,6 +17,7 @@ type CreditRow = {
   wallet: string;
   chat_credits: number;
   room_credits: number;
+  match_keys: number;
   free_chats_date: string | null;
   free_chats_used: number;
 };
@@ -31,7 +33,7 @@ function normalizeAddress(value: string) {
 async function loadRow(wallet: string): Promise<CreditRow> {
   const { data } = await supabaseAdmin
     .from("wallet_credits")
-    .select("wallet, chat_credits, room_credits, free_chats_date, free_chats_used")
+    .select("wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used")
     .eq("wallet", wallet)
     .maybeSingle();
   if (data) return data as CreditRow;
@@ -39,6 +41,7 @@ async function loadRow(wallet: string): Promise<CreditRow> {
     wallet,
     chat_credits: 0,
     room_credits: 0,
+    match_keys: 0,
     free_chats_date: today(),
     free_chats_used: 0,
   };
@@ -67,6 +70,7 @@ export async function getCredits(wallet: string): Promise<CreditState> {
     wallet,
     chatCredits: row.chat_credits,
     roomCredits: row.room_credits,
+    matchKeys: row.match_keys ?? 0,
     freeChatsLeft: freeLeft(row),
     claimedToday: await claimedToday(wallet),
   };
@@ -105,11 +109,29 @@ export async function spendRoom(wallet: string): Promise<void> {
   await save(wallet, { room_credits: row.room_credits - 1 });
 }
 
-async function grant(wallet: string, chats: number, rooms: number) {
+/** Spends one match key. Every online match entry needs one. */
+export async function spendKey(wallet: string): Promise<void> {
+  const row = await loadRow(wallet);
+  if ((row.match_keys ?? 0) <= 0) {
+    throw new Error(
+      `You need a match key to play online. Claim the daily reward or buy one for ${KEY_COST_NIM} NIM.`,
+    );
+  }
+  await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
+}
+
+/** Gives a match key back, e.g. when a matchmaking search is cancelled. */
+export async function refundKey(wallet: string): Promise<void> {
+  const row = await loadRow(wallet);
+  await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
+}
+
+async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
   const row = await loadRow(wallet);
   await save(wallet, {
     chat_credits: row.chat_credits + chats,
     room_credits: row.room_credits + rooms,
+    match_keys: (row.match_keys ?? 0) + keys,
   });
 }
 
@@ -148,9 +170,10 @@ async function lookupTx(hash: string): Promise<TxLookup> {
 type RedeemInput = {
   wallet: string;
   txHash: string;
-  kind: "chat" | "room";
+  kind: "chat" | "room" | "key";
   packId?: string | undefined;
   rooms?: number | undefined;
+  keys?: number | undefined;
 };
 
 /**
@@ -170,6 +193,7 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
 
   let chats = 0;
   let rooms = 0;
+  let keys = 0;
   let expectedNim = 0;
 
   if (input.kind === "chat") {
@@ -177,6 +201,10 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     if (!pack) throw new Error("Unknown chat pack.");
     chats = pack.chats;
     expectedNim = pack.nim;
+  } else if (input.kind === "key") {
+    const count = Math.max(1, Math.min(10, Math.round(input.keys ?? 1)));
+    keys = count;
+    expectedNim = count * KEY_COST_NIM;
   } else {
     const count = Math.max(1, Math.min(10, Math.round(input.rooms ?? 1)));
     rooms = count;
@@ -200,10 +228,11 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     nim: expectedNim,
     chat_credits: chats,
     room_credits: rooms,
+    key_credits: keys,
   });
   if (error) throw new Error("This payment was already used.");
 
-  await grant(input.wallet, chats, rooms);
+  await grant(input.wallet, chats, rooms, keys);
   return getCredits(input.wallet);
 }
 
@@ -213,6 +242,6 @@ export async function claimDaily(wallet: string): Promise<CreditState> {
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
   if (error) throw new Error("You already claimed today's reward. Come back tomorrow.");
-  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms);
+  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms, DAILY_REWARD.keys);
   return getCredits(wallet);
 }
