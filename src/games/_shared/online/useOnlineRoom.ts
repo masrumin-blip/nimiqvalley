@@ -13,6 +13,7 @@ import {
   leaveQueue,
   leaveRoom,
   pollQueue,
+  pushEvent,
   pushTick,
   respondChallenge,
   saveStats,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/mp/types";
 import { usePlayer } from "@/hooks/usePlayer";
 
-export type GameSlug = "checkers" | "carrom" | "hexaman";
+export type GameSlug = "checkers" | "carrom" | "hexaman" | "bomber";
 
 interface Options {
   gameSlug: GameSlug;
@@ -67,6 +68,7 @@ export function useOnlineRoom({
   const moveFn = useServerFn(submitMove);
   const skipFn = useServerFn(skipTurn);
   const tickFn = useServerFn(pushTick);
+  const eventFn = useServerFn(pushEvent);
   const statsFn = useServerFn(saveStats);
   const finishFn = useServerFn(finishRoom);
   const leaveFn = useServerFn(leaveRoom);
