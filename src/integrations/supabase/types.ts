@@ -89,6 +89,39 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_moderation: {
+        Row: {
+          last_message_at: string | null
+          last_normalized_text: string | null
+          muted_until: string | null
+          profanity_count: number
+          submission_times: string[]
+          updated_at: string
+          wallet: string
+          warning_window_started_at: string | null
+        }
+        Insert: {
+          last_message_at?: string | null
+          last_normalized_text?: string | null
+          muted_until?: string | null
+          profanity_count?: number
+          submission_times?: string[]
+          updated_at?: string
+          wallet: string
+          warning_window_started_at?: string | null
+        }
+        Update: {
+          last_message_at?: string | null
+          last_normalized_text?: string | null
+          muted_until?: string | null
+          profanity_count?: number
+          submission_times?: string[]
+          updated_at?: string
+          wallet?: string
+          warning_window_started_at?: string | null
+        }
+        Relationships: []
+      }
       chat_presence: {
         Row: {
           last_seen: string
@@ -632,7 +665,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      moderate_chat_submission: {
+        Args: {
+          _is_profane: boolean
+          _normalized_text: string
+          _wallet: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
