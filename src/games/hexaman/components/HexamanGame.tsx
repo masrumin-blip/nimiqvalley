@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
+import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
+import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { HEXAMAN_ROUND_MS, TICK_POLL_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
   buildGrid,
@@ -217,18 +222,127 @@ export function HexamanGame() {
     publish();
   }, [countPellets, publish, resetPositions]);
 
-  const startGame = useCallback(() => {
-    const g = game.current;
-    g.grid = buildGrid();
-    g.pellets = countPellets();
-    g.score = 0;
-    g.lives = 3;
-    g.level = 1;
-    g.floaters = [];
-    resetPositions();
-    g.status = "playing";
-    publish();
-  }, [countPellets, publish, resetPositions]);
+  const startGame = useCallback(
+    (online = false) => {
+      const g = game.current;
+      g.grid = buildGrid();
+      g.pellets = countPellets();
+      g.score = 0;
+      // Online runs are single-life: dying puts you out of the round.
+      g.lives = online ? 1 : 3;
+      g.level = 1;
+      g.floaters = [];
+      resetPositions();
+      g.status = "playing";
+      publish();
+    },
+    [countPellets, publish, resetPositions],
+  );
+
+  // ---- online run ----
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<"solo" | "online">("solo");
+  const [lobbyOpen, setLobbyOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const online = useOnlineRoom({
+    gameSlug: "hexaman",
+    active: lobbyOpen || mode === "online",
+    maxPlayers: 4,
+    withTicks: true,
+  });
+  const room = online.room;
+  const rivalsRef = useRef<
+    { name: string; x: number; y: number; alive: boolean }[]
+  >([]);
+  rivalsRef.current =
+    mode === "online"
+      ? online.ticks
+          .filter((t) => t.wallet !== online.wallet)
+          .map((t) => ({
+            name:
+              room?.players.find((p) => p.wallet === t.wallet)?.name ??
+              t.wallet.slice(0, 2),
+            x: t.x,
+            y: t.y,
+            alive: t.alive,
+          }))
+      : [];
+
+  // Start the run once the host opens the round.
+  useEffect(() => {
+    if (room?.status !== "playing" || mode === "online") return;
+    setMode("online");
+    setLobbyOpen(false);
+    setResultOpen(false);
+    startGame(true);
+  }, [room?.status, mode, startGame]);
+
+  // Stream my position; no collision checks between players anywhere.
+  useEffect(() => {
+    if (mode !== "online" || !room || room.status !== "playing") return;
+    const id = window.setInterval(() => {
+      const g = game.current;
+      online.sendTick({
+        x: Number(g.player.c.toFixed(2)),
+        y: Number(g.player.r.toFixed(2)),
+        dir: g.player.dir.x + g.player.dir.y * 2,
+        score: g.score,
+        alive: g.status !== "over",
+      });
+    }, TICK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [mode, room, online]);
+
+  // Report my final score once, then close the round when one runner is left
+  // (or when the three minute timer runs out).
+  const reportedRef = useRef(false);
+  useEffect(() => {
+    if (mode !== "online" || !room || room.status !== "playing") return;
+    if (hud.status === "over" && !reportedRef.current) {
+      reportedRef.current = true;
+      online.reportStats(hud.score, { level: hud.level });
+      online.sendTick({
+        x: game.current.player.c,
+        y: game.current.player.r,
+        dir: 0,
+        score: hud.score,
+        alive: false,
+      });
+    }
+    const meAlive = hud.status !== "over";
+    const alive = [
+      ...online.ticks.filter((t) => t.wallet !== online.wallet && t.alive),
+      ...(meAlive ? [{ wallet: online.wallet ?? "me" }] : []),
+    ];
+    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    if (alive.length <= 1 || timeUp) {
+      const best = [...room.players].sort((a, b) => b.score - a.score)[0];
+      const winner = alive.length === 1 ? (alive[0]?.wallet ?? null) : (best?.wallet ?? null);
+      online.finish(winner);
+    }
+  }, [mode, room, hud.status, hud.score, hud.level, online]);
+
+  useEffect(() => {
+    if (mode === "online" && room?.status === "finished") setResultOpen(true);
+  }, [mode, room?.status]);
+
+  const winnerName =
+    room?.winnerWallet === online.wallet
+      ? "You"
+      : (room?.players.find((p) => p.wallet === room?.winnerWallet)?.name ?? "Nobody");
+
+  const resultRows: ResultRow[] = [...(room?.players ?? [])]
+    .sort((a, b) => b.score - a.score)
+    .map((p) => ({
+      wallet: p.wallet,
+      name: p.name,
+      isYou: p.wallet === online.wallet,
+      stats: [
+        { label: "Score", value: String(p.score) },
+        { label: "Status", value: p.wallet === room?.winnerWallet ? "survivor" : "out" },
+      ],
+    }));
+
 
   const setDir = useCallback((d: Dir) => {
     const g = game.current;
