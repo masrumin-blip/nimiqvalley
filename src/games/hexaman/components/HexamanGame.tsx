@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { serverNow } from "@/lib/mp/clock";
 import { HEXAMAN_ROUND_MS, TICK_POLL_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
@@ -314,7 +315,7 @@ export function HexamanGame() {
       ...online.ticks.filter((t) => t.wallet !== online.wallet && t.alive),
       ...(meAlive ? [{ wallet: online.wallet ?? "me" }] : []),
     ];
-    const timeUp = room.endsAt ? Date.now() > Date.parse(room.endsAt) : false;
+    const timeUp = room.endsAt ? serverNow() > Date.parse(room.endsAt) : false;
     if (alive.length <= 1 || timeUp) {
       const best = [...room.players].sort((a, b) => b.score - a.score)[0];
       const winner = alive.length === 1 ? (alive[0]?.wallet ?? null) : (best?.wallet ?? null);

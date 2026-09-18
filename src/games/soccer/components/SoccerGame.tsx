@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
 import { reportScore } from "@/lib/report-score";
 import { useOnlineSoccer } from "@/games/soccer/online/useOnlineSoccer";
+import { serverNow } from "@/lib/mp/clock";
 import { TURN_TIMEOUT_MS, type MatchMove, type MatchState } from "@/lib/soccer/types";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
 import { KEY_COST_NIM } from "@/lib/credits";
@@ -344,7 +345,9 @@ export default function SoccerGame() {
         }
         return;
       }
-      if (Date.now() - turnStartRef.current > TURN_TIMEOUT_MS + 400) {
+      const startedAt = onlineRef.current.match?.turnStartedAt;
+      const started = startedAt ? Date.parse(startedAt) : turnStartRef.current;
+      if (serverNow() - started > TURN_TIMEOUT_MS + 400) {
         onlineRef.current.requestSkip(localTurnRef.current);
       }
     }, 150);
@@ -355,7 +358,9 @@ export default function SoccerGame() {
   useEffect(() => {
     if (mode !== "online" || phase !== "aim") return;
     const id = window.setInterval(() => {
-      const left = Math.ceil((TURN_TIMEOUT_MS - (Date.now() - turnStartRef.current)) / 1000);
+      const startedAt = onlineRef.current.match?.turnStartedAt;
+      const started = startedAt ? Date.parse(startedAt) : turnStartRef.current;
+      const left = Math.ceil((TURN_TIMEOUT_MS - (serverNow() - started)) / 1000);
       setTurnLeft(Math.max(0, left));
     }, 250);
     return () => window.clearInterval(id);
