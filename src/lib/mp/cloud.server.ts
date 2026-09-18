@@ -476,6 +476,10 @@ export async function saveStats(
   return { ok: true };
 }
 
+/**
+ * Ends the match and, for a staked ranked match, pays the winner once.
+ * `settled_at` makes the payout idempotent, so retries can never double pay.
+ */
 export async function finishRoom(wallet: string, id: string, winner: string | null) {
   const row = await getRow(id);
   if (!row) return { ok: false };
@@ -487,14 +491,54 @@ export async function finishRoom(wallet: string, id: string, winner: string | nu
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+  await settleRoom(id);
   return { ok: true, by: wallet };
+}
+
+/** Pays out (or refunds) a staked room exactly once. */
+async function settleRoom(id: string) {
+  const { data } = await supabaseAdmin
+    .from("mp_rooms")
+    .select("id, stake, settled_at, winner_wallet")
+    .eq("id", id)
+    .maybeSingle();
+  const row = data as
+    | { id: string; stake: number | string; settled_at: string | null; winner_wallet: string | null }
+    | null;
+  if (!row) return;
+  const stake = Number(row.stake ?? 0);
+  if (stake <= 0 || row.settled_at) return;
+
+  // Claim the settlement slot first; a second caller finds it taken.
+  const { data: claimed } = await supabaseAdmin
+    .from("mp_rooms")
+    .update({ settled_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("settled_at", null)
+    .select("id");
+  if (!claimed || claimed.length === 0) return;
+
+  const credits = await import("@/lib/credits.server");
+  const { data: seats } = await supabaseAdmin
+    .from("mp_room_players")
+    .select("wallet")
+    .eq("room_id", id);
+  const wallets = ((seats ?? []) as Array<{ wallet: string }>).map((s) => s.wallet);
+
+  if (row.winner_wallet) {
+    await credits.creditNim(row.winner_wallet, RANKED_PAYOUT_NIM, "ranked-win", id);
+  } else {
+    // Draw or voided match: both stakes come back as passes.
+    for (const w of wallets) await credits.refundRoom(w, "ranked-void", id);
+  }
 }
 
 /* ---------------------------------------------------------------- */
 /* Matchmaking queue                                                  */
 /* ---------------------------------------------------------------- */
 
-import { QUEUE_WAIT_CAP_MS, type QueueState } from "./types";
+import { RANKED_PAYOUT_NIM, RANKED_STAKE_NIM } from "@/lib/credits";
+import { QUEUE_WAIT_CAP_MS, type QueueMode, type QueueState } from "./types";
 
 type QueueRow = {
   id: string;
