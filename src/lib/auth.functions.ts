@@ -105,15 +105,23 @@ export const signInWithWallet = createServerFn({ method: "POST" })
     }
 
     const message = loginMessage(data.challenge);
+  let verificationStage = "loading crypto";
     try {
-      const { Address, PublicKey, Signature } = await import("@nimiq/core/web");
+      const nimiqCore = await import("@nimiq/core/web");
+      verificationStage = "initializing crypto";
+      await nimiqCore.default();
+
+      verificationStage = "decoding wallet response";
+      const { Address, PublicKey, Signature } = nimiqCore;
       const publicKey = new PublicKey(decodeKeyMaterial(data.publicKey));
       const signature = Signature.deserialize(decodeKeyMaterial(data.signature));
+      verificationStage = "matching wallet address";
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
         console.warn("[wallet-login] rejected: public-key mismatch");
         throw new Error("The signing key does not belong to this wallet.");
       }
 
+      verificationStage = "verifying signature";
       const matched = await verifyLoginSignature(
         publicKey as unknown as { verify: (s: unknown, d: Uint8Array) => boolean },
         signature,
@@ -126,7 +134,7 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       console.info(`[wallet-login] verified with ${matched}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
-      console.warn("[wallet-login] rejected: invalid response format", error);
+      console.warn(`[wallet-login] rejected during ${verificationStage}`, error);
       throw new Error("The wallet signature could not be verified.");
     }
 
