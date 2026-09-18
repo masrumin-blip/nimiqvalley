@@ -9,14 +9,27 @@ const walletSchema = z
 
 const challengeSchema = z.object({ address: walletSchema });
 
+const keyMaterial = z.string().trim().min(32).max(256);
+
 const signInSchema = z.object({
   address: walletSchema,
   challenge: z.string().uuid(),
-  publicKey: z.string().regex(/^[0-9a-fA-F]{64}$/),
-  signature: z.string().regex(/^[0-9a-fA-F]{128}$/),
-  scheme: z.enum(["pay-hex-v1", "hub-v1"]),
+  publicKey: keyMaterial,
+  signature: keyMaterial,
   displayName: z.string().trim().max(16).optional(),
 });
+
+/** Nimiq wallets return hex or base64 encoded key material. */
+function decodeKeyMaterial(raw: string): Uint8Array {
+  const value = raw.trim();
+  if (/^[0-9a-fA-F]+$/.test(value) && value.length % 2 === 0) {
+    const out = new Uint8Array(value.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(value.slice(i * 2, i * 2 + 2), 16);
+    return out;
+  }
+  const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
 
 export type PlayerInfo = { wallet: string; displayName: string | null } | null;
 
