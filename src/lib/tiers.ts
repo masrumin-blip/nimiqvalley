@@ -46,7 +46,14 @@ export const TIERS: Tier[] = [
 ];
 
 export function tierForUsd(usd: number): Tier {
-  let match: Tier = TIERS[0]!;
+  let match: Tier = TIERS[0] ?? {
+    id: "poor",
+    min: 0,
+    characterName: "Humble Villager",
+    houseName: "Wooden Hut",
+    characterBlurb: "Patched clothes, bare feet, big dreams.",
+    houseBlurb: "Straw roof and a crooked door.",
+  };
   for (const tier of TIERS) if (usd >= tier.min) match = tier;
   return match;
 }

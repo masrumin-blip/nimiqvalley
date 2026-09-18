@@ -2,14 +2,16 @@ import { useRef, useState, type MutableRefObject, type PointerEvent } from "reac
 
 interface Props {
   moveRef: MutableRefObject<{ x: number; y: number }>;
+  disabled?: boolean;
 }
 
-export default function Joystick({ moveRef }: Props) {
+export default function Joystick({ moveRef, disabled = false }: Props) {
   const baseRef = useRef<HTMLDivElement | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const active = useRef(false);
 
   const update = (e: PointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
     const base = baseRef.current;
     if (!base) return;
     const rect = base.getBoundingClientRect();
@@ -37,6 +39,7 @@ export default function Joystick({ moveRef }: Props) {
     <div
       ref={baseRef}
       onPointerDown={(e) => {
+        if (disabled) return;
         active.current = true;
         e.currentTarget.setPointerCapture(e.pointerId);
         update(e);
@@ -44,9 +47,10 @@ export default function Joystick({ moveRef }: Props) {
       onPointerMove={(e) => active.current && update(e)}
       onPointerUp={stop}
       onPointerCancel={stop}
-      className="relative h-32 w-32 touch-none rounded-full border-2 border-border/60 bg-card/70 backdrop-blur-sm select-none"
+      className={`relative h-32 w-32 touch-none rounded-full border-2 border-border/60 bg-card/70 backdrop-blur-sm select-none ${disabled ? "opacity-50" : ""}`}
       role="application"
       aria-label="Movement joystick"
+      aria-disabled={disabled}
     >
       <div
         className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-lg"
