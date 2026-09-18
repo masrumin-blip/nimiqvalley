@@ -170,6 +170,34 @@ export async function listMoves(id: string, since: number): Promise<MoveRecord[]
   );
 }
 
+/**
+ * Real-time action games (bomber) have no turn order: every player can fire an
+ * event at any moment. Events reuse the move log but grab the next free
+ * sequence number instead of waiting for a turn.
+ */
+export async function pushEvent(
+  wallet: string,
+  id: string,
+  kind: string,
+  payload: Record<string, number | string | boolean | null>,
+) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: last } = await supabaseAdmin
+      .from("mp_moves")
+      .select("turn_no")
+      .eq("room_id", id)
+      .order("turn_no", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const turnNo = Number((last as { turn_no?: number } | null)?.turn_no ?? 0) + 1 + attempt;
+    const { error } = await supabaseAdmin
+      .from("mp_moves")
+      .insert({ room_id: id, turn_no: turnNo, wallet, kind, payload });
+    if (!error) return { ok: true, turnNo };
+  }
+  return { ok: false, turnNo: 0 };
+}
+
 export async function listTicks(id: string): Promise<PlayerTick[]> {
   const { data } = await supabaseAdmin
     .from("mp_ticks")
