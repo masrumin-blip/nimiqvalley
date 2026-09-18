@@ -8,8 +8,11 @@ import {
   fetchLobby,
   fetchRoom,
   finishRoom,
+  joinQueue,
   joinRoom,
+  leaveQueue,
   leaveRoom,
+  pollQueue,
   pushTick,
   respondChallenge,
   saveStats,
@@ -19,10 +22,12 @@ import {
 } from "@/lib/mp.functions";
 import {
   LOBBY_POLL_MS,
+  QUEUE_POLL_MS,
   ROOM_POLL_MS,
   TICK_POLL_MS,
   type MoveRecord,
   type PlayerTick,
+  type QueueState,
   type RoomState,
 } from "@/lib/mp/types";
 import { usePlayer } from "@/hooks/usePlayer";
@@ -65,6 +70,9 @@ export function useOnlineRoom({
   const statsFn = useServerFn(saveStats);
   const finishFn = useServerFn(finishRoom);
   const leaveFn = useServerFn(leaveRoom);
+  const joinQueueFn = useServerFn(joinQueue);
+  const pollQueueFn = useServerFn(pollQueue);
+  const leaveQueueFn = useServerFn(leaveQueue);
 
   const [roomId, setRoomId] = useState<string | null>(null);
   const [room, setRoom] = useState<RoomState | null>(null);
