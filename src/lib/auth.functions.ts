@@ -117,7 +117,9 @@ export const signInWithWallet = createServerFn({ method: "POST" })
 
     const session = await playerSession();
     await session.update({ wallet });
-    return { wallet, displayName };
+    const { issuePlayerToken } = await import("./session.server");
+    const token = await issuePlayerToken(wallet);
+    return { wallet, displayName, token };
   });
 
 /** Current signed-in player, or null. */
@@ -153,8 +155,9 @@ export const setDisplayName = createServerFn({ method: "POST" })
 
 /** Sign the player out. */
 export const signOutPlayer = createServerFn({ method: "POST" }).handler(async () => {
-  const { playerSession } = await import("./session.server");
+  const { playerSession, revokeRequestToken } = await import("./session.server");
   const session = await playerSession();
   await session.clear();
+  await revokeRequestToken();
   return { ok: true };
 });
