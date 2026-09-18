@@ -588,7 +588,7 @@ const badgeTone: Record<AchievementBadge["tier"], string> = {
   gold: "border-primary/40 bg-primary/10 text-primary",
   silver: "border-border bg-muted text-foreground",
   bronze: "border-accent bg-accent/50 text-accent-foreground",
-  emerald: "border-success/40 bg-success/10 text-success",
+  emerald: "border-primary/40 bg-primary/15 text-primary",
 };
 
 function BadgeIcon({ badge }: { badge: AchievementBadge }) {
