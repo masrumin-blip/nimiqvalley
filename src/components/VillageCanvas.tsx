@@ -41,7 +41,7 @@ type Direction = "down" | "left" | "right" | "up";
 const SPRITE_COLS = 16;
 const SPRITE_ROWS = 4;
 const NPC_SPRITE_ROWS = 6;
-const CAMERA_ZOOM = 0.7;
+const CAMERA_ZOOM = 0.85;
 const TIER_ROW: Record<TierId, number> = { poor: 0, normal: 1, cool: 2, sultan: 3 };
 const DIRECTION_COL: Record<Direction, number> = { down: 0, left: 4, right: 8, up: 12 };
 
