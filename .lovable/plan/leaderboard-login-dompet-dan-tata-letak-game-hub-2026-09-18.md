@@ -6,7 +6,7 @@
 - Untuk membuktikan alamat itu benar milik pemain, dompet diminta menandatangani satu pesan singkat; tanda tangan diperiksa di sisi server sebelum skor disimpan.
 - Sesi disimpan di perangkat, jadi pemain tidak perlu menyambung ulang tiap kali main.
 - Pemain bisa mengisi nama tampilan (maks 16 karakter). Kalau kosong, dipakai alamat yang dipersingkat.
-- Tanpa login pemain tetap bisa main; skor lokal tetap jalan, hanya tidak masuk papan peringkat global.
+- Tanpa login pemain tidak bisa main 
 
 ## 2. Papan peringkat
 
@@ -16,6 +16,7 @@ Game yang punya papan peringkat (11): Jump, Car Race, Hexaman, Mininja, Rooftop,
 Tidak punya: Checkers, Bomber, Pet, Carronimiq.
 
 Metrik per game (skor tertinggi disimpan, kecuali balapan):
+
 - Jump, Hexaman, Mininja, Slide, Tappy, Shooter, Spaceship: skor akhir.
 - Rooftop: koin terkumpul. Crossing: koin terkumpul.
 - Soccer: jumlah kemenangan lawan CPU (akumulasi).
@@ -24,6 +25,7 @@ Metrik per game (skor tertinggi disimpan, kecuali balapan):
 Alur: saat satu ronde selesai, game mengirim hasilnya; server hanya menyimpan bila lebih baik dari rekor pemain sebelumnya di game itu.
 
 Halaman `/leaderboard`:
+
 - Daftar pilihan game di atas, tabel 50 besar di bawah (peringkat, nama, skor).
 - Baris pemain sendiri disorot, dan posisinya ditampilkan meski di luar 50 besar.
 - Tombol kembali ke Game Hub.
@@ -31,7 +33,7 @@ Halaman `/leaderboard`:
 ## 3. Tampilan Game Hub
 
 - Daftar game jadi 2 kolom di semua ukuran layar (2 game per baris ke bawah), jarak dan tinggi kartu dirapikan agar pas di ponsel.
-- Di atas daftar game: satu baris tombol berisi "Leaderboard" dan status login (Connect / nama pemain).
+- Di atas daftar game: satu baris tombol berisi tombol Leaderboard untuk menuju ke halaman khusus leaderboard ,dan status login (Connect / nama pemain).
 
 ## Catatan teknis
 
