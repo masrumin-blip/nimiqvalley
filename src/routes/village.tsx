@@ -37,6 +37,7 @@ export const Route = createFileRoute("/village")({
 });
 
 function VillagePage() {
+  const { player } = usePlayer();
   const moveRef = useRef({ x: 0, y: 0 });
   const [nimAddress, setNimAddress] = useState<string | null>(null);
   const [evmAddress, setEvmAddress] = useState<string | null>(null);
