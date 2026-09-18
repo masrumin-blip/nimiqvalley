@@ -112,7 +112,6 @@ export const fetchMatch = createServerFn({ method: "GET" })
       return { match, moves, serverNow: new Date().toISOString() };
     },
   );
-  });
 
 export const submitMove = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>

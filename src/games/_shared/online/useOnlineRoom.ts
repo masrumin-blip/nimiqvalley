@@ -21,6 +21,7 @@ import {
   startRoom,
   submitMove,
 } from "@/lib/mp.functions";
+import { setServerOffset } from "@/lib/mp/clock";
 import {
   LOBBY_POLL_MS,
   QUEUE_POLL_MS,
@@ -106,6 +107,7 @@ export function useOnlineRoom({
     queryFn: async () => {
       if (!roomId) return null;
       const res = await roomFn({ data: { id: roomId, since: lastTurn.current, withTicks } });
+      setServerOffset(res.serverNow);
       if (res.room) setRoom(res.room);
       if (withTicks) setTicks(res.ticks);
       if (res.moves.length > 0) {

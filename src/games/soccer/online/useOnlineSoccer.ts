@@ -15,6 +15,7 @@ import {
   skipTurn,
   submitMove,
 } from "@/lib/soccer.functions";
+import { setServerOffset } from "@/lib/mp/clock";
 import { LOBBY_POLL_MS, MATCH_POLL_MS, type MatchMove, type MatchState } from "@/lib/soccer/types";
 import { usePlayer } from "@/hooks/usePlayer";
 
@@ -69,6 +70,7 @@ export function useOnlineSoccer(active: boolean) {
     queryFn: async () => {
       if (!matchId) return null;
       const res = await matchFn({ data: { id: matchId, since: lastTurn.current } });
+      setServerOffset(res.serverNow);
       if (res.match) setMatch(res.match);
       if (res.moves.length > 0) {
         lastTurn.current = res.moves[res.moves.length - 1]!.turnNo;
