@@ -52,6 +52,7 @@ async function verifyLoginSignature(
   publicKey: { verify: (signature: unknown, data: Uint8Array) => boolean },
   signature: unknown,
   message: string,
+  blake2b: (data: Uint8Array) => Uint8Array,
 ): Promise<string | null> {
   const encoder = new TextEncoder();
   const raw = encoder.encode(message);
@@ -61,6 +62,7 @@ async function verifyLoginSignature(
     ["raw", raw],
   ];
   for (const [label, bytes] of candidates) {
+    if (publicKey.verify(signature, blake2b(bytes))) return `blake2b(${label})`;
     if (publicKey.verify(signature, await sha256(bytes))) return `sha256(${label})`;
     if (publicKey.verify(signature, bytes)) return label;
   }
@@ -105,19 +107,28 @@ export const signInWithWallet = createServerFn({ method: "POST" })
     }
 
     const message = loginMessage(data.challenge);
+  let verificationStage = "loading crypto";
     try {
-      const { Address, PublicKey, Signature } = await import("@nimiq/core/web");
+      const nimiqCore = await import("@nimiq/core/web");
+      verificationStage = "initializing crypto";
+      await nimiqCore.default();
+
+      verificationStage = "decoding wallet response";
+      const { Address, Hash, PublicKey, Signature } = nimiqCore;
       const publicKey = new PublicKey(decodeKeyMaterial(data.publicKey));
       const signature = Signature.deserialize(decodeKeyMaterial(data.signature));
+      verificationStage = "matching wallet address";
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
         console.warn("[wallet-login] rejected: public-key mismatch");
         throw new Error("The signing key does not belong to this wallet.");
       }
 
+      verificationStage = "verifying signature";
       const matched = await verifyLoginSignature(
         publicKey as unknown as { verify: (s: unknown, d: Uint8Array) => boolean },
         signature,
         message,
+        (bytes) => Hash.computeBlake2b(bytes),
       );
       if (!matched) {
         console.warn("[wallet-login] rejected: signature mismatch");
@@ -126,7 +137,7 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       console.info(`[wallet-login] verified with ${matched}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
-      console.warn("[wallet-login] rejected: invalid response format", error);
+      console.warn(`[wallet-login] rejected during ${verificationStage}`, error);
       throw new Error("The wallet signature could not be verified.");
     }
 
