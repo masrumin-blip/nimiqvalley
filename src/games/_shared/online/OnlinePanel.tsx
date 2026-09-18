@@ -4,7 +4,7 @@ import { Coins, Loader2, Swords, Trophy, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
-import { RANKED_PAYOUT_NIM, RANKED_STAKE_NIM, ROOM_COST_NIM, TICKET_PACKS } from "@/lib/credits";
+import { RANKED_PAYOUT_NIM, RANKED_STAKE_NIM, TICKET_PACKS } from "@/lib/credits";
 import type { OnlineRoom } from "./useOnlineRoom";
 
 interface Props {
