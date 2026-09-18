@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { reportScore } from "@/lib/report-score";
 
 // The canvas is 800px but the camera shows a 1600px world region at 0.5 scale,
 // so the action reads as twice as far away.
@@ -684,6 +685,7 @@ export function MininjaGame() {
             window.localStorage.setItem("neon-ninja-best", String(nextBest));
             bestRef.current = nextBest;
             setScore(finalScore); setPhase("gameover");
+            reportScore("mininja", finalScore);
           }
         });
         g.entities = g.entities.filter((e) => e.x + e.w > -30 && !e.dead);

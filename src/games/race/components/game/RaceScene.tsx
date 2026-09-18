@@ -15,6 +15,7 @@ import { getTrack, gridPose, SAMPLES, trackCollide } from "@/games/race/lib/trac
 import { hud, resetHud } from "@/games/race/lib/hud";
 import { useGame, BOT_SKILLS, PLAYER_SPEED_SCALE } from "@/games/race/store/game";
 import { playSfx } from "@/lib/sfx";
+import { reportScore } from "@/lib/report-score";
 
 const COUNTDOWN = 3.2;
 const PLAYER_ID = "player";
@@ -296,6 +297,7 @@ export function RaceScene() {
           isYou: false,
         });
       }
+      if (hud.bestLap !== null) reportScore("race", hud.bestLap);
       store.finishRace();
     }
 

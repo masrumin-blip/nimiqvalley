@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Scene, type Controls } from "./Scene";
+import { reportScore } from "@/lib/report-score";
 
 type Phase = "ready" | "playing" | "over";
 
@@ -53,6 +54,7 @@ export function RooftopGame() {
     if (deathPending.current) return;
     deathPending.current = true;
     setImpact(cause === "obstacle");
+    reportScore("rooftop", c);
     setCoins(c);
     setMeters(m);
     deathTimer.current = setTimeout(

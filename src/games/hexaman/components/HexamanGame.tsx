@@ -12,6 +12,7 @@ import {
 } from "./maze";
 import { PALETTE } from "./palette";
 import { Button } from "@/components/ui/button";
+import { reportScore } from "@/lib/report-score";
 
 const CELL = 26;
 const W = COLS * CELL;
@@ -403,6 +404,7 @@ export function HexamanGame() {
             if (g.lives <= 0) {
               g.status = "over";
               playSfx("gameover", 0.8);
+              reportScore("hexaman", g.score);
             } else {
               resetPositions();
               g.status = "ready";

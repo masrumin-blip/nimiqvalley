@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, H, MAX_AMMO, W, type Hud, type PlayerColor } from "@/games/ship/game/engine";
 import { Joystick } from "@/games/ship/components/Joystick";
 import { Button } from "@/components/ui/button";
+import { reportScore } from "@/lib/report-score";
 
 
 type Phase = "menu" | "playing" | "paused" | "over";
@@ -87,6 +88,7 @@ function Index() {
     game.onHud = setHud;
     game.onOver = (score) => {
       setPhase("over");
+      reportScore("ship", score);
       setHiscore((prev) => {
         const next = Math.max(prev, score);
         localStorage.setItem(HISCORE_KEY, String(next));

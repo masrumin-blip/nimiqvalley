@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
 import { Trophy, Medal, Play, RotateCcw, Loader2, Crown } from "lucide-react";
+import { reportScore } from "@/lib/report-score";
 
 // ---- Game constants (logical canvas units) ----
 const W = 400;
@@ -157,6 +158,7 @@ export function TappyGame() {
     }
     playSfx("gameover");
     setPhase("dead");
+    reportScore("tappy", g.score);
     setBest((prev) => {
       const nb = Math.max(prev, g.score);
       localStorage.setItem("tappy-best", String(nb));
