@@ -58,7 +58,7 @@ export const signInWithWallet = createServerFn({ method: "POST" })
 
     const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${data.challenge}\nThis request does not send a transaction.`;
     try {
-      const { Address, PublicKey, Signature } = await import("@nimiq/core");
+      const { Address, PublicKey, Signature } = await import("@nimiq/core/web");
       const publicKey = PublicKey.fromHex(data.publicKey);
       const signature = Signature.fromHex(data.signature);
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
