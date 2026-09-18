@@ -567,13 +567,23 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     window.addEventListener("keyup", onKeyUp);
 
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
+      // Use layout size (clientWidth/Height): getBoundingClientRect() is affected by the
+      // stage's fit-to-screen CSS transform, which changes the buffer size and makes the
+      // camera look nearer/farther after returning from a scenic view.
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (w <= 0 || h <= 0) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(rect.width * dpr);
-      canvas.height = Math.floor(rect.height * dpr);
+      const nw = Math.floor(w * dpr);
+      const nh = Math.floor(h * dpr);
+      if (canvas.width === nw && canvas.height === nh) return;
+      canvas.width = nw;
+      canvas.height = nh;
     };
     resize();
     window.addEventListener("resize", resize);
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     const frame = (t: number) => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -821,6 +831,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", resize);
+      ro.disconnect();
     };
   }, [moveRef, onNearbyChange, onViewpointChange, paused]);
 
