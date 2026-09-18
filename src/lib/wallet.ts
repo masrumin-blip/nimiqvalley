@@ -115,7 +115,7 @@ export async function signLoginMessage(
   kind: WalletKind,
   message: string,
   address: string,
-): Promise<string> {
+): Promise<LoginSignature> {
   if (kind === "pay") return signNimiqMessage(message);
   const api = await hub();
   const signed = await api.signMessage({ appName: APP_NAME, message, signer: address });
