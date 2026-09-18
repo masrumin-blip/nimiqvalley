@@ -4,6 +4,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { ArrowLeft, ArrowUp } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { ChatCredits } from "@/components/ChatCredits";
 import { Button } from "@/components/ui/button";
 import { getCharacter } from "@/lib/characters";
 
@@ -124,10 +125,11 @@ function ChatRoom() {
               </Link>
             </Button>
             <img src={character.image} alt="" className="size-11 rounded-full object-cover object-top ring-1 ring-ink/10 sm:hidden" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-lg font-semibold sm:hidden">{character.name}</h1>
               <p className="font-mono text-[9px] uppercase text-ember">{character.role}</p>
             </div>
+            <ChatCredits />
           </header>
 
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-7 sm:py-8" aria-live="polite">
