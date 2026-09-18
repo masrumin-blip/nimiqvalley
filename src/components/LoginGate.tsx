@@ -1,14 +1,16 @@
-import { LogIn, Wallet } from "lucide-react";
-import type { ReactNode } from "react";
+import { Coins, LogIn, Wallet } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { usePlayer, usePlayerActions } from "@/hooks/usePlayer";
-import { isInsideNimiqPay } from "@/lib/wallet";
+import { connectPolygon, isInsideNimiqPay } from "@/lib/wallet";
 
 /** Asks for a wallet sign-in before anything else in the app is shown. */
 export function LoginGate({ children }: { children: ReactNode }) {
   const { player, isLoading } = usePlayer();
   const { connect } = usePlayerActions();
+  const [evm, setEvm] = useState<string | null>(null);
+  const [evmError, setEvmError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -53,7 +55,23 @@ export function LoginGate({ children }: { children: ReactNode }) {
             <Wallet className="size-4" />
             Nimiq browser wallet
           </Button>
+          <Button
+            variant="ghost"
+            className="w-full rounded-full text-xs font-bold"
+            onClick={async () => {
+              setEvmError(null);
+              try {
+                setEvm(await connectPolygon());
+              } catch (error) {
+                setEvmError((error as Error)?.message ?? "Could not connect the EVM wallet.");
+              }
+            }}
+          >
+            <Coins className="size-4" />
+            {evm ? `EVM: ${evm.slice(0, 6)}…${evm.slice(-4)}` : "Connect EVM wallet (USDT)"}
+          </Button>
         </div>
+        {evmError && <p className="mt-3 text-xs text-destructive">{evmError}</p>}
 
         {connect.isPending && (
           <p className="mt-3 text-xs text-muted-foreground">Waiting for your wallet…</p>
