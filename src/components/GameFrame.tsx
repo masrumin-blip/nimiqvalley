@@ -36,17 +36,17 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
 
   if (fit) {
     return (
-      <div className="relative h-[100svh] w-full overflow-hidden overscroll-none bg-background">
+      <div className={`g-${slug} relative h-[100svh] w-full overflow-hidden overscroll-none bg-background`}>
         {exitButton}
-        <div className={`g-${slug} h-full w-full overflow-hidden`}>{children}</div>
+        <div className="h-full w-full overflow-hidden">{children}</div>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className={`g-${slug} relative min-h-screen bg-background`}>
       {exitButton}
-      <div className={`g-${slug}`}>{children}</div>
+      {children}
     </div>
   );
 }
