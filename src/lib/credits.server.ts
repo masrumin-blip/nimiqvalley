@@ -170,9 +170,10 @@ async function lookupTx(hash: string): Promise<TxLookup> {
 type RedeemInput = {
   wallet: string;
   txHash: string;
-  kind: "chat" | "room";
+  kind: "chat" | "room" | "key";
   packId?: string | undefined;
   rooms?: number | undefined;
+  keys?: number | undefined;
 };
 
 /**
@@ -192,6 +193,7 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
 
   let chats = 0;
   let rooms = 0;
+  let keys = 0;
   let expectedNim = 0;
 
   if (input.kind === "chat") {
@@ -199,6 +201,10 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     if (!pack) throw new Error("Unknown chat pack.");
     chats = pack.chats;
     expectedNim = pack.nim;
+  } else if (input.kind === "key") {
+    const count = Math.max(1, Math.min(10, Math.round(input.keys ?? 1)));
+    keys = count;
+    expectedNim = count * KEY_COST_NIM;
   } else {
     const count = Math.max(1, Math.min(10, Math.round(input.rooms ?? 1)));
     rooms = count;
