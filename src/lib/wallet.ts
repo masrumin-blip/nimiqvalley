@@ -21,8 +21,9 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 async function transactionHash(serialized: string): Promise<string> {
-  const { Transaction } = await import("@nimiq/core");
-  return Transaction.fromAny(serialized).hash();
+  const { hashTransaction } = await import("./tx.functions");
+  const { hash } = await hashTransaction({ data: { serialized } });
+  return hash;
 }
 
 export function getEthereum(): EthereumProvider | null {
