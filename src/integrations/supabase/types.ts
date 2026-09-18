@@ -203,6 +203,7 @@ export type Database = {
           id: string
           joined_at: string
           max_players: number
+          mode: string
           rank_hint: number
           room_id: string | null
           settings: Json
@@ -214,6 +215,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -225,6 +227,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -287,6 +290,8 @@ export type Database = {
           kind: string
           max_players: number
           settings: Json
+          settled_at: string | null
+          stake: number
           started_at: string | null
           status: string
           turn_no: number
@@ -305,6 +310,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -323,6 +330,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -330,6 +339,36 @@ export type Database = {
           turn_wallet?: string | null
           updated_at?: string
           winner_wallet?: string | null
+        }
+        Relationships: []
+      }
+      mp_tickets: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          reason: string
+          room_id: string | null
+          unit: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          reason: string
+          room_id?: string | null
+          unit?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          reason?: string
+          room_id?: string | null
+          unit?: string
+          wallet?: string
         }
         Relationships: []
       }
@@ -557,6 +596,7 @@ export type Database = {
           chat_credits: number
           free_chats_date: string | null
           free_chats_used: number
+          nim_balance: number
           room_credits: number
           updated_at: string
           wallet: string
@@ -565,6 +605,7 @@ export type Database = {
           chat_credits?: number
           free_chats_date?: string | null
           free_chats_used?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet: string
@@ -573,6 +614,7 @@ export type Database = {
           chat_credits?: number
           free_chats_date?: string | null
           free_chats_used?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet?: string

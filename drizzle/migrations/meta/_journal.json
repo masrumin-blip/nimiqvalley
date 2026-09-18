@@ -43,6 +43,13 @@
       "when": 1789752371800,
       "tag": "0005_create_credits_and_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789753462284,
+      "tag": "0006_ranked_match_tickets",
+      "breakpoints": true
     }
   ]
 }
