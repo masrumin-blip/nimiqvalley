@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePlayer } from "@/hooks/usePlayer";
 import VillageCanvas from "@/components/VillageCanvas";
 import Joystick from "@/components/Joystick";
 import GameStage from "@/components/GameStage";
