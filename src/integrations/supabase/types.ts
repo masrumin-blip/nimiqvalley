@@ -14,6 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_dms: {
+        Row: {
+          created_at: string
+          from_wallet: string
+          id: string
+          pair_key: string
+          text: string
+          to_wallet: string
+        }
+        Insert: {
+          created_at?: string
+          from_wallet: string
+          id?: string
+          pair_key: string
+          text: string
+          to_wallet: string
+        }
+        Update: {
+          created_at?: string
+          from_wallet?: string
+          id?: string
+          pair_key?: string
+          text?: string
+          to_wallet?: string
+        }
+        Relationships: []
+      }
+      chat_friends: {
+        Row: {
+          created_at: string
+          from_wallet: string
+          id: string
+          status: string
+          to_wallet: string
+        }
+        Insert: {
+          created_at?: string
+          from_wallet: string
+          id?: string
+          status?: string
+          to_wallet: string
+        }
+        Update: {
+          created_at?: string
+          from_wallet?: string
+          id?: string
+          status?: string
+          to_wallet?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          text: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          text: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          text?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      chat_presence: {
+        Row: {
+          last_seen: string
+          wallet: string
+        }
+        Insert: {
+          last_seen?: string
+          wallet: string
+        }
+        Update: {
+          last_seen?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      chat_profiles: {
+        Row: {
+          bio: string
+          discord: string
+          dm_policy: string
+          instagram: string
+          twitter: string
+          updated_at: string
+          visibility: string
+          wallet: string
+        }
+        Insert: {
+          bio?: string
+          discord?: string
+          dm_policy?: string
+          instagram?: string
+          twitter?: string
+          updated_at?: string
+          visibility?: string
+          wallet: string
+        }
+        Update: {
+          bio?: string
+          discord?: string
+          dm_policy?: string
+          instagram?: string
+          twitter?: string
+          updated_at?: string
+          visibility?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
