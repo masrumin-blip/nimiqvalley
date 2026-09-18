@@ -85,6 +85,13 @@
       "when": 1789764415993,
       "tag": "0011_create_player_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789765442758,
+      "tag": "0012_add_soccer_entry_cost",
+      "breakpoints": true
     }
   ]
 }
