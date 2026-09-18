@@ -54,6 +54,13 @@ export function AppPreloader({ children }: { children: ReactNode }) {
         />
       </div>
       <p className="mt-3 font-mono text-xs font-bold text-foreground">{percent}%</p>
+      <button
+        type="button"
+        onClick={() => setDone(true)}
+        className="mt-6 text-xs font-semibold text-muted-foreground underline underline-offset-4"
+      >
+        Continue anyway
+      </button>
     </div>
   );
 }
