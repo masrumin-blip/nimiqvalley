@@ -7,6 +7,7 @@ import {
   createRoom,
   fetchLobby,
   fetchMatch,
+  finishMatch,
   joinRoom,
   leaveMatch,
   quickMatch,
