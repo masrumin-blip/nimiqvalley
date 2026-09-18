@@ -746,6 +746,9 @@ export default function SoccerGame() {
       : "CPU";
   const lobby = online.lobby;
   const waiting = online.match && online.match.status === "waiting" ? online.match : null;
+  const { credits } = useCredits();
+  const { buyKeys } = useCreditActions();
+  const matchKeys = credits?.matchKeys ?? 0;
 
   const exitToMenu = () => {
     if (cpuTimer.current) window.clearTimeout(cpuTimer.current);
