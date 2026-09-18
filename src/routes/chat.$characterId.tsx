@@ -6,6 +6,9 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatCredits } from "@/components/ChatCredits";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCredits } from "@/hooks/useCredits";
+import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
 
 export const Route = createFileRoute("/chat/$characterId")({
@@ -49,6 +52,10 @@ function ChatRoom() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const { credits } = useCredits();
+  const left = totalChatsLeft(credits);
+
 
   const transport = useMemo(
     () =>
