@@ -14,6 +14,7 @@ const signInSchema = z.object({
   challenge: z.string().uuid(),
   publicKey: z.string().regex(/^[0-9a-fA-F]{64}$/),
   signature: z.string().regex(/^[0-9a-fA-F]{128}$/),
+  scheme: z.enum(["pay-hex-v1", "hub-v1"]),
   displayName: z.string().trim().max(16).optional(),
 });
 
@@ -62,38 +63,27 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       const publicKey = PublicKey.fromHex(data.publicKey);
       const signature = Signature.fromHex(data.signature);
       if (!publicKey.toAddress().equals(Address.fromUserFriendlyAddress(wallet))) {
+        console.warn(`[wallet-login] rejected ${data.scheme}: public-key mismatch`);
         throw new Error("The signing key does not belong to this wallet.");
       }
 
       const encoder = new TextEncoder();
       const messageBytes = encoder.encode(message);
-      const prefix = "\u0016Nimiq Signed Message:\n";
-      // Nimiq's length prefix counts bytes, not UTF-16 code units.
-      const lengthPrefixed = encoder.encode(`${prefix}${messageBytes.length}${message}`);
-      const hubPrefixed = encoder.encode(`${prefix}${message}`);
       const sha256 = async (bytes: Uint8Array) =>
         new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer));
 
-      const candidates: Array<{ label: string; bytes: Uint8Array }> = [
-        { label: "sha256(prefix+len+msg)", bytes: await sha256(lengthPrefixed) },
-        { label: "sha256(prefix+msg)", bytes: await sha256(hubPrefixed) },
-        { label: "sha256(msg)", bytes: await sha256(messageBytes) },
-        { label: "raw(prefix+len+msg)", bytes: lengthPrefixed },
-        { label: "raw(prefix+msg)", bytes: hubPrefixed },
-        { label: "raw(msg)", bytes: messageBytes },
-      ];
+      const signedBytes = data.scheme === "pay-hex-v1"
+        ? await sha256(messageBytes)
+        : await sha256(encoder.encode(`\u0016Nimiq Signed Message:\n${messageBytes.length}${message}`));
 
-      const matched = candidates.find((candidate) => {
-        try {
-          return publicKey.verify(signature, candidate.bytes);
-        } catch {
-          return false;
-        }
-      });
-      if (!matched) throw new Error("The wallet signature could not be verified.");
-      console.info(`[wallet-login] signature verified via ${matched.label}`);
+      if (!publicKey.verify(signature, signedBytes)) {
+        console.warn(`[wallet-login] rejected ${data.scheme}: signature mismatch`);
+        throw new Error("The wallet signature could not be verified.");
+      }
+      console.info(`[wallet-login] verified ${data.scheme}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
+      console.warn(`[wallet-login] rejected ${data.scheme}: invalid response format`);
       throw new Error("The wallet signature could not be verified.");
     }
 

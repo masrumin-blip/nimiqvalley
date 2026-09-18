@@ -10,7 +10,11 @@ export interface EthereumProvider {
 }
 
 type WalletError = { error: { type: string; message: string } };
-export type LoginSignature = { publicKey: string; signature: string };
+export type LoginSignature = {
+  publicKey: string;
+  signature: string;
+  scheme: "pay-hex-v1" | "hub-v1";
+};
 
 function isWalletError(value: unknown): value is WalletError {
   return Boolean(value && typeof value === "object" && "error" in value);
@@ -18,6 +22,11 @@ function isWalletError(value: unknown): value is WalletError {
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(message: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message));
+  return bytesToHex(new Uint8Array(digest));
 }
 
 async function transactionHash(serialized: string): Promise<string> {
@@ -41,6 +50,7 @@ export async function connectNimiq(): Promise<string> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
   const accounts = (await nimiq.listAccounts()) as unknown;
+  if (isWalletError(accounts)) throw new Error(accounts.error.message);
   if (!Array.isArray(accounts) || typeof accounts[0] !== "string")
     throw new Error("No Nimiq address was shared.");
   return accounts[0];
@@ -50,9 +60,11 @@ export async function connectNimiq(): Promise<string> {
 export async function signNimiqMessage(message: string): Promise<LoginSignature> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
-  const result = await nimiq.sign(message);
+  // Nimiq Pay can sign explicit hex bytes. Supplying a fixed 32-byte digest
+  // removes any ambiguity about wallet-side text encoding or Hub prefixes.
+  const result = await nimiq.sign({ message: await sha256Hex(message), isHex: true });
   if (isWalletError(result)) throw new Error(result.error.message);
-  return result;
+  return { ...result, scheme: "pay-hex-v1" };
 }
 
 /** Send NIM through the wallet approval dialog. Returns the transaction hash. */
@@ -123,6 +135,7 @@ export async function signLoginMessage(
   return {
     publicKey: bytesToHex(signed.signerPublicKey),
     signature: bytesToHex(signed.signature),
+    scheme: "hub-v1",
   };
 }
 
