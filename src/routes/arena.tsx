@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Check, Globe, Lock, MessageSquare, Send, User, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, Award, Check, Crown, Gamepad2, Globe, Lock, Medal, MessageSquare, Send, Shield, Trophy, User, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { PlayerBadge } from "@/components/PlayerBadge";
 import { WalletGate } from "@/components/WalletGate";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePlayer } from "@/hooks/usePlayer";
+import { fetchAchievements } from "@/lib/achievements.functions";
+import type { AchievementBadge, AchievementSummary } from "@/lib/achievements";
 import {
   addFriend,
   fetchChat,
@@ -17,8 +20,9 @@ import {
   saveProfile,
   sendChat,
   sendDm,
+  viewProfile,
 } from "@/lib/chat.functions";
-import { CHAT_LIMITS, POLL_INTERVAL_MS, type Socials } from "@/lib/chat/types";
+import { CHAT_LIMITS, POLL_INTERVAL_MS, type ProfileView, type Socials } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
 
 const title = "Arena Chat — NimiqValley";
@@ -53,6 +57,7 @@ function ArenaPage() {
 function Arena() {
   const [tab, setTab] = useState<Tab>("global");
   const [dmWith, setDmWith] = useState<{ wallet: string; name: string } | null>(null);
+  const [profileWallet, setProfileWallet] = useState<string | null>(null);
   const social = useSocial();
   const pending = social.data?.incoming.length ?? 0;
 
@@ -80,7 +85,7 @@ function Arena() {
         <TabButton active={tab === "me"} onClick={() => setTab("me")} icon={<User className="size-3.5" />} label="Profile" />
       </nav>
 
-      {tab === "global" && <GlobalChat />}
+      {tab === "global" && <GlobalChat onProfile={setProfileWallet} />}
       {tab === "dm" &&
         (dmWith ? (
           <DmRoom peer={dmWith} onBack={() => setDmWith(null)} />
@@ -89,6 +94,7 @@ function Arena() {
         ))}
       {tab === "friends" && (
         <Friends
+          onProfile={setProfileWallet}
           onMessage={(p) => {
             setDmWith(p);
             setTab("dm");
@@ -96,6 +102,7 @@ function Arena() {
         />
       )}
       {tab === "me" && <ProfileEditor />}
+      <PlayerProfileDialog wallet={profileWallet} onOpenChange={(open) => !open && setProfileWallet(null)} />
     </main>
   );
 }
@@ -143,7 +150,7 @@ function Panel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function GlobalChat() {
+function GlobalChat({ onProfile }: { onProfile: (wallet: string) => void }) {
   const { player } = usePlayer();
   const qc = useQueryClient();
   const listFn = useServerFn(fetchChat);
@@ -197,9 +204,9 @@ function GlobalChat() {
                 )}
               >
                 {!mine && (
-                  <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide opacity-70">
+                  <button type="button" onClick={() => onProfile(m.wallet)} className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide opacity-70 transition-opacity hover:opacity-100">
                     {m.name}
-                  </p>
+                  </button>
                 )}
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
               </div>
@@ -371,7 +378,7 @@ function DmRoom({
   );
 }
 
-function Friends({ onMessage }: { onMessage: (p: { wallet: string; name: string }) => void }) {
+function Friends({ onMessage, onProfile }: { onMessage: (p: { wallet: string; name: string }) => void; onProfile: (wallet: string) => void }) {
   const qc = useQueryClient();
   const social = useSocial();
   const addFn = useServerFn(addFriend);
@@ -453,7 +460,7 @@ function Friends({ onMessage }: { onMessage: (p: { wallet: string; name: string 
           <ul className="space-y-1">
             {(social.data?.friends ?? []).map((f) => (
               <li key={f.wallet} className="flex items-center justify-between rounded-xl px-3 py-2 hover:bg-accent">
-                <span className="text-sm font-semibold text-foreground">{f.name}</span>
+                <button type="button" onClick={() => onProfile(f.wallet)} className="text-sm font-semibold text-foreground hover:text-primary">{f.name}</button>
                 <Button size="sm" variant="secondary" className="rounded-full" onClick={() => onMessage(f)}>
                   <MessageSquare className="size-3.5" /> Message
                 </Button>
@@ -485,7 +492,13 @@ function ProfileEditor() {
   const qc = useQueryClient();
   const social = useSocial();
   const saveFn = useServerFn(saveProfile);
+  const achievementFn = useServerFn(fetchAchievements);
   const profile = social.data?.profile;
+  const achievements = useQuery({
+    queryKey: ["arena-achievements", profile?.wallet],
+    queryFn: () => achievementFn({ data: {} }),
+    enabled: Boolean(profile?.wallet),
+  });
 
   const [bio, setBio] = useState("");
   const [socials, setSocials] = useState<Socials>({ twitter: "", instagram: "", discord: "" });
@@ -514,6 +527,8 @@ function ProfileEditor() {
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">You</p>
           <p className="text-lg font-black text-foreground">{profile?.name ?? "…"}</p>
         </div>
+
+        <AchievementCollection summary={achievements.data} loading={achievements.isLoading} />
 
         <label className="block text-sm">
           <span className="mb-1 block font-semibold text-foreground">Bio</span>
@@ -566,5 +581,90 @@ function ProfileEditor() {
         {save.isSuccess && <p className="text-xs text-muted-foreground">Profile saved.</p>}
       </div>
     </Panel>
+  );
+}
+
+const badgeTone: Record<AchievementBadge["tier"], string> = {
+  gold: "border-primary/40 bg-primary/10 text-primary",
+  silver: "border-border bg-muted text-foreground",
+  bronze: "border-accent bg-accent/50 text-accent-foreground",
+  emerald: "border-success/40 bg-success/10 text-success",
+};
+
+function BadgeIcon({ badge }: { badge: AchievementBadge }) {
+  if (badge.kind === "rank") return badge.tier === "gold" ? <Crown className="size-4" /> : <Medal className="size-4" />;
+  if (badge.kind === "wins") return <Shield className="size-4" />;
+  return <Gamepad2 className="size-4" />;
+}
+
+function AchievementCollection({ summary, loading = false }: { summary?: AchievementSummary; loading?: boolean }) {
+  return (
+    <section aria-label="Achievements" className="space-y-3 border-y border-border py-4">
+      <div className="flex items-center gap-2">
+        <Trophy className="size-4 text-primary" />
+        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-foreground">Achievements</h3>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <Stat value={summary?.badges.length ?? 0} label="Badges" />
+        <Stat value={summary?.onlineWins ?? 0} label="Online wins" />
+        <Stat value={`${summary?.gamesPlayed ?? 0}/${summary?.totalGames ?? 11}`} label="Games" />
+      </div>
+      {loading ? (
+        <p className="text-xs text-muted-foreground">Loading achievements…</p>
+      ) : summary && summary.badges.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {summary.badges.map((badge) => (
+            <div key={badge.id} className={cn("flex min-w-0 items-center gap-2 rounded-lg border p-2", badgeTone[badge.tier])}>
+              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-background/60"><BadgeIcon badge={badge} /></span>
+              <span className="min-w-0">
+                <strong className="block truncate text-xs">{badge.title}</strong>
+                <span className="block truncate text-[10px] opacity-75">{badge.detail}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+          <Award className="size-4" /> Play a leaderboard game or win online to earn your first badge.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Stat({ value, label }: { value: number | string; label: string }) {
+  return <div className="rounded-lg bg-muted px-2 py-2"><strong className="block text-lg leading-none text-foreground">{value}</strong><span className="mt-1 block text-[10px] text-muted-foreground">{label}</span></div>;
+}
+
+function PlayerProfileDialog({ wallet, onOpenChange }: { wallet: string | null; onOpenChange: (open: boolean) => void }) {
+  const profileFn = useServerFn(viewProfile);
+  const achievementFn = useServerFn(fetchAchievements);
+  const profile = useQuery<ProfileView>({
+    queryKey: ["arena-profile", wallet],
+    queryFn: () => profileFn({ data: { target: wallet ?? "" } }),
+    enabled: Boolean(wallet),
+  });
+  const achievements = useQuery({
+    queryKey: ["arena-achievements", wallet],
+    queryFn: () => achievementFn({ data: { target: wallet ?? undefined } }),
+    enabled: Boolean(wallet),
+  });
+  return (
+    <Dialog open={Boolean(wallet)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85svh] max-w-md overflow-y-auto rounded-lg">
+        <DialogHeader>
+          <DialogTitle>{profile.data?.name ?? "Player profile"}</DialogTitle>
+          <DialogDescription>{profile.data?.hidden ? "Private profile · achievements are public" : profile.data?.bio || "NimiqValley player"}</DialogDescription>
+        </DialogHeader>
+        <AchievementCollection summary={achievements.data} loading={achievements.isLoading} />
+        {!profile.data?.hidden && profile.data?.socials && (
+          <div className="space-y-1 text-xs text-muted-foreground">
+            {profile.data.socials.twitter && <p>X: {profile.data.socials.twitter}</p>}
+            {profile.data.socials.instagram && <p>Instagram: {profile.data.socials.instagram}</p>}
+            {profile.data.socials.discord && <p>Discord: {profile.data.socials.discord}</p>}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
