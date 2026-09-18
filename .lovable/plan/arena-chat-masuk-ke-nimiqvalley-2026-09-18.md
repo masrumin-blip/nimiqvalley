@@ -2,6 +2,8 @@
 
 Menambahkan area obrolan antar pemain (chat global, profil, teman, pesan pribadi) dari aplikasi yang kamu unggah ke dalam NimiqValley, tanpa mengubah AI Chat yang sudah ada.
 
+buat ada di game hub di kolom atas
+
 ## Yang akan dibuat
 
 Halaman baru **Arena** di alamat `/arena`, berisi 4 tab:
