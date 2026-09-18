@@ -98,26 +98,26 @@ function VillagePage() {
     setActiveViewpoint(null);
   }, []);
 
-  const handleConnectNimiq = async () => {
-    setBusy(true);
-    setStatus(null);
-    try {
-      setNimAddress(await connectNimiq());
-      // In Nimiq Pay the Ethereum provider is bundled alongside the Nimiq provider,
-      // so we automatically connect Polygon USDT after the Nimiq wallet is approved.
-      if (isInsideNimiqPay() && getEthereum()) {
-        try {
-          setEvmAddress(await connectPolygon());
-        } catch (err) {
-          setStatus(err instanceof Error ? err.message : "Could not connect the Polygon wallet.");
-        }
-      }
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Could not connect the Nimiq wallet.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // The player already signed in with their wallet at the start of the app,
+  // so reuse that address instead of asking for another connection.
+  useEffect(() => {
+    if (player?.wallet) setNimAddress(player.wallet);
+  }, [player?.wallet]);
+
+  // Inside Nimiq Pay the Polygon provider comes bundled, so read USDT silently.
+  useEffect(() => {
+    if (!nimAddress || evmAddress) return;
+    if (!isInsideNimiqPay() || !getEthereum()) return;
+    let cancelled = false;
+    void connectPolygon()
+      .then((addr) => {
+        if (!cancelled) setEvmAddress(addr);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [nimAddress, evmAddress]);
 
   const amountNum = Number(amount);
   const wouldLeave = nim - (Number.isFinite(amountNum) ? amountNum : 0);
