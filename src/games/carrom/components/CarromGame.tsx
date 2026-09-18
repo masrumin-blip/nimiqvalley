@@ -989,6 +989,7 @@ export default function CarromGame() {
           title={phase === "won" ? "You win!" : `${rivalName} wins`}
           subtitle="Final standings"
           rows={resultRows}
+          payout={rankedPayout}
           onPlayAgain={() => {
             online.leave.mutate();
             setPhaseBoth("menu");

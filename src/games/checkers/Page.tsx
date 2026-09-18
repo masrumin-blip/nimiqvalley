@@ -465,6 +465,7 @@ function CheckersGame() {
               title={outcome === "draw" ? "Draw" : outcome === mySide ? "You win!" : `${rivalName} wins`}
               subtitle="Final standings"
               rows={resultRows}
+              payout={rankedPayout}
               onPlayAgain={exitToMenu}
               onExit={() => navigate({ to: "/games" })}
             />

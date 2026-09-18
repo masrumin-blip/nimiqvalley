@@ -1030,6 +1030,7 @@ export function HexamanGame() {
           title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
           subtitle="Run results"
           rows={resultRows}
+          payout={rankedPayout}
           onPlayAgain={() => {
             online.leave.mutate();
             setMode("solo");
