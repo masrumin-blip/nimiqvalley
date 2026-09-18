@@ -5,26 +5,28 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import VillageCanvas from "@/components/VillageCanvas";
 import Joystick from "@/components/Joystick";
 import GameStage from "@/components/GameStage";
+import SceneryView from "@/components/SceneryView";
+import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
 import { connectNimiq, connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
 import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForUsd } from "@/lib/tiers";
-import type { Neighbor } from "@/lib/village";
+import type { Neighbor, RestSpot } from "@/lib/village";
 
 export const Route = createFileRoute("/village")({
   head: () => ({
     meta: [
-      { title: "Nimiq Village — Top-Down Crypto Village Game" },
+      { title: "Nimiq Island — An Island Village with Interactive Scenery" },
       {
         name: "description",
         content:
-          "Explore a hand-drawn top-down village where your NIM balance shapes your character and your Polygon USDT shapes your house.",
+          "Explore a pixel-art island village, meet villagers and animals, and unwind at six animated scenic spots.",
       },
-      { property: "og:title", content: "Nimiq Village — Top-Down Crypto Village Game" },
+      { property: "og:title", content: "Nimiq Island — An Island Village with Interactive Scenery" },
       {
         property: "og:description",
         content:
-          "Walk around a cozy village, meet neighbours and send NIM. Your wallet decides how rich your villager and home look.",
+          "Explore a cozy island and discover six relaxing spots with animated scenery.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -45,6 +47,8 @@ function VillagePage() {
   const [demo, setDemo] = useState(false);
   const [demoTier, setDemoTier] = useState(1);
   const [demoHouseTier, setDemoHouseTier] = useState(1);
+  const [nearbyViewpoint, setNearbyViewpoint] = useState<RestSpot | null>(null);
+  const [activeViewpoint, setActiveViewpoint] = useState<RestSpot | null>(null);
 
   const priceFn = useServerFn(getNimPrice);
   const balanceFn = useServerFn(getNimBalance);
@@ -71,15 +75,25 @@ function VillagePage() {
   });
 
   const DEMO_USD = [2, 7, 25, 120];
-  const nim = demo ? DEMO_USD[demoTier]! * 250 : (nimBalance.data?.nim ?? 0);
-  const nimUsd = demo ? DEMO_USD[demoTier]! : nim * (price.data?.usd ?? 0);
-  const usdtValue = demo ? DEMO_USD[demoHouseTier]! : (usdt.data ?? 0);
+  const demoNimUsd = DEMO_USD[demoTier] ?? DEMO_USD[0] ?? 0;
+  const demoUsdt = DEMO_USD[demoHouseTier] ?? DEMO_USD[0] ?? 0;
+  const nim = demo ? demoNimUsd * 250 : (nimBalance.data?.nim ?? 0);
+  const nimUsd = demo ? demoNimUsd : nim * (price.data?.usd ?? 0);
+  const usdtValue = demo ? demoUsdt : (usdt.data ?? 0);
   const charTier = useMemo(() => tierForUsd(nimUsd), [nimUsd]);
   const houseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
 
   const onNearbyChange = useCallback((n: Neighbor | null) => {
     setNearby(n);
     if (!n) setSendOpen(false);
+  }, []);
+  const onViewpointChange = useCallback((spot: RestSpot | null) => {
+    setNearbyViewpoint(spot);
+  }, []);
+
+  const closeScenery = useCallback(() => {
+    moveRef.current = { x: 0, y: 0 };
+    setActiveViewpoint(null);
   }, []);
 
   const handleConnectNimiq = async () => {
@@ -140,8 +154,8 @@ function VillagePage() {
 
   return (
     <GameStage>
-    <main className="relative h-full w-full overflow-hidden bg-background">
-      <h1 className="sr-only">Nimiq Village — a top-down village powered by your wallet</h1>
+      <main className="relative h-full w-full overflow-hidden bg-background">
+      <h1 className="sr-only">Nimiq Island — an island village with six interactive scenic views</h1>
 
       <Link
         to="/"
@@ -157,6 +171,8 @@ function VillagePage() {
           houseTier={houseTier.id}
           moveRef={moveRef}
           onNearbyChange={onNearbyChange}
+          onViewpointChange={onViewpointChange}
+          paused={Boolean(activeViewpoint)}
         />
       </div>
 
@@ -196,7 +212,7 @@ function VillagePage() {
                 </p>
                 <div className="mt-1 flex gap-1">
                   {TIERS.map((t, i) => (
-                    <button
+                    <Button
                       key={t.id}
                       onClick={() => setDemoTier(i)}
                       className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
@@ -206,7 +222,7 @@ function VillagePage() {
                       }`}
                     >
                       {t.characterName.split(" ")[0]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -216,7 +232,7 @@ function VillagePage() {
                 </p>
                 <div className="mt-1 flex gap-1">
                   {TIERS.map((t, i) => (
-                    <button
+                    <Button
                       key={t.id}
                       onClick={() => setDemoHouseTier(i)}
                       className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
@@ -226,16 +242,16 @@ function VillagePage() {
                       }`}
                     >
                       {t.houseName.split(" ")[0]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
-              <button
+              <Button
                 onClick={() => setDemo(false)}
                 className="min-h-9 w-full rounded-lg border border-input bg-background text-[11px] font-semibold text-foreground"
               >
                 Leave demo mode
-              </button>
+              </Button>
             </div>
           )}
           {status && <p className="mt-2 text-xs text-card-foreground/80">{status}</p>}
@@ -252,14 +268,14 @@ function VillagePage() {
               house is.
             </p>
             <div className="mt-5 space-y-2">
-              <button
+              <Button
                 onClick={handleConnectNimiq}
                 disabled={busy}
                 className="min-h-11 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
                 Connect Nimiq wallet
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setStatus(null);
                   setDemo(true);
@@ -267,7 +283,7 @@ function VillagePage() {
                 className="min-h-11 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm font-semibold text-foreground"
               >
                 Try the demo — no wallet needed
-              </button>
+              </Button>
             </div>
             {status && <p className="mt-3 text-xs text-destructive">{status}</p>}
             <p className="mt-4 text-xs text-muted-foreground">
@@ -279,15 +295,26 @@ function VillagePage() {
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
-        <Joystick moveRef={moveRef} />
+        <Joystick moveRef={moveRef} disabled={Boolean(activeViewpoint)} />
         <div className="flex flex-col items-end gap-2">
+          {nearbyViewpoint && !activeViewpoint && (
+            <Button
+              onClick={() => {
+                moveRef.current = { x: 0, y: 0 };
+                setActiveViewpoint(nearbyViewpoint);
+              }}
+              className="min-h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg"
+            >
+              View scenery · {nearbyViewpoint.name}
+            </Button>
+          )}
           {nearby && !sendOpen && (
-            <button
+            <Button
               onClick={() => setSendOpen(true)}
               className="min-h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg"
             >
               Send NIM to {nearby.name.split(" ")[0]}
-            </button>
+            </Button>
           )}
           <p className="rounded-lg bg-card/70 px-3 py-1 text-[11px] text-muted-foreground backdrop-blur">
             Drag the pad or use WASD / arrows
@@ -320,19 +347,19 @@ function VillagePage() {
               </p>
             )}
             <div className="mt-3 flex gap-2">
-              <button
+              <Button
                 onClick={() => setSendOpen(false)}
                 className="min-h-11 flex-1 rounded-xl border border-input bg-background text-sm font-semibold text-foreground"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSend}
                 disabled={busy || blockedByReserve || (!nimAddress && !demo)}
                 className="min-h-11 flex-1 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
               >
                 {busy ? "Waiting…" : demo ? "Send (demo)" : "Send"}
-              </button>
+              </Button>
             </div>
             {!nimAddress && !demo && (
               <p className="mt-2 text-xs text-destructive">Connect your Nimiq wallet first.</p>
@@ -345,7 +372,8 @@ function VillagePage() {
           </div>
         </div>
       )}
-    </main>
+      {activeViewpoint && <SceneryView spot={activeViewpoint} onClose={closeScenery} />}
+      </main>
     </GameStage>
   );
 }
