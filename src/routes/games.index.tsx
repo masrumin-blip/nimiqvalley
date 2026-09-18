@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MessagesSquare, Trophy } from "lucide-react";
+import { KeyShopDialog } from "@/components/KeyShopDialog";
 import { PlayerBadge } from "@/components/PlayerBadge";
 import { GAMES } from "@/lib/games";
 
