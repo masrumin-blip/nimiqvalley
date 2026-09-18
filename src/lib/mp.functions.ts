@@ -60,8 +60,42 @@ export const createRoom = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
+    const { spendRoom } = await import("./credits.server");
+    await spendRoom(wallet);
     const cloud = await import("./mp/cloud.server");
     return cloud.createRoom(wallet, data.gameSlug, "room", data.maxPlayers, data.settings, null);
+  });
+
+export const joinQueue = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        gameSlug: slugSchema,
+        maxPlayers: z.number().int().min(2).max(4),
+        settings: settingsSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const cloud = await import("./mp/cloud.server");
+    return cloud.joinQueue(wallet, data.gameSlug, data.maxPlayers, data.settings);
+  });
+
+export const pollQueue = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ gameSlug: slugSchema }).parse(input))
+  .handler(async ({ data }): Promise<QueueState> => {
+    const wallet = await requireWallet();
+    const cloud = await import("./mp/cloud.server");
+    return cloud.pollQueue(wallet, data.gameSlug);
+  });
+
+export const leaveQueue = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ gameSlug: slugSchema }).parse(input))
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const cloud = await import("./mp/cloud.server");
+    return cloud.leaveQueue(wallet, data.gameSlug);
   });
 
 export const joinRoom = createServerFn({ method: "POST" })
