@@ -1,0 +1,16 @@
+export const PALETTE = {
+  bg: "#05030f",
+  gridGlow: "#1b1040",
+  wall: "#faff00",
+  wallInner: "#565900",
+  pellet: "#f5d0fe",
+  power: "#ff2fd0",
+  player: "#ff8a00",
+  door: "#ff2fd0",
+  ghosts: ["#ff2f6d", "#00ffc8", "#ff9f1c", "#a855f7"],
+  frightened: "#faff00",
+  frightenedFlash: "#e9f4ff",
+  eyes: "#eaf6ff",
+  pupil: "#05030f",
+  text: "#eaf6ff",
+};

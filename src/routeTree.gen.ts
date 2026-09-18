@@ -10,33 +10,297 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as VillageRouteImport } from './routes/village'
+import { Route as ChatIndexRouteImport } from './routes/chat.index'
+import { Route as ChatCharacterIdRouteImport } from './routes/chat.$characterId'
+import { Route as GamesIndexRouteImport } from './routes/games.index'
+import { Route as GamesBomberRouteImport } from './routes/games.bomber'
+import { Route as GamesCarromRouteImport } from './routes/games.carrom'
+import { Route as GamesCheckersRouteImport } from './routes/games.checkers'
+import { Route as GamesCrossingRouteImport } from './routes/games.crossing'
+import { Route as GamesHexamanRouteImport } from './routes/games.hexaman'
+import { Route as GamesJumpRouteImport } from './routes/games.jump'
+import { Route as GamesMininjaRouteImport } from './routes/games.mininja'
+import { Route as GamesPetRouteImport } from './routes/games.pet'
+import { Route as GamesRaceRouteImport } from './routes/games.race'
+import { Route as GamesRooftopRouteImport } from './routes/games.rooftop'
+import { Route as GamesShipRouteImport } from './routes/games.ship'
+import { Route as GamesShooterRouteImport } from './routes/games.shooter'
+import { Route as GamesSlideRouteImport } from './routes/games.slide'
+import { Route as GamesSoccerRouteImport } from './routes/games.soccer'
+import { Route as GamesTappyRouteImport } from './routes/games.tappy'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VillageRoute = VillageRouteImport.update({
+  id: '/village',
+  path: '/village',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/chat/',
+  path: '/chat/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatCharacterIdRoute = ChatCharacterIdRouteImport.update({
+  id: '/chat/$characterId',
+  path: '/chat/$characterId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesIndexRoute = GamesIndexRouteImport.update({
+  id: '/games/',
+  path: '/games/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesBomberRoute = GamesBomberRouteImport.update({
+  id: '/games/bomber',
+  path: '/games/bomber',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesCarromRoute = GamesCarromRouteImport.update({
+  id: '/games/carrom',
+  path: '/games/carrom',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesCheckersRoute = GamesCheckersRouteImport.update({
+  id: '/games/checkers',
+  path: '/games/checkers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesCrossingRoute = GamesCrossingRouteImport.update({
+  id: '/games/crossing',
+  path: '/games/crossing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesHexamanRoute = GamesHexamanRouteImport.update({
+  id: '/games/hexaman',
+  path: '/games/hexaman',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesJumpRoute = GamesJumpRouteImport.update({
+  id: '/games/jump',
+  path: '/games/jump',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesMininjaRoute = GamesMininjaRouteImport.update({
+  id: '/games/mininja',
+  path: '/games/mininja',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesPetRoute = GamesPetRouteImport.update({
+  id: '/games/pet',
+  path: '/games/pet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesRaceRoute = GamesRaceRouteImport.update({
+  id: '/games/race',
+  path: '/games/race',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesRooftopRoute = GamesRooftopRouteImport.update({
+  id: '/games/rooftop',
+  path: '/games/rooftop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesShipRoute = GamesShipRouteImport.update({
+  id: '/games/ship',
+  path: '/games/ship',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesShooterRoute = GamesShooterRouteImport.update({
+  id: '/games/shooter',
+  path: '/games/shooter',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesSlideRoute = GamesSlideRouteImport.update({
+  id: '/games/slide',
+  path: '/games/slide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesSoccerRoute = GamesSoccerRouteImport.update({
+  id: '/games/soccer',
+  path: '/games/soccer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesTappyRoute = GamesTappyRouteImport.update({
+  id: '/games/tappy',
+  path: '/games/tappy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/village': typeof VillageRoute
+  '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/bomber': typeof GamesBomberRoute
+  '/games/carrom': typeof GamesCarromRoute
+  '/games/checkers': typeof GamesCheckersRoute
+  '/games/crossing': typeof GamesCrossingRoute
+  '/games/hexaman': typeof GamesHexamanRoute
+  '/games/jump': typeof GamesJumpRoute
+  '/games/mininja': typeof GamesMininjaRoute
+  '/games/pet': typeof GamesPetRoute
+  '/games/race': typeof GamesRaceRoute
+  '/games/rooftop': typeof GamesRooftopRoute
+  '/games/ship': typeof GamesShipRoute
+  '/games/shooter': typeof GamesShooterRoute
+  '/games/slide': typeof GamesSlideRoute
+  '/games/soccer': typeof GamesSoccerRoute
+  '/games/tappy': typeof GamesTappyRoute
+  '/chat/': typeof ChatIndexRoute
+  '/games/': typeof GamesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/village': typeof VillageRoute
+  '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/bomber': typeof GamesBomberRoute
+  '/games/carrom': typeof GamesCarromRoute
+  '/games/checkers': typeof GamesCheckersRoute
+  '/games/crossing': typeof GamesCrossingRoute
+  '/games/hexaman': typeof GamesHexamanRoute
+  '/games/jump': typeof GamesJumpRoute
+  '/games/mininja': typeof GamesMininjaRoute
+  '/games/pet': typeof GamesPetRoute
+  '/games/race': typeof GamesRaceRoute
+  '/games/rooftop': typeof GamesRooftopRoute
+  '/games/ship': typeof GamesShipRoute
+  '/games/shooter': typeof GamesShooterRoute
+  '/games/slide': typeof GamesSlideRoute
+  '/games/soccer': typeof GamesSoccerRoute
+  '/games/tappy': typeof GamesTappyRoute
+  '/chat': typeof ChatIndexRoute
+  '/games': typeof GamesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/village': typeof VillageRoute
+  '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/bomber': typeof GamesBomberRoute
+  '/games/carrom': typeof GamesCarromRoute
+  '/games/checkers': typeof GamesCheckersRoute
+  '/games/crossing': typeof GamesCrossingRoute
+  '/games/hexaman': typeof GamesHexamanRoute
+  '/games/jump': typeof GamesJumpRoute
+  '/games/mininja': typeof GamesMininjaRoute
+  '/games/pet': typeof GamesPetRoute
+  '/games/race': typeof GamesRaceRoute
+  '/games/rooftop': typeof GamesRooftopRoute
+  '/games/ship': typeof GamesShipRoute
+  '/games/shooter': typeof GamesShooterRoute
+  '/games/slide': typeof GamesSlideRoute
+  '/games/soccer': typeof GamesSoccerRoute
+  '/games/tappy': typeof GamesTappyRoute
+  '/chat/': typeof ChatIndexRoute
+  '/games/': typeof GamesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/village'
+    | '/chat/$characterId'
+    | '/games/bomber'
+    | '/games/carrom'
+    | '/games/checkers'
+    | '/games/crossing'
+    | '/games/hexaman'
+    | '/games/jump'
+    | '/games/mininja'
+    | '/games/pet'
+    | '/games/race'
+    | '/games/rooftop'
+    | '/games/ship'
+    | '/games/shooter'
+    | '/games/slide'
+    | '/games/soccer'
+    | '/games/tappy'
+    | '/chat/'
+    | '/games/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/about'
+    | '/village'
+    | '/chat/$characterId'
+    | '/games/bomber'
+    | '/games/carrom'
+    | '/games/checkers'
+    | '/games/crossing'
+    | '/games/hexaman'
+    | '/games/jump'
+    | '/games/mininja'
+    | '/games/pet'
+    | '/games/race'
+    | '/games/rooftop'
+    | '/games/ship'
+    | '/games/shooter'
+    | '/games/slide'
+    | '/games/soccer'
+    | '/games/tappy'
+    | '/chat'
+    | '/games'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/village'
+    | '/chat/$characterId'
+    | '/games/bomber'
+    | '/games/carrom'
+    | '/games/checkers'
+    | '/games/crossing'
+    | '/games/hexaman'
+    | '/games/jump'
+    | '/games/mininja'
+    | '/games/pet'
+    | '/games/race'
+    | '/games/rooftop'
+    | '/games/ship'
+    | '/games/shooter'
+    | '/games/slide'
+    | '/games/soccer'
+    | '/games/tappy'
+    | '/chat/'
+    | '/games/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  VillageRoute: typeof VillageRoute
+  ChatCharacterIdRoute: typeof ChatCharacterIdRoute
+  GamesBomberRoute: typeof GamesBomberRoute
+  GamesCarromRoute: typeof GamesCarromRoute
+  GamesCheckersRoute: typeof GamesCheckersRoute
+  GamesCrossingRoute: typeof GamesCrossingRoute
+  GamesHexamanRoute: typeof GamesHexamanRoute
+  GamesJumpRoute: typeof GamesJumpRoute
+  GamesMininjaRoute: typeof GamesMininjaRoute
+  GamesPetRoute: typeof GamesPetRoute
+  GamesRaceRoute: typeof GamesRaceRoute
+  GamesRooftopRoute: typeof GamesRooftopRoute
+  GamesShipRoute: typeof GamesShipRoute
+  GamesShooterRoute: typeof GamesShooterRoute
+  GamesSlideRoute: typeof GamesSlideRoute
+  GamesSoccerRoute: typeof GamesSoccerRoute
+  GamesTappyRoute: typeof GamesTappyRoute
+  ChatIndexRoute: typeof ChatIndexRoute
+  GamesIndexRoute: typeof GamesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +312,171 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/village': {
+      id: '/village'
+      path: '/village'
+      fullPath: '/village'
+      preLoaderRoute: typeof VillageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/': {
+      id: '/chat/'
+      path: '/chat'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/$characterId': {
+      id: '/chat/$characterId'
+      path: '/chat/$characterId'
+      fullPath: '/chat/$characterId'
+      preLoaderRoute: typeof ChatCharacterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/': {
+      id: '/games/'
+      path: '/games'
+      fullPath: '/games/'
+      preLoaderRoute: typeof GamesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/bomber': {
+      id: '/games/bomber'
+      path: '/games/bomber'
+      fullPath: '/games/bomber'
+      preLoaderRoute: typeof GamesBomberRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/carrom': {
+      id: '/games/carrom'
+      path: '/games/carrom'
+      fullPath: '/games/carrom'
+      preLoaderRoute: typeof GamesCarromRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/checkers': {
+      id: '/games/checkers'
+      path: '/games/checkers'
+      fullPath: '/games/checkers'
+      preLoaderRoute: typeof GamesCheckersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/crossing': {
+      id: '/games/crossing'
+      path: '/games/crossing'
+      fullPath: '/games/crossing'
+      preLoaderRoute: typeof GamesCrossingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/hexaman': {
+      id: '/games/hexaman'
+      path: '/games/hexaman'
+      fullPath: '/games/hexaman'
+      preLoaderRoute: typeof GamesHexamanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/jump': {
+      id: '/games/jump'
+      path: '/games/jump'
+      fullPath: '/games/jump'
+      preLoaderRoute: typeof GamesJumpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/mininja': {
+      id: '/games/mininja'
+      path: '/games/mininja'
+      fullPath: '/games/mininja'
+      preLoaderRoute: typeof GamesMininjaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/pet': {
+      id: '/games/pet'
+      path: '/games/pet'
+      fullPath: '/games/pet'
+      preLoaderRoute: typeof GamesPetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/race': {
+      id: '/games/race'
+      path: '/games/race'
+      fullPath: '/games/race'
+      preLoaderRoute: typeof GamesRaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/rooftop': {
+      id: '/games/rooftop'
+      path: '/games/rooftop'
+      fullPath: '/games/rooftop'
+      preLoaderRoute: typeof GamesRooftopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/ship': {
+      id: '/games/ship'
+      path: '/games/ship'
+      fullPath: '/games/ship'
+      preLoaderRoute: typeof GamesShipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/shooter': {
+      id: '/games/shooter'
+      path: '/games/shooter'
+      fullPath: '/games/shooter'
+      preLoaderRoute: typeof GamesShooterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/slide': {
+      id: '/games/slide'
+      path: '/games/slide'
+      fullPath: '/games/slide'
+      preLoaderRoute: typeof GamesSlideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/soccer': {
+      id: '/games/soccer'
+      path: '/games/soccer'
+      fullPath: '/games/soccer'
+      preLoaderRoute: typeof GamesSoccerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/tappy': {
+      id: '/games/tappy'
+      path: '/games/tappy'
+      fullPath: '/games/tappy'
+      preLoaderRoute: typeof GamesTappyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  VillageRoute: VillageRoute,
+  ChatCharacterIdRoute: ChatCharacterIdRoute,
+  GamesBomberRoute: GamesBomberRoute,
+  GamesCarromRoute: GamesCarromRoute,
+  GamesCheckersRoute: GamesCheckersRoute,
+  GamesCrossingRoute: GamesCrossingRoute,
+  GamesHexamanRoute: GamesHexamanRoute,
+  GamesJumpRoute: GamesJumpRoute,
+  GamesMininjaRoute: GamesMininjaRoute,
+  GamesPetRoute: GamesPetRoute,
+  GamesRaceRoute: GamesRaceRoute,
+  GamesRooftopRoute: GamesRooftopRoute,
+  GamesShipRoute: GamesShipRoute,
+  GamesShooterRoute: GamesShooterRoute,
+  GamesSlideRoute: GamesSlideRoute,
+  GamesSoccerRoute: GamesSoccerRoute,
+  GamesTappyRoute: GamesTappyRoute,
+  ChatIndexRoute: ChatIndexRoute,
+  GamesIndexRoute: GamesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
