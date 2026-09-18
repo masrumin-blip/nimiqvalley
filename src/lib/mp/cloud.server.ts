@@ -213,22 +213,45 @@ export async function listTicks(id: string): Promise<PlayerTick[]> {
   }));
 }
 
-/** Leaves every open room of this game the player is still sitting in. */
-export async function abandonAll(wallet: string, gameSlug: string) {
+/**
+ * Leaves every open room of this game the player is still sitting in.
+ * Returns the entry costs ("key" / "room") of rooms this player hosted that were
+ * never actually played, so the caller can give them back.
+ */
+export async function abandonAll(
+  wallet: string,
+  gameSlug: string,
+): Promise<Array<"key" | "room">> {
   const { data: mine } = await supabaseAdmin
     .from("mp_room_players")
     .select("room_id")
     .eq("wallet", wallet);
   const ids = ((mine ?? []) as Array<{ room_id: string }>).map((r) => r.room_id);
-  if (ids.length === 0) return;
+  if (ids.length === 0) return [];
   const { data } = await supabaseAdmin
     .from("mp_rooms")
-    .select("id, host_wallet")
+    .select("id, host_wallet, status, settings")
     .eq("game_slug", gameSlug)
     .in("id", ids)
     .in("status", ["waiting", "invited", "playing"]);
-  const rows = (data ?? []) as Array<{ id: string; host_wallet: string }>;
-  if (rows.length === 0) return;
+  const rows = (data ?? []) as Array<{
+    id: string;
+    host_wallet: string;
+    status: string;
+    settings: Record<string, unknown> | null;
+  }>;
+  if (rows.length === 0) return [];
+
+  // A room the host leaves before anyone else sat down was never used.
+  const refunds: Array<"key" | "room"> = [];
+  for (const row of rows) {
+    if (row.host_wallet !== wallet) continue;
+    if (row.status === "playing") continue;
+    if ((await seatCount(row.id)) > 1) continue;
+    const entry = row.settings?.["__entry"];
+    refunds.push(entry === "room" ? "room" : "key");
+  }
+
   const now = new Date().toISOString();
   await supabaseAdmin
     .from("mp_room_players")
