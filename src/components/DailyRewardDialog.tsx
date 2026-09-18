@@ -86,8 +86,8 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
 
         {credits && (
           <p className="text-center text-[11px] text-muted-foreground">
-            Balance: {credits.roomCredits} rooms · {credits.chatCredits + credits.freeChatsLeft} chat
-            messages
+            Balance: {credits.matchKeys} keys · {credits.roomCredits} rooms ·{" "}
+            {credits.chatCredits + credits.freeChatsLeft} chat messages
           </p>
         )}
       </DialogContent>
