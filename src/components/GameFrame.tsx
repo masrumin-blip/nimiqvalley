@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { WalletGate } from "@/components/WalletGate";
 
 /** Games that must fit a phone screen exactly, with no page scrolling. */
 const FIT_SLUGS = new Set([
@@ -66,16 +67,20 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
   if (fit) {
     return (
       <div className={`g-${slug} relative h-[100svh] w-full overflow-hidden overscroll-none bg-background`}>
-        {exitButton}
-        <div className="h-full w-full overflow-hidden">{children}</div>
+        <WalletGate name={name}>
+          {exitButton}
+          <div className="h-full w-full overflow-hidden">{children}</div>
+        </WalletGate>
       </div>
     );
   }
 
   return (
     <div className={`g-${slug} relative min-h-screen bg-background`}>
-      {exitButton}
-      {children}
+      <WalletGate name={name}>
+        {exitButton}
+        {children}
+      </WalletGate>
     </div>
   );
 }
