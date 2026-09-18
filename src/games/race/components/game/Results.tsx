@@ -1,13 +1,11 @@
 import { formatTime } from "@/games/race/lib/hud";
 import { useGame } from "@/games/race/store/game";
-import { setRoomInUrl } from "@/games/race/lib/room";
 import { Button } from "@/components/ui/button";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 export function Results() {
-  const { results, mode, laps, backToMenu, backToLobby, startSingle } =
-    useGame();
+  const { results, laps, backToMenu, startSingle } = useGame();
   const you = results.findIndex((r) => r.isYou) + 1;
 
   return (
@@ -44,37 +42,18 @@ export function Results() {
           ))}
         </ul>
 
-        {mode === "online" && (
-          <p className="mt-3 text-center text-xs text-foreground/60">
-            Other drivers appear as they finish.
-          </p>
-        )}
-
         <div className="mt-7 space-y-3">
-          {mode === "online" ? (
-            <Button
-              type="button"
-              onClick={backToLobby}
-              className="h-auto w-full rounded-sm bg-primary py-4 font-display text-xl uppercase text-primary-foreground shadow-pop active:translate-y-1 active:shadow-none"
-            >
-              Return to Lobby
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={startSingle}
-              className="h-auto w-full rounded-sm bg-primary py-4 font-display text-xl uppercase text-primary-foreground shadow-pop active:translate-y-1 active:shadow-none"
-            >
-              Race Again
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={startSingle}
+            className="h-auto w-full rounded-sm bg-primary py-4 font-display text-xl uppercase text-primary-foreground shadow-pop active:translate-y-1 active:shadow-none"
+          >
+            Race Again
+          </Button>
           <Button
             variant="outline"
             type="button"
-            onClick={() => {
-              setRoomInUrl(null);
-              backToMenu();
-            }}
+            onClick={backToMenu}
             className="h-auto w-full rounded-sm border border-border bg-card/80 py-3 font-bold uppercase text-foreground"
           >
             Main Menu

@@ -38,7 +38,7 @@ export const GAMES: GameEntry[] = [
     slug: "race",
     path: "/games/race",
     name: "Nimiq Car Race",
-    tagline: "Race in 3D against competitive bots on a low-poly track.",
+    tagline: "Race solo in 3D against competitive bots on a low-poly track.",
     emoji: "🏎️",
     accent: "oklch(0.75 0.19 30)",
     cover: raceCover,

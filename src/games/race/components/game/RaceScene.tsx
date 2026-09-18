@@ -14,10 +14,10 @@ import {
 import { getTrack, gridPose, SAMPLES, trackCollide } from "@/games/race/lib/track";
 import { hud, resetHud } from "@/games/race/lib/hud";
 import { useGame, BOT_SKILLS, PLAYER_SPEED_SCALE } from "@/games/race/store/game";
-import { playerId, useNet, type NetState } from "@/games/race/net/NetContext";
 import { playSfx } from "@/lib/sfx";
 
 const COUNTDOWN = 3.2;
+const PLAYER_ID = "player";
 
 type Racer = {
   id: string;
@@ -76,26 +76,18 @@ const _target = new THREE.Vector3();
 
 export function RaceScene() {
   const laps = useGame((s) => s.laps);
-  const mode = useGame((s) => s.mode);
   const difficulty = useGame((s) => s.difficulty);
   const colorId = useGame((s) => s.colorId);
   const name = useGame((s) => s.name);
-  const net = useNet();
   const keys = useKeyboard();
-
-  const roster = net?.roster ?? [];
-  const mySlot = Math.max(
-    0,
-    roster.findIndex((p) => p.id === playerId),
-  );
 
   const player = useMemo(
     () =>
       makeRacer(
-        playerId,
+        PLAYER_ID,
         name,
         colorById(colorId),
-        mode === "online" ? mySlot : 0,
+        0,
         0,
         1,
       ),
@@ -104,7 +96,6 @@ export function RaceScene() {
   );
 
   const bots = useMemo(() => {
-    if (mode === "online") return [];
     const pool = CAR_COLORS.filter((c) => c.id !== colorId);
     const names = ["Rizky", "Bara", "Nadia"];
     const skills = BOT_SKILLS[useGame.getState().difficulty];
@@ -121,13 +112,11 @@ export function RaceScene() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const remoteRefs = useRef(new Map<string, THREE.Group>());
   const clock = useRef({ t: -COUNTDOWN, lapStart: 0, sendAcc: 0, done: false, started: false });
   const sfxAt = useRef({ collision: -10, engine: -10 });
-  const sentState = useRef({ at: -1, prog: -1 });
 
   useEffect(() => {
-    resetHud(laps, mode === "online" ? Math.max(roster.length, 1) : 4);
+    resetHud(laps, 4);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -272,33 +261,11 @@ export function RaceScene() {
       if (racing && b.finished === null && b.lap > laps) b.finished = c.t;
     }
 
-    // --- remote cars ---
-    if (net) {
-      const t = 1 - Math.exp(-12 * dt);
-      for (const [id, s] of net.statesRef.current) {
-        const g = remoteRefs.current.get(id);
-        if (!g) continue;
-        g.visible = true;
-        _target.set(s.x, 0, s.z);
-        if (g.position.distanceTo(_target) > 6) g.position.copy(_target);
-        else g.position.lerp(_target, t);
-        const dy = s.ry - g.rotation.y;
-        g.rotation.y += Math.atan2(Math.sin(dy), Math.cos(dy)) * t;
-      }
-    }
-
     // --- standings ---
     const field: { id: string; prog: number }[] = [
       { id: player.id, prog: player.prog },
       ...bots.map((b) => ({ id: b.id, prog: b.prog })),
     ];
-    if (net) {
-      for (const p of net.roster) {
-        if (p.id === playerId) continue;
-        const s = net.statesRef.current.get(p.id);
-        field.push({ id: p.id, prog: s?.prog ?? 0 });
-      }
-    }
     field.sort((a, b) => b.prog - a.prog);
     hud.position = field.findIndex((f) => f.id === player.id) + 1;
     hud.total = field.length;
@@ -313,7 +280,7 @@ export function RaceScene() {
       playSfx(hud.position === 1 ? "win" : "gameover");
       const store = useGame.getState();
       store.addResult({
-        id: playerId,
+        id: PLAYER_ID,
         name: player.name,
         color: player.color.body,
         time: c.t,
@@ -330,37 +297,7 @@ export function RaceScene() {
           isYou: false,
         });
       }
-      net?.send("finish", {
-        id: playerId,
-        name: player.name,
-        color: player.color.body,
-        time: c.t,
-      });
       store.finishRace();
-    }
-
-    // --- network send (throttled) ---
-    if (net) {
-      c.sendAcc += dt;
-      if (c.sendAcc >= 1 / 8) {
-        c.sendAcc = 0;
-        const prog = Math.round(player.prog * 1000) / 1000;
-        const moved = Math.abs(prog - sentState.current.prog) > 0.0005;
-        const stale = state.clock.elapsedTime - sentState.current.at > 1;
-        if (!document.hidden && (moved || stale)) {
-          sentState.current = { at: state.clock.elapsedTime, prog };
-          net.send("state", {
-            id: playerId,
-            name: player.name,
-            color: player.color.id,
-            x: Math.round(player.v.px * 100) / 100,
-            z: Math.round(player.v.pz * 100) / 100,
-            ry: Math.round(player.v.yaw * 100) / 100,
-            lap: player.lap,
-            prog,
-          } satisfies NetState);
-        }
-      }
     }
 
     // --- chase camera ---
@@ -380,8 +317,6 @@ export function RaceScene() {
     cam.fov += (targetFov - cam.fov) * Math.min(1, 3 * dt);
     cam.updateProjectionMatrix();
   });
-
-  const remotePlayers = (net?.roster ?? []).filter((p) => p.id !== playerId);
 
   return (
     <group>
@@ -405,21 +340,6 @@ export function RaceScene() {
         </group>
       ))}
 
-      {remotePlayers.map((p) => {
-        const col = colorById(p.color);
-        return (
-          <group
-            key={p.id}
-            visible={false}
-            ref={(g) => {
-              if (g) remoteRefs.current.set(p.id, g);
-              else remoteRefs.current.delete(p.id);
-            }}
-          >
-            <Car body={col.body} accent={col.accent} ghost />
-          </group>
-        );
-      })}
     </group>
   );
 }
