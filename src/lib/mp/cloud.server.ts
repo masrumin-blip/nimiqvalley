@@ -556,8 +556,15 @@ export async function joinQueue(
 }
 
 export async function leaveQueue(wallet: string, gameSlug: string) {
+  const { data } = await supabaseAdmin
+    .from("mp_queue")
+    .select("id, room_id")
+    .eq("game_slug", gameSlug)
+    .eq("wallet", wallet)
+    .maybeSingle();
   await supabaseAdmin.from("mp_queue").delete().eq("game_slug", gameSlug).eq("wallet", wallet);
-  return { ok: true };
+  const row = data as { room_id: string | null } | null;
+  return { ok: true, wasWaiting: Boolean(row) && !row?.room_id };
 }
 
 /**
