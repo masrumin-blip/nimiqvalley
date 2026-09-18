@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
+import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
+import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
   BOARD_B,
@@ -24,8 +29,8 @@ import {
   type Piece,
 } from "@/games/carrom/game/carrom";
 
-type Phase = "menu" | "rules" | "guide" | "aim" | "moving" | "board" | "won" | "lost";
-type Mode = "training" | "cpu";
+type Phase = "menu" | "rules" | "guide" | "aim" | "moving" | "board" | "won" | "lost" | "online";
+type Mode = "training" | "cpu" | "online";
 type Difficulty = "easy" | "normal" | "hard";
 type Side = "you" | "cpu";
 type PlayerColor = "white" | "orange";
@@ -286,7 +291,138 @@ export default function CarromGame() {
     setPhaseBoth("aim");
   }, [resetBoardState, setPhaseBoth]);
 
+  // ---- online play ----
+  const navigate = useNavigate();
+  const online = useOnlineRoom({
+    gameSlug: "carrom",
+    active: phase === "online" || mode === "online",
+    maxPlayers: 2,
+    settings: { freeTurn: true },
+  });
+  const room = online.room;
+  const rivalName = room?.players.find((p) => p.wallet !== online.wallet)?.name ?? "Rival";
+  const onlineResultOpen = mode === "online" && (phase === "won" || phase === "lost");
+
   const striker = () => piecesRef.current.find((p) => p.kind === "striker");
+
+  const sendShot = useCallback(
+    (x: number, vx: number, vy: number) => {
+      if (!room) return;
+      online.sendMove(room.turnNo, "shot", { x, vx, vy });
+    },
+    [online, room],
+  );
+
+  // Start the board as soon as both players are seated.
+  useEffect(() => {
+    if (room?.status === "playing" && (phase === "online" || phase === "menu")) {
+      startGame("online", difficulty);
+      setPhaseBoth("aim");
+    }
+  }, [room?.status, phase, startGame, difficulty, setPhaseBoth]);
+
+  // Replay the rival's shot, mirrored through the board centre.
+  const appliedShots = useRef(0);
+  useEffect(() => {
+    if (mode !== "online") return;
+    const fresh = online.moves.slice(appliedShots.current);
+    if (fresh.length === 0) return;
+    appliedShots.current = online.moves.length;
+    for (const rec of fresh) {
+      if (rec.wallet === online.wallet || rec.kind !== "shot") continue;
+      const s = striker();
+      if (!s) continue;
+      s.x = Math.min(Math.max(2 * CX - Number(rec.payload["x"]), STRIKER_MIN_X), STRIKER_MAX_X);
+      s.y = CPU_STRIKER_LINE_Y;
+      s.vx = -Number(rec.payload["vx"]);
+      s.vy = -Number(rec.payload["vy"]);
+      s.alive = true;
+      shotPocketedRef.current = [];
+      touchedRef.current = false;
+      turnRef.current = "cpu";
+      setTurn("cpu");
+      playSfx("flick", 0.7);
+      setPhaseBoth("moving");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online.moves, mode]);
+
+  useEffect(() => {
+    appliedShots.current = 0;
+  }, [room?.id]);
+
+  // Ten seconds per shot: an automatic stroke keeps both boards in sync.
+  useEffect(() => {
+    if (mode !== "online" || phase !== "aim" || turn !== "you") return;
+    const timer = setTimeout(() => {
+      if (phaseRef.current !== "aim" || turnRef.current !== "you") return;
+      const s = striker();
+      if (!s) return;
+      const shot = planCpuShot(
+        piecesRef.current,
+        youColorRef.current,
+        "easy",
+        queenPendingRef.current === "you",
+        STRIKER_LINE_Y,
+      );
+      if (!shot) return;
+      s.x = shot.strikerX;
+      s.y = STRIKER_LINE_Y;
+      s.vx = shot.vx;
+      s.vy = shot.vy;
+      sendShot(s.x, s.vx, s.vy);
+      shotPocketedRef.current = [];
+      touchedRef.current = false;
+      setShots((v) => v + 1);
+      playSfx("flick", 0.8);
+      setPhaseBoth("moving");
+    }, TURN_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [mode, phase, turn, setPhaseBoth, sendShot]);
+
+  // Publish the winner once the match ends.
+  const reportedRef = useRef(false);
+  useEffect(() => {
+    if (mode !== "online" || !room) return;
+    if (phase !== "won" && phase !== "lost") {
+      reportedRef.current = false;
+      return;
+    }
+    if (reportedRef.current) return;
+    reportedRef.current = true;
+    const rival = room.players.find((p) => p.wallet !== online.wallet)?.wallet ?? null;
+    online.finish(phase === "won" ? (online.wallet ?? null) : rival);
+  }, [mode, phase, room, online]);
+
+  const resultRows: ResultRow[] = (() => {
+    const mine = {
+      wallet: online.wallet ?? "you",
+      name: "You",
+      isYou: true,
+      points: match.you,
+      stats: [
+        { label: "Points", value: String(match.you) },
+        { label: "Boards", value: String(match.youBoards) },
+        { label: "Shots", value: String(shots) },
+        { label: "Pieces left", value: String(left) },
+      ],
+    };
+    const rival = {
+      wallet: "rival",
+      name: rivalName,
+      isYou: false,
+      points: match.cpu,
+      stats: [
+        { label: "Points", value: String(match.cpu) },
+        { label: "Boards", value: String(match.cpuBoards) },
+        { label: "Pieces left", value: String(cpuLeft) },
+      ],
+    };
+    return [mine, rival]
+      .sort((a, b) => b.points - a.points)
+      .map(({ wallet, name, isYou, stats }) => ({ wallet, name, isYou, stats }));
+  })();
+
 
   // ---- input ----
   const toGame = (e: React.PointerEvent) => {
@@ -354,6 +490,7 @@ export default function CarromGame() {
     const power = Math.min(dist / 170, 1) * MAX_POWER * 0.9;
     s.vx = (dx / dist) * power;
     s.vy = (dy / dist) * power;
+    if (modeRef.current === "online") sendShot(s.x, s.vx, s.vy);
     shotPocketedRef.current = [];
     touchedRef.current = false;
     setShots((v) => v + 1);
@@ -480,7 +617,7 @@ export default function CarromGame() {
       const ps = piecesRef.current;
       const s = striker();
       if (!s) return;
-      const vsCpu = modeRef.current === "cpu";
+      const vsCpu = modeRef.current !== "training";
       const shooter: Side = vsCpu ? turnRef.current : "you";
       const opponent: Side = shooter === "you" ? "cpu" : "you";
       const pocketed = shotPocketedRef.current;
@@ -614,7 +751,9 @@ export default function CarromGame() {
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      const dt = Math.min((now - last) / 1000, 0.033);
+      // Online runs a fixed timestep so both clients replay identical physics.
+      const dt =
+        modeRef.current === "online" ? 1 / 60 : Math.min((now - last) / 1000, 0.033);
       last = now;
 
       if (phaseRef.current === "moving" && !exitOpenRef.current) {
@@ -677,7 +816,11 @@ export default function CarromGame() {
   };
 
   const modeTitle =
-    mode === "training" ? "Training" : `VS CPU · ${DIFFICULTY[difficulty].label} · Board ${boardNo}`;
+    mode === "training"
+      ? "Training"
+      : mode === "online"
+        ? `Online · vs ${rivalName} · Board ${boardNo}`
+        : `VS CPU · ${DIFFICULTY[difficulty].label} · Board ${boardNo}`;
 
   return (
     <div
@@ -804,6 +947,15 @@ export default function CarromGame() {
                 </div>
               </div>
               <button
+                onClick={() => setPhaseBoth("online")}
+                className="rounded-2xl border border-neon-lime/50 bg-card/70 px-5 py-4 text-left transition hover:border-neon-lime hover:bg-card"
+              >
+                <span className="block text-xl font-bold text-foreground">Online</span>
+                <span className="block text-sm text-muted-foreground">
+                  Play a real rival: create a room, join a code, or challenge a friend.
+                </span>
+              </button>
+              <button
                 onClick={() => setPhaseBoth("rules")}
                 className="flex items-center justify-center gap-2 rounded-2xl border border-neon-amber/50 bg-card/60 px-5 py-4 transition hover:border-neon-amber hover:bg-card"
               >
@@ -815,6 +967,35 @@ export default function CarromGame() {
             </div>
           </Overlay>
         )}
+
+        {phase === "online" && (
+          <Overlay>
+            <h2 className="text-4xl font-black text-neon-lime">ONLINE MATCH</h2>
+            <p className="mt-2 max-w-sm text-center text-muted-foreground">
+              Take turns with a real rival. Ten seconds per shot.
+            </p>
+            <div className="mt-6 w-full max-w-sm">
+              <OnlinePanel
+                online={online}
+                maxPlayers={2}
+                onBack={() => setPhaseBoth("menu")}
+              />
+            </div>
+          </Overlay>
+        )}
+
+        <MatchResultDialog
+          open={onlineResultOpen}
+          title={phase === "won" ? "You win!" : `${rivalName} wins`}
+          subtitle="Final standings"
+          rows={resultRows}
+          onPlayAgain={() => {
+            online.leave.mutate();
+            setPhaseBoth("menu");
+          }}
+          onExit={() => navigate({ to: "/games" })}
+        />
+
 
         {phase === "rules" && (
           <Overlay>

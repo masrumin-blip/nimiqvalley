@@ -137,6 +137,186 @@ export type Database = {
         }
         Relationships: []
       }
+      mp_moves: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          room_id: string
+          turn_no: number
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          room_id: string
+          turn_no: number
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          room_id?: string
+          turn_no?: number
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_moves_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "mp_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_room_players: {
+        Row: {
+          id: string
+          joined_at: string
+          room_id: string
+          score: number
+          seat: number
+          stats: Json
+          status: string
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          room_id: string
+          score?: number
+          seat?: number
+          stats?: Json
+          status?: string
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          room_id?: string
+          score?: number
+          seat?: number
+          stats?: Json
+          status?: string
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_room_players_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "mp_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_rooms: {
+        Row: {
+          code: string | null
+          created_at: string
+          ends_at: string | null
+          game_slug: string
+          host_wallet: string
+          id: string
+          kind: string
+          max_players: number
+          settings: Json
+          started_at: string | null
+          status: string
+          turn_no: number
+          turn_started_at: string
+          turn_wallet: string | null
+          updated_at: string
+          winner_wallet: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          ends_at?: string | null
+          game_slug: string
+          host_wallet: string
+          id?: string
+          kind?: string
+          max_players?: number
+          settings?: Json
+          started_at?: string | null
+          status?: string
+          turn_no?: number
+          turn_started_at?: string
+          turn_wallet?: string | null
+          updated_at?: string
+          winner_wallet?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          ends_at?: string | null
+          game_slug?: string
+          host_wallet?: string
+          id?: string
+          kind?: string
+          max_players?: number
+          settings?: Json
+          started_at?: string | null
+          status?: string
+          turn_no?: number
+          turn_started_at?: string
+          turn_wallet?: string | null
+          updated_at?: string
+          winner_wallet?: string | null
+        }
+        Relationships: []
+      }
+      mp_ticks: {
+        Row: {
+          alive: boolean
+          dir: number
+          room_id: string
+          score: number
+          updated_at: string
+          wallet: string
+          x: number
+          y: number
+        }
+        Insert: {
+          alive?: boolean
+          dir?: number
+          room_id: string
+          score?: number
+          updated_at?: string
+          wallet: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          alive?: boolean
+          dir?: number
+          room_id?: string
+          score?: number
+          updated_at?: string
+          wallet?: string
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_ticks_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "mp_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
