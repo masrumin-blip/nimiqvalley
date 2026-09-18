@@ -29,6 +29,21 @@ export async function connectNimiq(): Promise<string> {
   return accounts[0];
 }
 
+/** Ask the wallet to sign a login challenge. Returns the signature. */
+export async function signNimiqMessage(message: string): Promise<string> {
+  const { init } = await import("@nimiq/mini-app-sdk");
+  const nimiq = (await init({ timeout: 5000 })) as unknown as {
+    signMessage?: (args: { message: string }) => Promise<unknown>;
+  };
+  if (typeof nimiq.signMessage !== "function")
+    throw new Error("This wallet cannot sign messages.");
+  const result = await nimiq.signMessage({ message });
+  if (typeof result === "string") return result;
+  const sig = (result as { signature?: string })?.signature;
+  if (typeof sig !== "string") throw new Error("The wallet did not return a signature.");
+  return sig;
+}
+
 /** Send NIM through the wallet approval dialog. Returns the transaction hash. */
 export async function sendNim(recipient: string, nimAmount: number): Promise<string> {
   const { init } = await import("@nimiq/mini-app-sdk");
