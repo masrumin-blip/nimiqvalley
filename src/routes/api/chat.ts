@@ -1,8 +1,14 @@
+import { createOpenAI } from "@ai-sdk/openai";
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
 import { getCharacter } from "@/lib/characters";
-import { createGriphubProvider, griphubModelId, GRIPHUB_MAX_TOKENS } from "@/lib/griphub.server";
+import {
+  createLovableAiGatewayRunIdFetch,
+  getLovableAiGatewayResponseHeaders,
+  getLovableAiGatewayRunId,
+  withLovableAiGatewayRunIdHeader,
+} from "@/lib/ai-gateway.server";
 
 type ChatRequestBody = { messages?: unknown; characterId?: unknown };
 
@@ -19,8 +25,8 @@ export const Route = createFileRoute("/api/chat")({
           return new Response("Unknown character", { status: 400 });
         }
 
-        const key = process.env["GRIPHUB_API_KEY"];
-        if (!key) return new Response("Missing GRIPHUB_API_KEY", { status: 500 });
+        const key = process.env["LOVABLE_API_KEY"];
+        if (!key) return new Response("Lovable AI is not configured.", { status: 500 });
 
         const { currentWallet } = await import("@/lib/session.server");
         const wallet = await currentWallet();
@@ -36,7 +42,17 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
-        const griphub = createGriphubProvider(key);
+        const initialRunId = getLovableAiGatewayRunId(request);
+        const runIdFetch = createLovableAiGatewayRunIdFetch(initialRunId);
+        const lovable = createOpenAI({
+          baseURL: "https://ai.gateway.lovable.dev/v1",
+          apiKey: key,
+          headers: {
+            "Lovable-API-Key": key,
+            "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+          },
+          fetch: runIdFetch.fetch,
+        });
 
         const system = [
           character.persona,
@@ -47,16 +63,34 @@ export const Route = createFileRoute("/api/chat")({
 
         try {
           const result = streamText({
-            model: griphub(griphubModelId()),
+            model: lovable.responses("openai/gpt-6-astra"),
             system,
             messages: await convertToModelMessages(messages as UIMessage[]),
-            maxOutputTokens: GRIPHUB_MAX_TOKENS,
+            maxRetries: 0,
             abortSignal: request.signal,
+            providerOptions: {
+              openai: {
+                forceReasoning: true,
+                reasoningEffort: "medium",
+                reasoningSummary: "auto",
+                store: false,
+                include: ["reasoning.encrypted_content"],
+              },
+            },
           });
 
-          return result.toUIMessageStreamResponse({
-            originalMessages: messages as UIMessage[],
-          });
+          return withLovableAiGatewayRunIdHeader(
+            result.toUIMessageStreamResponse({
+              originalMessages: messages as UIMessage[],
+              sendReasoning: true,
+              headers: getLovableAiGatewayResponseHeaders(undefined, {
+                ...(initialRunId ? { "X-Lovable-AIG-Run-ID": initialRunId } : {}),
+              }),
+              onError: (error) =>
+                error instanceof Error ? error.message : "Lovable AI could not answer this request.",
+            }),
+            runIdFetch,
+          );
         } catch (err) {
           if (err instanceof Error && err.name === "AbortError") {
             return new Response(null, { status: 499 });
@@ -65,7 +99,10 @@ export const Route = createFileRoute("/api/chat")({
             typeof (err as { statusCode?: number })?.statusCode === "number"
               ? (err as { statusCode: number }).statusCode
               : 502;
-          return new Response("Chat service error", { status });
+          return new Response(
+            err instanceof Error ? err.message : "Lovable AI could not answer this request.",
+            { status },
+          );
         }
       },
     },
