@@ -489,3 +489,152 @@ export async function finishRoom(wallet: string, id: string, winner: string | nu
     .eq("id", id);
   return { ok: true, by: wallet };
 }
+
+/* ---------------------------------------------------------------- */
+/* Matchmaking queue                                                  */
+/* ---------------------------------------------------------------- */
+
+import { QUEUE_WAIT_CAP_MS, type QueueState } from "./types";
+
+type QueueRow = {
+  id: string;
+  wallet: string;
+  game_slug: string;
+  max_players: number;
+  rank_hint: number;
+  settings: unknown;
+  room_id: string | null;
+  joined_at: string;
+};
+
+const QUEUE_COLUMNS = "id, wallet, game_slug, max_players, rank_hint, settings, room_id, joined_at";
+const STALE_MS = 90_000;
+
+/** Leaderboard value for this game, used as a rough skill hint. */
+async function rankHint(wallet: string, gameSlug: string) {
+  const { data } = await supabaseAdmin
+    .from("scores")
+    .select("value")
+    .eq("wallet", wallet)
+    .eq("game_slug", gameSlug)
+    .maybeSingle();
+  return Math.round(Number((data as { value?: number } | null)?.value ?? 0));
+}
+
+async function clearStale(gameSlug: string) {
+  const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+  await supabaseAdmin
+    .from("mp_queue")
+    .delete()
+    .eq("game_slug", gameSlug)
+    .is("room_id", null)
+    .lt("heartbeat_at", cutoff);
+}
+
+export async function joinQueue(
+  wallet: string,
+  gameSlug: string,
+  maxPlayers: number,
+  settings: Record<string, string | number | boolean>,
+) {
+  await clearStale(gameSlug);
+  const now = new Date().toISOString();
+  await supabaseAdmin.from("mp_queue").upsert(
+    {
+      game_slug: gameSlug,
+      wallet,
+      max_players: maxPlayers,
+      settings,
+      rank_hint: await rankHint(wallet, gameSlug),
+      room_id: null,
+      joined_at: now,
+      heartbeat_at: now,
+    },
+    { onConflict: "game_slug,wallet" },
+  );
+  return { ok: true };
+}
+
+export async function leaveQueue(wallet: string, gameSlug: string) {
+  await supabaseAdmin.from("mp_queue").delete().eq("game_slug", gameSlug).eq("wallet", wallet);
+  return { ok: true };
+}
+
+/**
+ * Heartbeat + pairing step.
+ * The player who has waited longest creates the room; the other one picks it
+ * up on its next poll, so a pair never ends up in two different rooms.
+ */
+export async function pollQueue(wallet: string, gameSlug: string): Promise<QueueState> {
+  await clearStale(gameSlug);
+  const now = Date.now();
+
+  const { data: mineRow } = await supabaseAdmin
+    .from("mp_queue")
+    .select(QUEUE_COLUMNS)
+    .eq("game_slug", gameSlug)
+    .eq("wallet", wallet)
+    .maybeSingle();
+  const mine = mineRow as QueueRow | null;
+  if (!mine) return { waiting: false, waitedMs: 0, queueSize: 0, room: null, suggestCpu: false };
+
+  // Someone already paired us up.
+  if (mine.room_id) {
+    const room = await getRoom(mine.room_id);
+    await leaveQueue(wallet, gameSlug);
+    return { waiting: false, waitedMs: 0, queueSize: 0, room, suggestCpu: false };
+  }
+
+  await supabaseAdmin
+    .from("mp_queue")
+    .update({ heartbeat_at: new Date().toISOString() })
+    .eq("id", mine.id);
+
+  const waitedMs = now - new Date(mine.joined_at).getTime();
+
+  const { data: others } = await supabaseAdmin
+    .from("mp_queue")
+    .select(QUEUE_COLUMNS)
+    .eq("game_slug", gameSlug)
+    .is("room_id", null)
+    .neq("wallet", wallet)
+    .eq("max_players", mine.max_players)
+    .order("joined_at", { ascending: true })
+    .limit(20);
+  const pool = (others ?? []) as QueueRow[];
+
+  // Rank window widens every 10 seconds and disappears after the wait cap.
+  const steps = Math.floor(waitedMs / 10_000);
+  const window = waitedMs >= QUEUE_WAIT_CAP_MS ? Infinity : 500 * (steps + 1);
+  const candidate = pool.find((row) => Math.abs(row.rank_hint - mine.rank_hint) <= window);
+
+  if (!candidate) {
+    return {
+      waiting: true,
+      waitedMs,
+      queueSize: pool.length + 1,
+      room: null,
+      suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
+    };
+  }
+
+  const candidateWaited = now - new Date(candidate.joined_at).getTime();
+  const iCreate = candidateWaited < waitedMs || (candidateWaited === waitedMs && wallet < candidate.wallet);
+  if (!iCreate) {
+    return {
+      waiting: true,
+      waitedMs,
+      queueSize: pool.length + 1,
+      room: null,
+      suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
+    };
+  }
+
+  const settings = (mine.settings as Record<string, string | number | boolean>) ?? {};
+  const created = await createRoom(wallet, gameSlug, "quick", mine.max_players, settings, null);
+  const row = await getRow(created.id);
+  const room = row ? await joinExisting(row, candidate.wallet) : created;
+  await supabaseAdmin.from("mp_queue").update({ room_id: room.id }).eq("id", candidate.id);
+  await leaveQueue(wallet, gameSlug);
+  return { waiting: false, waitedMs, queueSize: 0, room, suggestCpu: false };
+}
