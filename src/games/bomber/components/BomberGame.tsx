@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   BomberGame as Engine,
   H,
@@ -10,6 +11,12 @@ import {
 } from "./engine";
 import { playSound, primeAudio, type SoundName } from "./sound";
 import { Button } from "@/components/ui/button";
+import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
+import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
+import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
+import { TICK_POLL_MS } from "@/lib/mp/types";
+
+const BOMBER_ROUND_MS = 180_000;
 
 type Screen = "start" | "playing";
 
@@ -86,6 +93,35 @@ export default function BomberGame() {
   const [soundOn, setSoundOn] = useState(true);
   const [best, setBest] = useState(0);
 
+  /* ---------------- online battle ---------------- */
+  const navigate = useNavigate();
+  const [onlineMode, setOnlineMode] = useState(false);
+  const [lobbyOpen, setLobbyOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const seedRef = useRef(Math.floor(Math.random() * 1_000_000_000));
+  const seatRef = useRef(0);
+  const onlineRef = useRef(false);
+  const settings = useMemo(
+    () => ({ seed: seedRef.current, freeTurn: true }),
+    [],
+  );
+  const online = useOnlineRoom({
+    gameSlug: "bomber",
+    active: lobbyOpen || onlineMode,
+    maxPlayers: 4,
+    withTicks: true,
+    settings,
+  });
+  const room = online.room;
+  const seats = useMemo(
+    () => [...(room?.players ?? [])].sort((a, b) => a.seat - b.seat),
+    [room?.players],
+  );
+  const mySeat = Math.max(
+    0,
+    seats.findIndex((p) => p.wallet === online.wallet),
+  );
+
   useEffect(() => {
     try {
       const saved = Number(localStorage.getItem("nimiq-bomber-best") ?? 0);
@@ -111,13 +147,20 @@ export default function BomberGame() {
   }, []);
 
   const start = useCallback(
-    (nextMode: Mode, diff: Difficulty, players: number) => {
+    (
+      nextMode: Mode,
+      diff: Difficulty,
+      players: number,
+      net?: { seed: number; localId: number; names: string[] },
+    ) => {
       primeAudio();
       setMode(nextMode);
       setDifficulty(diff);
       setPlayerCount(players);
       keysRef.current.clear();
       touchRef.current = { x: 0, y: 0 };
+      onlineRef.current = Boolean(net);
+      seatRef.current = net?.localId ?? 0;
       engineRef.current = new Engine({
         mode: nextMode,
         difficulty: diff,
@@ -125,6 +168,9 @@ export default function BomberGame() {
         best: bestRef.current,
         onHud,
         sound,
+        ...(net
+          ? { online: true, seed: net.seed, localId: net.localId, names: net.names }
+          : {}),
       });
       setPaused(false);
       setConfirmExit(false);
