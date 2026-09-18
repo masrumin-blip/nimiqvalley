@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { usePlayer, usePlayerActions } from "@/hooks/usePlayer";
 import { shortWallet } from "@/lib/leaderboard";
+import { preferredWallet } from "@/lib/wallet";
 
 /** Wallet connect button / signed-in player chip with name editing and sign out. */
 export function PlayerBadge({ className = "" }: { className?: string }) {
@@ -29,7 +30,7 @@ export function PlayerBadge({ className = "" }: { className?: string }) {
         <Button
           size="sm"
           className="h-9 rounded-full px-4 text-xs font-bold"
-          onClick={() => connect.mutate()}
+          onClick={() => connect.mutate(preferredWallet())}
           disabled={connect.isPending}
         >
           <LogIn className="size-4" />

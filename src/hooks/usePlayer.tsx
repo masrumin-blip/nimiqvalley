@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { getPlayer, setDisplayName, signInWithWallet, signOutPlayer } from "@/lib/auth.functions";
 import type { PlayerInfo } from "@/lib/auth.functions";
-import { connectNimiq, signNimiqMessage } from "@/lib/wallet";
+import { connectWallet, preferredWallet, signLoginMessage, type WalletKind } from "@/lib/wallet";
 
 export function usePlayer() {
   const fetchPlayer = useServerFn(getPlayer);
@@ -22,13 +22,16 @@ export function usePlayerActions() {
   const rename = useServerFn(setDisplayName);
 
   const connect = useMutation({
-    mutationFn: async () => {
-      const address = await connectNimiq();
+    mutationFn: async (kind: WalletKind = preferredWallet()) => {
+      const address = await connectWallet(kind);
       const message = `NimiqValley login ${new Date().toISOString()}`;
-      const signature = await signNimiqMessage(message);
+      const signature = await signLoginMessage(kind, message, address);
       return signIn({ data: { address, message, signature } });
     },
-    onSuccess: (player) => queryClient.setQueryData(["player"], player),
+    onSuccess: (player) => {
+      queryClient.setQueryData(["player"], player);
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
   });
 
   const disconnect = useMutation({
@@ -36,6 +39,7 @@ export function usePlayerActions() {
     onSuccess: () => {
       queryClient.setQueryData(["player"], null);
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });
 

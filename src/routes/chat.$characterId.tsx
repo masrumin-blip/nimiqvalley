@@ -4,7 +4,11 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { ArrowLeft, ArrowUp } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { ChatCredits } from "@/components/ChatCredits";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCredits } from "@/hooks/useCredits";
+import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
 
 export const Route = createFileRoute("/chat/$characterId")({
@@ -48,6 +52,10 @@ function ChatRoom() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const { credits } = useCredits();
+  const left = totalChatsLeft(credits);
+
 
   const transport = useMemo(
     () =>
@@ -75,13 +83,19 @@ function ChatRoom() {
     transport,
     onError: (err) => {
       const m = err.message;
-      if (m.includes("401") || m.includes("403")) {
+      if (m.includes("402")) {
+        setError("You are out of chat messages. Buy a pack or claim the daily reward.");
+      } else if (m.includes("401") || m.includes("403")) {
         setError("The valley gate key was refused. Please check the chat service key.");
-      } else if (m.includes("402") || m.includes("429")) {
+      } else if (m.includes("429")) {
         setError("The valley is out of ink for now. Please try again in a moment.");
       } else {
         setError("The connection to the valley flickered. Please try again.");
       }
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
+    onFinish: () => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });
 
@@ -95,6 +109,10 @@ function ChatRoom() {
     event.preventDefault();
     const text = draft.trim();
     if (!text || isBusy) return;
+    if (left <= 0) {
+      setError("You are out of chat messages. Buy a pack or claim the daily reward.");
+      return;
+    }
     setError(null);
     setDraft("");
     void sendMessage({ text });
@@ -124,10 +142,11 @@ function ChatRoom() {
               </Link>
             </Button>
             <img src={character.image} alt="" className="size-11 rounded-full object-cover object-top ring-1 ring-ink/10 sm:hidden" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-lg font-semibold sm:hidden">{character.name}</h1>
               <p className="font-mono text-[9px] uppercase text-ember">{character.role}</p>
             </div>
+            <ChatCredits />
           </header>
 
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-5 sm:px-7 sm:py-8" aria-live="polite">

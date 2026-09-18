@@ -57,6 +57,109 @@ export async function sendNim(recipient: string, nimAmount: number): Promise<str
   return result;
 }
 
+/* ------------------------------------------------------------------ */
+/* Nimiq browser wallet (Hub) — used when the app is not inside Nimiq Pay */
+/* ------------------------------------------------------------------ */
+
+const APP_NAME = "NimiqValley";
+const HUB_URL = "https://hub.nimiq.com";
+
+async function hub() {
+  const mod = await import("@nimiq/hub-api");
+  const HubApi = (mod as unknown as { default: new (url: string) => unknown }).default;
+  return new HubApi(HUB_URL) as {
+    chooseAddress: (o: { appName: string }) => Promise<{ address: string }>;
+    signMessage: (o: {
+      appName: string;
+      message: string;
+      signer?: string;
+    }) => Promise<{ signer: string; signature: { toHex?: () => string } | string }>;
+    checkout: (o: {
+      appName: string;
+      recipient: string;
+      value: number;
+      extraData?: string;
+    }) => Promise<{ hash: string }>;
+  };
+}
+
+function toHex(signature: { toHex?: () => string } | string): string {
+  if (typeof signature === "string") return signature;
+  if (typeof signature?.toHex === "function") return signature.toHex();
+  return JSON.stringify(signature);
+}
+
+export type WalletKind = "pay" | "hub";
+
+/** Which wallet the app should talk to by default. */
+export function preferredWallet(): WalletKind {
+  return isInsideNimiqPay() ? "pay" : "hub";
+}
+
+/** Connect either Nimiq Pay or the Nimiq browser wallet and return the address. */
+export async function connectWallet(kind: WalletKind = preferredWallet()): Promise<string> {
+  if (kind === "pay") return connectNimiq();
+  const api = await hub();
+  const picked = await api.chooseAddress({ appName: APP_NAME });
+  if (!picked?.address) throw new Error("No Nimiq address was shared.");
+  return picked.address;
+}
+
+/** Sign the login challenge with either wallet. */
+export async function signLoginMessage(
+  kind: WalletKind,
+  message: string,
+  address: string,
+): Promise<string> {
+  if (kind === "pay") return signNimiqMessage(message);
+  const api = await hub();
+  const signed = await api.signMessage({ appName: APP_NAME, message, signer: address });
+  return toHex(signed.signature);
+}
+
+/** Pay NIM with either wallet. Returns the transaction hash. */
+export async function payNim(
+  recipient: string,
+  nimAmount: number,
+  note: string,
+  kind: WalletKind = preferredWallet(),
+): Promise<string> {
+  const value = Math.round(nimAmount * 100_000);
+  if (kind === "pay") {
+    const { init } = await import("@nimiq/mini-app-sdk");
+    const nimiq = (await init({ timeout: 5000 })) as unknown as {
+      sendBasicTransactionWithData?: (a: {
+        recipient: string;
+        value: number;
+        fee: number;
+        data: string;
+      }) => Promise<unknown>;
+      sendBasicTransaction: (a: {
+        recipient: string;
+        value: number;
+        fee: number;
+      }) => Promise<unknown>;
+    };
+    const result =
+      typeof nimiq.sendBasicTransactionWithData === "function"
+        ? await nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
+        : await nimiq.sendBasicTransaction({ recipient, value, fee: 0 });
+    if (typeof result === "string") return result;
+    const hash = (result as { hash?: string })?.hash;
+    if (typeof hash !== "string") throw new Error("The wallet did not confirm the payment.");
+    return hash;
+  }
+  const api = await hub();
+  const receipt = await api.checkout({
+    appName: APP_NAME,
+    recipient: recipient.replace(/\s+/g, ""),
+    value,
+    extraData: note,
+  });
+  if (!receipt?.hash) throw new Error("The wallet did not confirm the payment.");
+  return receipt.hash;
+}
+
 /** Connect an EVM wallet on Polygon and return the address. */
 export async function connectPolygon(): Promise<string> {
   const eth = getEthereum();

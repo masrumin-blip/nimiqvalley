@@ -61,3 +61,16 @@ export const HEXAMAN_ROUND_MS = 180_000;
 export const ROOM_POLL_MS = 1000;
 export const LOBBY_POLL_MS = 2000;
 export const TICK_POLL_MS = 260;
+
+/** Matchmaking queue tuning. */
+export const QUEUE_POLL_MS = 1500;
+/** How long a player waits before being offered a CPU match instead. */
+export const QUEUE_WAIT_CAP_MS = 60_000;
+
+export interface QueueState {
+  waiting: boolean;
+  waitedMs: number;
+  queueSize: number;
+  room: RoomState | null;
+  suggestCpu: boolean;
+}

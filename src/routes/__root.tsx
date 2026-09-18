@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { GlobalClickSfx } from "../components/GlobalClickSfx";
 import { AppPreloader } from "../components/AppPreloader";
+import { LoginGate } from "../components/LoginGate";
 
 function NotFoundComponent() {
   return (
@@ -128,8 +129,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <GlobalClickSfx />
       <AppPreloader>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <LoginGate>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </LoginGate>
       </AppPreloader>
     </QueryClientProvider>
   );

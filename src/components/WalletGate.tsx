@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { usePlayer, usePlayerActions } from "@/hooks/usePlayer";
+import { preferredWallet } from "@/lib/wallet";
 
 /** Shows the children only when a Nimiq wallet is connected. */
 export function WalletGate({ name, children }: { name: string; children: ReactNode }) {
@@ -28,7 +29,7 @@ export function WalletGate({ name, children }: { name: string; children: ReactNo
           </p>
           <Button
             className="mt-5 w-full rounded-full font-bold"
-            onClick={() => connect.mutate()}
+            onClick={() => connect.mutate(preferredWallet())}
             disabled={connect.isPending}
           >
             <LogIn className="size-4" />

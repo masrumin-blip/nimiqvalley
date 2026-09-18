@@ -3,6 +3,8 @@ import { Loader2, Swords, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useCredits, useCreditActions } from "@/hooks/useCredits";
+import { ROOM_COST_NIM } from "@/lib/credits";
 import type { OnlineRoom } from "./useOnlineRoom";
 
 interface Props {
@@ -18,6 +20,9 @@ interface Props {
 /** Shared lobby UI: create a room, join by code, or challenge an Arena friend. */
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
+  const { credits } = useCredits();
+  const { buyRooms } = useCreditActions();
+  const rooms = credits?.roomCredits ?? 0;
   const room = online.room;
   const invites = online.lobby?.invites ?? [];
   const friends = online.lobby?.friends ?? [];
@@ -83,16 +88,74 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
     );
   }
 
+  if (online.queueing) {
+    const waited = Math.floor((online.queue?.waitedMs ?? 0) / 1000);
+    return (
+      <div className="space-y-3 text-center">
+        <Loader2 className="mx-auto size-6 animate-spin text-primary" />
+        <p className="text-sm">Searching for an opponent… {waited}s</p>
+        <p className="text-xs text-muted-foreground">
+          {online.queue?.queueSize ?? 1} player(s) in the queue. The skill range widens every 10
+          seconds.
+        </p>
+        {online.queue?.suggestCpu ? (
+          <p className="text-xs text-muted-foreground">
+            Nobody nearby yet — try a private room or play the CPU.
+          </p>
+        ) : null}
+        <Button variant="outline" className="w-full" onClick={() => online.cancelQuick.mutate()}>
+          Cancel search
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <Button className="w-full" disabled={busy} onClick={() => online.openRoom.mutate()}>
+      <Button
+        className="w-full"
+        disabled={busy || online.startQuick.isPending}
+        onClick={() => online.startQuick.mutate()}
+      >
+        <Swords className="mr-2 size-4" />
+        Quick match (free)
+      </Button>
+
+      <Button
+        variant="secondary"
+        className="w-full"
+        disabled={busy}
+        onClick={() => online.openRoom.mutate()}
+      >
         {online.openRoom.isPending ? (
           <Loader2 className="mr-2 size-4 animate-spin" />
         ) : (
           <Users className="mr-2 size-4" />
         )}
-        Create room ({maxPlayers} players)
+        Create room ({maxPlayers} players) — {ROOM_COST_NIM} NIM
       </Button>
+      <p className="-mt-2 text-center text-xs text-muted-foreground">
+        {rooms} room pass(es) left. Joining a room is always free.
+      </p>
+      {rooms <= 0 ? (
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={buyRooms.isPending}
+          onClick={() => buyRooms.mutate(1)}
+        >
+          {buyRooms.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Pay {ROOM_COST_NIM} NIM for 1 room pass
+        </Button>
+      ) : null}
+      {buyRooms.isError ? (
+        <p className="text-center text-xs text-destructive">
+          {(buyRooms.error as Error).message}
+        </p>
+      ) : null}
+
+
+
 
       <div className="flex gap-2">
         <Input

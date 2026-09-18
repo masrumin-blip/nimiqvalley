@@ -12,3 +12,6 @@
 - [x] Nimiq Soccer online multiplayer (quick match, room code, friend challenge, 10s turn timer).
 - [x] Online multiplayer for Checkers, Carrom, and Hexaman (no player-vs-player collision; last runner standing ends the Hexaman round with a stats popup).
 - [x] Automatic game achievement badges on Arena Chat profiles.
+- [x] Preload all games at boot, wallet login gate (Nimiq Pay + browser wallet), English-only UI.
+- [x] NIM payments: chat packs, 25 NIM room passes, daily X-visit reward.
+- [x] Shared matchmaking queue with widening skill window and 60s CPU suggestion.
