@@ -472,6 +472,45 @@ export class BomberGame {
     if (bomb) bomb.timer = 0;
   }
 
+  /** Online: apply a remote seat's streamed position/state. */
+  setRemoteState(id: number, x: number, y: number, facing: number, alive: boolean, score: number) {
+    const b = this.bombers[id];
+    if (!b || id === this.localId) return;
+    b.x = x;
+    b.y = y;
+    b.facing = facing;
+    b.score = score;
+    if (!alive && b.alive) {
+      b.alive = false;
+      b.lives = 0;
+    }
+  }
+
+  /** Online: a remote player dropped a bomb. */
+  remoteBomb(id: number, cx: number, cy: number, range: number, remote: boolean) {
+    if (id === this.localId) return;
+    if (this.bombs.some((x) => x.cx === cx && x.cy === cy)) return;
+    this.bombs.push({
+      cx,
+      cy,
+      timer: FUSE,
+      range,
+      remote,
+      owner: id,
+      slide: null,
+      px: cx * TILE + TILE / 2,
+      py: cy * TILE + TILE / 2,
+    });
+    this.sound("place");
+  }
+
+  /** Online: a remote player triggered their detonator. */
+  remoteDetonate(id: number) {
+    if (id === this.localId) return;
+    const bomb = this.bombs.find((x) => x.owner === id && x.remote);
+    if (bomb) bomb.timer = 0;
+  }
+
   update(dtRaw: number) {
     if (this.paused || this.status !== "playing") return;
     const dt = Math.min(dtRaw, 0.05);
@@ -481,6 +520,8 @@ export class BomberGame {
     for (const b of this.bombers) {
       if (!b.alive) continue;
       if (b.invuln > 0) b.invuln -= dt;
+      // Online: remote seats are positioned by their own client's ticks.
+      if (this.online && b.id !== this.localId) continue;
       if (b.cpu) this.thinkCpu(b, dt);
       this.moveBomber(b, dt);
     }
@@ -947,6 +988,8 @@ export class BomberGame {
 
     for (const b of this.bombers) {
       if (!b.alive || b.invuln > 0) continue;
+      // Online: each client is the authority for its own bomber only.
+      if (this.online && b.id !== this.localId) continue;
       const cx = Math.floor(b.x / TILE);
       const cy = Math.floor(b.y / TILE);
       if (this.flames.some((f) => f.cx === cx && f.cy === cy)) this.hurt(b);
@@ -969,7 +1012,13 @@ export class BomberGame {
     if (alive.length === 1) {
       const last = alive[0]!;
       this.winner = last.name;
-      this.status = this.mode === "cpu" && last.cpu ? "lost" : "won";
+      this.status = this.online
+        ? last.id === this.localId
+          ? "won"
+          : "lost"
+        : this.mode === "cpu" && last.cpu
+          ? "lost"
+          : "won";
       last.score += 500;
       this.sound(this.status === "won" ? "win" : "hurt");
       this.saveBest();
