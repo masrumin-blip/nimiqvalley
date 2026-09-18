@@ -7,7 +7,9 @@ function sessionConfig() {
     password: process.env["SESSION_SECRET"]!,
     name: "nimiqvalley-player",
     maxAge: 60 * 60 * 24 * 60,
-    cookie: { httpOnly: true, sameSite: "lax" as const, secure: true, path: "/" },
+    // The app runs inside the Lovable preview iframe (cross-site), so the
+    // session cookie must be SameSite=None; Secure to be stored at all.
+    cookie: { httpOnly: true, sameSite: "none" as const, secure: true, path: "/" },
   };
 }
 
