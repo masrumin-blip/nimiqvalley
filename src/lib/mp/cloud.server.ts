@@ -26,6 +26,7 @@ type RoomRow = {
   started_at: string | null;
   ends_at: string | null;
   winner_wallet: string | null;
+  stake: number | string | null;
 };
 
 type PlayerRow = {
@@ -37,7 +38,7 @@ type PlayerRow = {
 };
 
 const COLUMNS =
-  "id, game_slug, code, kind, status, host_wallet, max_players, settings, turn_no, turn_wallet, turn_started_at, started_at, ends_at, winner_wallet";
+  "id, game_slug, code, kind, status, host_wallet, max_players, settings, turn_no, turn_wallet, turn_started_at, started_at, ends_at, winner_wallet, stake";
 
 function randomCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -86,6 +87,7 @@ async function toStates(rows: RoomRow[]): Promise<RoomState[]> {
     startedAt: row.started_at,
     endsAt: row.ends_at,
     winnerWallet: row.winner_wallet,
+    stake: Number(row.stake ?? 0),
     players: (byRoom.get(row.id) ?? []).map(
       (p): RoomPlayer => ({
         wallet: p.wallet,

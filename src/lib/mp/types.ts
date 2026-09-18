@@ -28,6 +28,8 @@ export interface RoomState {
   startedAt: string | null;
   endsAt: string | null;
   winnerWallet: string | null;
+  /** NIM staked per player (0 for casual/private rooms). */
+  stake: number;
   players: RoomPlayer[];
 }
 
