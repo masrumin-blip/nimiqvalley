@@ -260,7 +260,7 @@ export class BomberGame {
       for (let x = 1; x < COLS - 1; x++) {
         if (this.grid[y]![x] !== 0) continue;
         if (safe.has(`${x},${y}`)) continue;
-        if (Math.random() < blockRatio) this.grid[y]![x] = 2;
+        if (this.rnd() < blockRatio) this.grid[y]![x] = 2;
       }
     }
 
@@ -268,7 +268,7 @@ export class BomberGame {
     for (let y = 1; y < ROWS - 1; y++)
       for (let x = 1; x < COLS - 1; x++)
         if (this.grid[y]![x] === 2) soft.push([x, y]);
-    shuffle(soft);
+    shuffle(soft, this.rnd);
     const pool: PowerType[] = [
       "fire",
       "fire",
@@ -284,7 +284,7 @@ export class BomberGame {
       "remote",
       "vest",
     ];
-    shuffle(pool);
+    shuffle(pool, this.rnd);
     this.hidden = new Map();
     pool.slice(0, Math.min(pool.length, soft.length)).forEach((type, i) => {
       this.hidden.set(`${soft[i]![0]},${soft[i]![1]}`, type);
@@ -292,13 +292,13 @@ export class BomberGame {
 
     // Bombers
     this.bombers = [];
-    const names = this.mode === "cpu" ? CPU_NAMES : BOMBER_NAMES;
-    const humans = this.mode === "multi" ? this.players : 1;
+    const names = this.seatNames ?? (this.mode === "cpu" ? CPU_NAMES : BOMBER_NAMES);
+    const humans = this.online || this.mode === "multi" ? this.players : 1;
     for (let i = 0; i < count; i++) {
       const [cx, cy] = CORNERS[i]!;
       this.bombers.push({
         id: i,
-        name: names[i]!,
+        name: names[i] ?? BOMBER_NAMES[i] ?? `P${i + 1}`,
         skin: BOMBER_SKINS[i]!,
         cpu: i >= humans,
         x: cx * TILE + TILE / 2,
@@ -331,7 +331,7 @@ export class BomberGame {
       for (let y = 1; y < ROWS - 1; y++)
         for (let x = 1; x < COLS - 1; x++)
           if (this.grid[y]![x] === 0 && x + y > 6) spots.push([x, y]);
-      shuffle(spots);
+      shuffle(spots, this.rnd);
       for (let i = 0; i < cfg.enemies && i < spots.length; i++) {
         const [x, y] = spots[i]!;
         this.enemies.push({
@@ -1387,9 +1387,19 @@ function itemColor(t: PowerType) {
   }
 }
 
-function shuffle<T>(arr: T[]) {
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle<T>(arr: T[], rnd: () => number = Math.random) {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rnd() * (i + 1));
     [arr[i], arr[j]] = [arr[j]!, arr[i]!];
   }
 }
