@@ -62,11 +62,23 @@ export const createRoom = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
-    const { spendKey, spendRoom } = await import("./credits.server");
-    await spendKey(wallet);
-    await spendRoom(wallet);
+    const { spendRoomEntry, refundRoomEntry } = await import("./credits.server");
+    const entry = await spendRoomEntry(wallet);
     const cloud = await import("./mp/cloud.server");
-    return cloud.createRoom(wallet, data.gameSlug, "room", data.maxPlayers, data.settings, null);
+    try {
+      return await cloud.createRoom(
+        wallet,
+        data.gameSlug,
+        "room",
+        data.maxPlayers,
+        data.settings,
+        null,
+        entry,
+      );
+    } catch (error) {
+      await refundRoomEntry(wallet, entry);
+      throw error as Error;
+    }
   });
 
 export const joinQueue = createServerFn({ method: "POST" })
