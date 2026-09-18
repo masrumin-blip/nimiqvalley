@@ -143,6 +143,7 @@ async function rpc<T>(method: string, params: unknown[]): Promise<T | null> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { result?: { data?: T } & T };
