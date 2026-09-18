@@ -19,6 +19,15 @@ function isWalletError(value: unknown): value is WalletError {
   return Boolean(value && typeof value === "object" && "error" in value);
 }
 
+/** Turn wallet provider errors into friendly English messages. */
+function walletErrorMessage(err: WalletError): string {
+  const { type, message } = err.error;
+  if (/permissiondenied|denied|reject/i.test(`${type} ${message}`)) {
+    return "You declined the wallet request.";
+  }
+  return message || "The wallet request failed.";
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -45,7 +54,7 @@ export async function connectNimiq(): Promise<string> {
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
   const accounts = (await nimiq.listAccounts()) as unknown;
-  if (isWalletError(accounts)) throw new Error(accounts.error.message);
+  if (isWalletError(accounts)) throw new Error(walletErrorMessage(accounts));
   if (!Array.isArray(accounts) || typeof accounts[0] !== "string")
     throw new Error("No Nimiq address was shared.");
   return accounts[0];
@@ -56,7 +65,7 @@ export async function signNimiqMessage(message: string): Promise<LoginSignature>
   const { init } = await import("@nimiq/mini-app-sdk");
   const nimiq = await init({ timeout: 5000 });
   const result = (await nimiq.sign(message)) as unknown;
-  if (isWalletError(result)) throw new Error(result.error.message);
+  if (isWalletError(result)) throw new Error(walletErrorMessage(result));
   if (
     !result ||
     typeof result !== "object" ||
@@ -78,7 +87,7 @@ export async function sendNim(recipient: string, nimAmount: number): Promise<str
     value: Math.round(nimAmount * 100_000),
     fee: 0,
   })) as unknown;
-  if (isWalletError(result)) throw new Error(result.error.message);
+  if (isWalletError(result)) throw new Error(walletErrorMessage(result));
   if (typeof result !== "string") throw new Error("The wallet did not confirm the transaction.");
   return transactionHash(result);
 }
@@ -167,7 +176,7 @@ export async function payNim(
       typeof nimiq.sendBasicTransactionWithData === "function"
         ? await nimiq.sendBasicTransactionWithData({ recipient, value, fee: 0, data: note })
         : await nimiq.sendBasicTransaction({ recipient, value, fee: 0 });
-    if (isWalletError(result)) throw new Error(result.error.message);
+    if (isWalletError(result)) throw new Error(walletErrorMessage(result));
     if (typeof result !== "string") throw new Error("The wallet did not confirm the payment.");
     return transactionHash(result);
   }
