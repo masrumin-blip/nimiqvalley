@@ -21,7 +21,7 @@ interface Props {
 export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }: Props) {
   const [code, setCode] = useState("");
   const { credits } = useCredits();
-  const { buyRooms, buyKeys } = useCreditActions();
+  const { buyRooms, buyKeys, phase } = useCreditActions();
   const rooms = credits?.roomCredits ?? 0;
   const keys = credits?.matchKeys ?? 0;
   const room = online.room;
@@ -177,6 +177,13 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
       {buyRooms.isError ? (
         <p className="text-center text-xs text-destructive">
           {(buyRooms.error as Error).message}
+        </p>
+      ) : null}
+      {buyKeys.isPending || buyRooms.isPending ? (
+        <p className="text-center text-xs text-muted-foreground">
+          {phase === "confirming"
+            ? "Confirming payment on the Nimiq network…"
+            : "Approve the payment in your wallet…"}
         </p>
       ) : null}
 
