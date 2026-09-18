@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as VillageRouteImport } from './routes/village'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatCharacterIdRouteImport } from './routes/chat.$characterId'
 import { Route as GamesIndexRouteImport } from './routes/games.index'
@@ -50,6 +51,11 @@ const LeaderboardRoute = LeaderboardRouteImport.update({
 const VillageRoute = VillageRouteImport.update({
   id: '/village',
   path: '/village',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/leaderboard'
     | '/village'
+    | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
     | '/games/carrom'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/leaderboard'
     | '/village'
+    | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
     | '/games/carrom'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/leaderboard'
     | '/village'
+    | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
     | '/games/carrom'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   LeaderboardRoute: typeof LeaderboardRoute
   VillageRoute: typeof VillageRoute
+  ApiChatRoute: typeof ApiChatRoute
   ChatCharacterIdRoute: typeof ChatCharacterIdRoute
   GamesBomberRoute: typeof GamesBomberRoute
   GamesCarromRoute: typeof GamesCarromRoute
@@ -344,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/village'
       fullPath: '/village'
       preLoaderRoute: typeof VillageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat/': {
@@ -480,6 +500,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   LeaderboardRoute: LeaderboardRoute,
   VillageRoute: VillageRoute,
+  ApiChatRoute: ApiChatRoute,
   ChatCharacterIdRoute: ChatCharacterIdRoute,
   GamesBomberRoute: GamesBomberRoute,
   GamesCarromRoute: GamesCarromRoute,
