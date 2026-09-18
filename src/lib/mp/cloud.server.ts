@@ -268,6 +268,7 @@ export async function abandonAll(
       "id",
       rows.map((r) => r.id),
     );
+  return refunds;
 }
 
 async function addPlayer(roomId: string, wallet: string, seat: number, status: string) {
