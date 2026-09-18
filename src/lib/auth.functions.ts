@@ -46,7 +46,7 @@ export const createWalletChallenge = createServerFn({ method: "POST" })
 /** Store the connected wallet in an httpOnly session cookie and upsert its profile. */
 export const signInWithWallet = createServerFn({ method: "POST" })
   .inputValidator((data) => signInSchema.parse(data))
-  .handler(async ({ data }): Promise<PlayerInfo> => {
+  .handler(async ({ data }): Promise<{ wallet: string; displayName: string | null; token: string }> => {
     const wallet = data.address.toUpperCase();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { playerSession } = await import("./session.server");
