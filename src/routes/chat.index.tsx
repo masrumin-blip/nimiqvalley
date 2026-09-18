@@ -82,7 +82,7 @@ function ChatHome() {
           ))}
         </section>
         <p className="pt-6 text-center font-mono text-[9px] uppercase text-ink/35">
-          local conversations · backend not connected
+          live ai companions · chats are not stored
         </p>
       </div>
     </main>
