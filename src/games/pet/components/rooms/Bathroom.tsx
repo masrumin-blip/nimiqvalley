@@ -67,7 +67,7 @@ export function Bathroom() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
         ref={areaRef}
         onPointerDown={(e) => {
@@ -75,10 +75,10 @@ export function Bathroom() {
           addBubble(e.clientX, e.clientY);
         }}
         onPointerMove={(e) => onMove(e.clientX, e.clientY)}
-        className="relative flex flex-1 touch-none items-end justify-center overflow-hidden rounded-3xl"
+        className="relative flex min-h-0 flex-1 touch-none items-end justify-center overflow-hidden rounded-2xl sm:rounded-3xl"
         style={{ cursor: "grab" }}
       >
-        <div className="absolute inset-x-6 bottom-4 h-24 rounded-[3rem] border-4 border-white/70 bg-[var(--room-tub)] shadow-inner" />
+        <div className="absolute inset-x-6 bottom-3 h-20 rounded-[3rem] border-4 border-white/70 bg-[var(--room-tub)] shadow-inner sm:bottom-4 sm:h-24" />
 
         {showering && (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
@@ -108,7 +108,7 @@ export function Bathroom() {
           washing={scrubbing || showering}
           cleanSparkle={cleanSparkle}
           onTap={() => sfx.giggle()}
-          className="relative z-10 mb-12 h-52 w-52 sm:h-64 sm:w-64"
+          className="relative z-10 mb-8 h-44 w-44 sm:mb-12 sm:h-64 sm:w-64"
         />
 
         {bubbles.map((b) => (
@@ -126,16 +126,16 @@ export function Bathroom() {
         ))}
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/85 p-3 backdrop-blur sm:flex-row sm:items-center">
+      <div className="mt-2 flex shrink-0 flex-col gap-2 rounded-2xl border border-border/60 bg-card/85 p-2.5 backdrop-blur sm:mt-3 sm:flex-row sm:items-center sm:rounded-3xl sm:p-3">
         <div className="flex-1">
-          <p className="text-sm font-semibold">🧼 Scrub with soap</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs font-semibold sm:text-sm">🧼 Scrub with soap</p>
+          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
             Press and drag across your pet to work up a lather. Dirt left: {Math.round(state.dirt)}%
           </p>
         </div>
         <button
           onClick={doRinse}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow transition hover:brightness-110 active:scale-95"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:brightness-110 active:scale-95 sm:px-5 sm:py-3"
         >
           <ShowerHead className="size-4" /> Rinse with shower
         </button>

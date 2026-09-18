@@ -67,16 +67,16 @@ function LivingRoom() {
 function GameShell() {
   const { state, toggleMute, reset, flashText } = useGame();
   const [room, setRoom] = useState<RoomId>("home");
-  const active = ROOMS.find((r) => r.id === room)!;
+  const active = ROOMS.find((r) => r.id === room) ?? ROOMS[0];
 
   return (
     <main
-      className="h-full w-full overflow-hidden px-2 pb-2 pt-2 transition-colors duration-500 sm:px-6 sm:pb-4"
-      style={{ background: active.bg }}
+      className="h-full w-full overflow-hidden px-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2 transition-colors duration-500 sm:px-6 sm:pb-4"
+      style={{ background: active?.bg }}
     >
       <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-        <header className="mb-2 flex items-center gap-2 pl-10">
-          <h1 className="truncate font-display text-xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+        <header className="mb-1.5 flex items-center gap-2 pl-12">
+          <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-foreground sm:text-3xl">
             {state.name}
           </h1>
           <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 shadow-sm sm:text-sm">
@@ -100,9 +100,9 @@ function GameShell() {
           </button>
         </header>
 
-        <StatBars className="mb-2" />
+        <StatBars className="mb-1.5" />
 
-        <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/25 p-2.5 shadow-lg backdrop-blur-sm sm:rounded-[2rem] sm:p-3">
+        <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/25 p-2 shadow-lg backdrop-blur-sm sm:rounded-[2rem] sm:p-3">
           {flashText && (
             <div
               className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background shadow-lg"
@@ -119,7 +119,7 @@ function GameShell() {
           {room === "shop" && <Shop />}
         </section>
 
-        <nav className="mt-2 grid shrink-0 grid-cols-6 gap-1 rounded-3xl border border-border/60 bg-card/90 p-1.5 shadow-lg backdrop-blur sm:gap-1.5 sm:p-2">
+        <nav className="mt-1.5 grid shrink-0 grid-cols-6 gap-1 rounded-2xl border border-border/60 bg-card/90 p-1 shadow-lg backdrop-blur sm:gap-1.5 sm:rounded-3xl sm:p-2">
           {ROOMS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -128,14 +128,14 @@ function GameShell() {
                 sfx.pop();
               }}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-semibold transition sm:text-xs",
+                "flex min-w-0 flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[9px] font-semibold transition sm:gap-1 sm:rounded-2xl sm:px-1 sm:py-2 sm:text-xs",
                 room === id
                   ? "bg-primary text-primary-foreground shadow"
                   : "text-muted-foreground hover:bg-accent",
               )}
             >
-              <Icon className="size-5" />
-              {label}
+              <Icon className="size-4 sm:size-5" />
+              <span className="max-w-full truncate">{label}</span>
             </button>
           ))}
         </nav>
