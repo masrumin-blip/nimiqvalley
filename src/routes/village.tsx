@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePlayer } from "@/hooks/usePlayer";
 import VillageCanvas from "@/components/VillageCanvas";
 import Joystick from "@/components/Joystick";
 import GameStage from "@/components/GameStage";
@@ -9,7 +10,7 @@ import SceneryView from "@/components/SceneryView";
 import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
-import { connectNimiq, connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
+import { connectPolygon, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
 import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForUsd } from "@/lib/tiers";
 import type { Neighbor, RestSpot } from "@/lib/village";
 
@@ -36,6 +37,7 @@ export const Route = createFileRoute("/village")({
 });
 
 function VillagePage() {
+  const { player } = usePlayer();
   const moveRef = useRef({ x: 0, y: 0 });
   const [nimAddress, setNimAddress] = useState<string | null>(null);
   const [evmAddress, setEvmAddress] = useState<string | null>(null);
@@ -84,8 +86,6 @@ function VillagePage() {
   const realHouseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
   const charTier = demo ? (TIERS[demoTier] ?? realCharTier) : realCharTier;
   const houseTier = demo ? (TIERS[demoHouseTier] ?? realHouseTier) : realHouseTier;
-  const charIndex = TIERS.findIndex((t) => t.id === charTier.id);
-  const houseIndex = TIERS.findIndex((t) => t.id === houseTier.id);
 
   const onNearbyChange = useCallback((n: Neighbor | null) => {
     setNearby(n);
@@ -100,26 +100,26 @@ function VillagePage() {
     setActiveViewpoint(null);
   }, []);
 
-  const handleConnectNimiq = async () => {
-    setBusy(true);
-    setStatus(null);
-    try {
-      setNimAddress(await connectNimiq());
-      // In Nimiq Pay the Ethereum provider is bundled alongside the Nimiq provider,
-      // so we automatically connect Polygon USDT after the Nimiq wallet is approved.
-      if (isInsideNimiqPay() && getEthereum()) {
-        try {
-          setEvmAddress(await connectPolygon());
-        } catch (err) {
-          setStatus(err instanceof Error ? err.message : "Could not connect the Polygon wallet.");
-        }
-      }
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Could not connect the Nimiq wallet.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // The player already signed in with their wallet at the start of the app,
+  // so reuse that address instead of asking for another connection.
+  useEffect(() => {
+    if (player?.wallet) setNimAddress(player.wallet);
+  }, [player?.wallet]);
+
+  // Inside Nimiq Pay the Polygon provider comes bundled, so read USDT silently.
+  useEffect(() => {
+    if (!nimAddress || evmAddress) return;
+    if (!isInsideNimiqPay() || !getEthereum()) return;
+    let cancelled = false;
+    void connectPolygon()
+      .then((addr) => {
+        if (!cancelled) setEvmAddress(addr);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [nimAddress, evmAddress]);
 
   const amountNum = Number(amount);
   const wouldLeave = nim - (Number.isFinite(amountNum) ? amountNum : 0);
@@ -154,7 +154,6 @@ function VillagePage() {
     }
   };
 
-  const connected = Boolean(nimAddress || evmAddress) || demo;
 
   return (
     <GameStage>
@@ -181,127 +180,87 @@ function VillagePage() {
       </div>
 
 
-      {/* Status HUD — always on top, same in demo and real mode */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 p-2">
-        <div className="pointer-events-auto mx-auto w-full max-w-md rounded-2xl border border-border/60 bg-card/90 px-3 py-2 shadow-lg backdrop-blur">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-muted/50 px-2.5 py-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* Status panel — original layout, moved to the top-left and scaled to 60% */}
+      <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.6] p-3">
+        <div className="pointer-events-auto w-[430px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Villager
               </p>
-              <p className="truncate text-sm font-bold text-card-foreground">
-                {charTier.characterName}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="text-sm font-semibold text-card-foreground">{charTier.characterName}</p>
+              <p className="text-xs text-muted-foreground">
                 {demo
                   ? `Demo · ${formatUsd(nimUsd)}`
                   : nimAddress
                     ? `${formatNim(nim)} · ${formatUsd(nimUsd)}`
-                    : "Wallet not connected"}
+                    : "Loading balance…"}
               </p>
             </div>
-            <div className="rounded-xl bg-muted/50 px-2.5 py-1.5 text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-right">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Home
               </p>
-              <p className="truncate text-sm font-bold text-card-foreground">
-                {houseTier.houseName}
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
+              <p className="text-sm font-semibold text-card-foreground">{houseTier.houseName}</p>
+              <p className="text-xs text-muted-foreground">
                 {demo || evmAddress ? `${formatUsd(usdtValue)} USDT` : "Polygon not connected"}
               </p>
             </div>
           </div>
-
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Villager level
-              </p>
-              <div className="mt-1 flex gap-1">
-                {TIERS.map((t, i) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    disabled={!demo}
-                    onClick={() => setDemoTier(i)}
-                    title={t.characterName}
-                    aria-label={`Villager level ${t.characterName}`}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      i <= charIndex ? "bg-primary" : "bg-border"
-                    } ${demo ? "cursor-pointer" : "cursor-default"}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-right text-[10px] uppercase tracking-wide text-muted-foreground">
-                Home level
-              </p>
-              <div className="mt-1 flex gap-1">
-                {TIERS.map((t, i) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    disabled={!demo}
-                    onClick={() => setDemoHouseTier(i)}
-                    title={t.houseName}
-                    aria-label={`Home level ${t.houseName}`}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      i <= houseIndex ? "bg-primary" : "bg-border"
-                    } ${demo ? "cursor-pointer" : "cursor-default"}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
           {demo && (
-            <Button
-              onClick={() => setDemo(false)}
-              className="mt-2 h-8 w-full rounded-lg border border-input bg-background text-[11px] font-semibold text-foreground"
-            >
-              Leave demo mode
-            </Button>
+            <div className="mt-3 space-y-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Demo villager level
+                </p>
+                <div className="mt-1 flex gap-1">
+                  {TIERS.map((t, i) => (
+                    <Button
+                      key={t.id}
+                      onClick={() => setDemoTier(i)}
+                      className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
+                        i === demoTier
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-input bg-background text-foreground"
+                      }`}
+                    >
+                      {t.characterName.split(" ")[0]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Demo home level
+                </p>
+                <div className="mt-1 flex gap-1">
+                  {TIERS.map((t, i) => (
+                    <Button
+                      key={t.id}
+                      onClick={() => setDemoHouseTier(i)}
+                      className={`min-h-9 flex-1 rounded-lg px-1 text-[11px] font-semibold ${
+                        i === demoHouseTier
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-input bg-background text-foreground"
+                      }`}
+                    >
+                      {t.houseName.split(" ")[0]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
+          <Button
+            onClick={() => setDemo((v) => !v)}
+            className="mt-2 min-h-9 w-full rounded-lg border border-input bg-background text-[11px] font-semibold text-foreground"
+          >
+            {demo ? "Leave demo mode" : "Try demo mode"}
+          </Button>
           {status && <p className="mt-2 text-xs text-card-foreground/80">{status}</p>}
         </div>
       </div>
 
-      {/* Connect overlay */}
-      {!connected && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background p-5">
-          <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 text-center shadow-xl">
-            <h2 className="text-xl font-semibold text-card-foreground">Welcome to the village</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your NIM decides how your villager looks. Your USDT on Polygon decides how grand your
-              house is.
-            </p>
-            <div className="mt-5 space-y-2">
-              <Button
-                onClick={handleConnectNimiq}
-                disabled={busy}
-                className="min-h-11 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-              >
-                Connect Nimiq wallet
-              </Button>
-              <Button
-                onClick={() => {
-                  setStatus(null);
-                  setDemo(true);
-                }}
-                className="min-h-11 w-full rounded-xl border border-input bg-background px-4 py-3 text-sm font-semibold text-foreground"
-              >
-                Try the demo — no wallet needed
-              </Button>
-            </div>
-            {status && <p className="mt-3 text-xs text-destructive">{status}</p>}
-            <p className="mt-4 text-xs text-muted-foreground">
-              Works inside Nimiq Pay and in a normal browser with a wallet.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Controls */}
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
