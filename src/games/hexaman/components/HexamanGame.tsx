@@ -840,7 +840,7 @@ export function HexamanGame() {
           style={{ aspectRatio: `${W} / ${H}` }}
           className="h-[80%] max-h-[80%] w-auto max-w-full touch-none rounded-xl"
         />
-        {(hud.status === "ready" || hud.status === "over") && (
+        {(hud.status === "ready" || hud.status === "over") && !lobbyOpen && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm">
             <h2 className="font-display text-2xl font-black uppercase tracking-[0.2em] text-primary drop-shadow-[0_0_12px_var(--color-primary)]">
               {hud.status === "over" ? "System Down" : "Ready"}
@@ -856,8 +856,51 @@ export function HexamanGame() {
             >
               {hud.status === "over" ? "Reboot" : "Start"}
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setLobbyOpen(true)}
+              className="rounded-full px-6 py-2 font-mono text-xs font-bold uppercase tracking-[0.2em]"
+            >
+              Online
+            </Button>
           </div>
         )}
+
+        {lobbyOpen && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto rounded-2xl bg-background/90 p-4 backdrop-blur-sm">
+            <h2 className="font-display text-xl font-black uppercase tracking-[0.2em] text-primary">
+              Online run
+            </h2>
+            <p className="max-w-[90%] text-center font-mono text-[10px] text-muted-foreground">
+              Up to 4 runners, one life each, three minute round. Players pass
+              through each other — only the viruses bite. Last one running wins.
+            </p>
+            <div className="w-full max-w-xs">
+              <OnlinePanel
+                online={online}
+                maxPlayers={4}
+                manualStart
+                roundMs={HEXAMAN_ROUND_MS}
+                onBack={() => setLobbyOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        <MatchResultDialog
+          open={resultOpen}
+          title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
+          subtitle="Run results"
+          rows={resultRows}
+          onPlayAgain={() => {
+            online.leave.mutate();
+            setMode("solo");
+            setResultOpen(false);
+            setLobbyOpen(true);
+          }}
+          onExit={() => navigate({ to: "/games" })}
+        />
+
       </div>
 
       <div className="grid w-[132px] shrink-0 grid-cols-3 gap-1.5 md:hidden">
