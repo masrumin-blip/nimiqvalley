@@ -67,10 +67,16 @@ export const QUEUE_POLL_MS = 1500;
 /** How long a player waits before being offered a CPU match instead. */
 export const QUEUE_WAIT_CAP_MS = 60_000;
 
+/** Casual is free and unranked; ranked stakes one match pass per player. */
+export type QueueMode = "casual" | "ranked";
+
 export interface QueueState {
   waiting: boolean;
   waitedMs: number;
   queueSize: number;
   room: RoomState | null;
   suggestCpu: boolean;
+  mode: QueueMode;
+  /** Set when the pairing could not charge a player. */
+  notice?: string | null;
 }
