@@ -14,7 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      scores: {
+        Row: {
+          game_slug: string
+          id: string
+          updated_at: string
+          value: number
+          wallet: string
+        }
+        Insert: {
+          game_slug: string
+          id?: string
+          updated_at?: string
+          value: number
+          wallet: string
+        }
+        Update: {
+          game_slug?: string
+          id?: string
+          updated_at?: string
+          value?: number
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scores_wallet_fkey"
+            columns: ["wallet"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["wallet"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
