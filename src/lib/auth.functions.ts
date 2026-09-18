@@ -74,7 +74,7 @@ export const createWalletChallenge = createServerFn({ method: "POST" })
     const wallet = data.address.toUpperCase();
     const challenge = randomUUID();
     const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-    const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${challenge}\nThis request does not send a transaction.`;
+    const message = loginMessage(challenge);
     const { error } = await supabaseAdmin.from("wallet_login_challenges").insert({
       wallet,
       challenge,
@@ -104,7 +104,7 @@ export const signInWithWallet = createServerFn({ method: "POST" })
       throw new Error("This sign-in request expired. Please try again.");
     }
 
-    const message = `Sign in to NimiqValley\n\nWallet: ${wallet}\nChallenge: ${data.challenge}\nThis request does not send a transaction.`;
+    const message = loginMessage(data.challenge);
     try {
       const { Address, PublicKey, Signature } = await import("@nimiq/core/web");
       const publicKey = new PublicKey(decodeKeyMaterial(data.publicKey));
@@ -114,19 +114,16 @@ export const signInWithWallet = createServerFn({ method: "POST" })
         throw new Error("The signing key does not belong to this wallet.");
       }
 
-      const encoder = new TextEncoder();
-      const messageBytes = encoder.encode(message);
-      const prefixed = encoder.encode(
-        `\u0016Nimiq Signed Message:\n${messageBytes.length}${message}`,
+      const matched = await verifyLoginSignature(
+        publicKey as unknown as { verify: (s: unknown, d: Uint8Array) => boolean },
+        signature,
+        message,
       );
-      const digest = new Uint8Array(
-        await crypto.subtle.digest("SHA-256", prefixed as unknown as ArrayBuffer),
-      );
-
-      if (!publicKey.verify(signature, digest)) {
+      if (!matched) {
         console.warn("[wallet-login] rejected: signature mismatch");
         throw new Error("The wallet signature could not be verified.");
       }
+      console.info(`[wallet-login] verified with ${matched}`);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("The ")) throw error;
       console.warn("[wallet-login] rejected: invalid response format", error);
