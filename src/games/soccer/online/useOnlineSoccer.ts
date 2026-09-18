@@ -112,7 +112,11 @@ export function useOnlineSoccer(active: boolean) {
   });
   const leave = useMutation({
     mutationFn: () => leaveFn(),
-    onSuccess: () => adopt(null),
+    onSuccess: () => {
+      adopt(null);
+      // An unused room gives its key or room pass back.
+      void queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
   });
 
   const sendShot = useCallback(
