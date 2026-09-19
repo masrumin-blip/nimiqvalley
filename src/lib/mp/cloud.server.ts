@@ -761,20 +761,36 @@ export async function pollQueue(wallet: string, gameSlug: string): Promise<Queue
     };
   }
 
-  const candidateWaited = now - new Date(candidate.joined_at).getTime();
-  const iCreate = candidateWaited < waitedMs || (candidateWaited === waitedMs && wallet < candidate.wallet);
-  if (!iCreate) {
-    return {
-      waiting: true,
-      waitedMs,
-      queueSize: pool.length + 1,
-      room: null,
-      suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
-    };
-  }
+  // Who opens the room is decided from server timestamps only, so both sides
+  // reach the same answer and no twin rooms appear.
+  const mineJoined = new Date(mine.joined_at).getTime();
+  const theirJoined = new Date(candidate.joined_at).getTime();
+  const iCreate =
+    mineJoined < theirJoined || (mineJoined === theirJoined && wallet < candidate.wallet);
+  const stillWaiting = {
+    waiting: true as const,
+    waitedMs,
+    queueSize: pool.length + 1,
+    room: null,
+    suggestCpu: waitedMs >= QUEUE_WAIT_CAP_MS,
+  };
+  if (!iCreate) return stillWaiting;
 
   const settings = (mine.settings as Record<string, string | number | boolean>) ?? {};
   const created = await createRoom(wallet, gameSlug, "quick", mine.max_players, settings, null);
+
+  // Claim the opponent; if somebody else got them first, drop the room again.
+  const { data: claimed } = await supabaseAdmin
+    .from("mp_queue")
+    .update({ room_id: created.id })
+    .eq("id", candidate.id)
+    .is("room_id", null)
+    .select("id");
+  if (((claimed ?? []) as unknown[]).length === 0) {
+    await abandonAll(wallet, gameSlug);
+    return stillWaiting;
+  }
+
   const row = await getRow(created.id);
   const room = row ? await joinExisting(row, candidate.wallet) : created;
   await supabaseAdmin.from("mp_queue").update({ room_id: room.id }).eq("id", candidate.id);
