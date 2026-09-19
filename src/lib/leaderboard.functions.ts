@@ -86,6 +86,9 @@ export const getLeaderboard = createServerFn({ method: "POST" })
     };
   });
 
+/** Two saves for the same game closer together than this are refused. */
+const SUBMIT_COOLDOWN_MS = 10_000;
+
 /** Save a finished round; only keeps the player's best result per game. */
 export const submitScore = createServerFn({ method: "POST" })
   .inputValidator((data) =>
@@ -97,16 +100,27 @@ export const submitScore = createServerFn({ method: "POST" })
     if (!wallet) return { saved: false as const, reason: "not-signed-in" as const };
 
     const game = getLeaderboardGame(data.slug)!;
+
+    // A score outside what this game can physically produce is a forged
+    // request, not a round: reject it instead of storing it.
+    if (data.value < game.minValue || data.value > game.maxValue) {
+      return { saved: false as const, reason: "implausible" as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: existing } = await supabaseAdmin
       .from("scores")
-      .select("value")
+      .select("value, updated_at")
       .eq("wallet", wallet)
       .eq("game_slug", data.slug)
       .maybeSingle();
 
     if (existing) {
+      const last = Date.parse(String((existing as { updated_at?: string }).updated_at ?? ""));
+      if (Number.isFinite(last) && Date.now() - last < SUBMIT_COOLDOWN_MS) {
+        return { saved: false as const, reason: "too-fast" as const };
+      }
       const current = Number(existing.value);
       const better = game.order === "asc" ? data.value < current : data.value > current;
       if (!better) return { saved: false as const, reason: "not-better" as const };

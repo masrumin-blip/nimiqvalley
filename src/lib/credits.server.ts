@@ -14,6 +14,26 @@ import {
 
 const RPC_URL = "https://rpc.nimiqwatch.com";
 
+/**
+ * The generated Database types only know the functions that existed when they
+ * were last regenerated. The atomic credit functions come from migration
+ * 0015_atomic_credit_operations.sql, so call them through an untyped rpc
+ * handle and check the shape here.
+ */
+async function callRpc<T>(
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<{ data: T | null; error: string | null }> {
+  const client = supabaseAdmin as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  };
+  const { data, error } = await client.rpc(fn, args);
+  return { data: (data as T | null) ?? null, error: error?.message ?? null };
+}
+
 type CreditRow = {
   wallet: string;
   chat_credits: number;
@@ -46,7 +66,9 @@ async function loadRow(wallet: string): Promise<CreditRow> {
     free_chats_date: today(),
     free_chats_used: 0,
   };
-  await supabaseAdmin.from("wallet_credits").upsert({ ...fresh, updated_at: new Date().toISOString() });
+  await supabaseAdmin
+    .from("wallet_credits")
+    .upsert({ ...fresh, updated_at: new Date().toISOString() });
   return fresh;
 }
 
@@ -77,78 +99,74 @@ export async function getCredits(wallet: string): Promise<CreditState> {
   };
 }
 
-async function save(wallet: string, patch: Partial<CreditRow>) {
-  await supabaseAdmin
-    .from("wallet_credits")
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("wallet", wallet);
-}
+export type ChatSpend = CreditState & { source: "free" | "paid" };
 
-/** Spends one AI chat message. Throws when the player has nothing left. */
-export async function spendChat(wallet: string): Promise<CreditState> {
-  const row = await loadRow(wallet);
-  const isToday = row.free_chats_date === today();
-  const used = isToday ? row.free_chats_used : 0;
-  if (used < FREE_CHATS_PER_DAY) {
-    await save(wallet, { free_chats_date: today(), free_chats_used: used + 1 });
-  } else if (row.chat_credits > 0) {
-    await save(wallet, { chat_credits: row.chat_credits - 1 });
-  } else {
-    throw new Error("No chat messages left. Buy a pack or claim the daily reward.");
+/**
+ * Spends one AI chat message (free daily quota first, then paid credits) in a
+ * single atomic database call — concurrent requests can no longer spend the
+ * same credit twice. Throws when the player has nothing left.
+ */
+export async function spendChat(wallet: string): Promise<ChatSpend> {
+  const { data, error } = await callRpc<Array<{ source: string }>>("spend_chat_credit", {
+    p_wallet: wallet,
+    p_free_limit: FREE_CHATS_PER_DAY,
+  });
+  const row = data?.[0];
+  if (error || !row) {
+    if (error?.includes("NO_CHAT_CREDIT")) {
+      throw new Error("No chat messages left. Buy a pack or claim the daily reward.");
+    }
+    throw new Error("Could not spend a chat message. Please try again.");
   }
-  return getCredits(wallet);
+  return { ...(await getCredits(wallet)), source: row.source === "free" ? "free" : "paid" };
 }
 
-/** Spends one room credit. Throws when the player has none. */
+/** Gives one chat message back, e.g. when the AI gateway failed to answer. */
+export async function refundChat(wallet: string, source: "free" | "paid"): Promise<void> {
+  await callRpc("refund_chat_credit", { p_wallet: wallet, p_source: source });
+}
+
+/** Spends one room credit atomically. Throws when the player has none. */
 export async function spendRoom(wallet: string): Promise<void> {
-  const row = await loadRow(wallet);
-  if (row.room_credits <= 0) {
+  const { data, error } = await callRpc<boolean>("spend_room_credit", { p_wallet: wallet });
+  if (error || !data) {
     throw new Error(
       `Creating a room costs ${ROOM_COST_NIM} NIM. Buy room credits or claim the daily reward.`,
     );
   }
-  await save(wallet, { room_credits: row.room_credits - 1 });
 }
 
-/** Spends one match key. Every online match entry needs one. */
+/** Spends one match key atomically. Every online match entry needs one. */
 export async function spendKey(wallet: string): Promise<void> {
-  const row = await loadRow(wallet);
-  if ((row.match_keys ?? 0) <= 0) {
+  const { data, error } = await callRpc<boolean>("spend_match_key", { p_wallet: wallet });
+  if (error || !data) {
     throw new Error(
       `You need a match key to play online. Claim the daily reward or buy one for ${KEY_COST_NIM} NIM.`,
     );
   }
-  await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
 }
 
 /** Gives a match key back, e.g. when a matchmaking search is cancelled. */
 export async function refundKey(wallet: string): Promise<void> {
-  const row = await loadRow(wallet);
-  await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
+  await callRpc("grant_credits", { p_wallet: wallet, p_key: 1 });
 }
 
 /** Gives a room pass back when the room was never actually played. */
 export async function refundRoom(wallet: string): Promise<void> {
-  const row = await loadRow(wallet);
-  await save(wallet, { room_credits: row.room_credits + 1 });
+  await callRpc("grant_credits", { p_wallet: wallet, p_room: 1 });
 }
 
 export type RoomEntry = "key" | "room";
 
 /** Opening a room costs one match key OR one room pass — whichever the player has. */
 export async function spendRoomEntry(wallet: string): Promise<RoomEntry> {
-  const row = await loadRow(wallet);
-  if ((row.match_keys ?? 0) > 0) {
-    await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
-    return "key";
+  const { data, error } = await callRpc<string>("spend_room_entry", { p_wallet: wallet });
+  if (error || (data !== "key" && data !== "room")) {
+    throw new Error(
+      `Opening a room needs a match key or a room pass. Claim the daily reward, or buy one for ${KEY_COST_NIM} NIM (key) or ${ROOM_COST_NIM} NIM (room pass).`,
+    );
   }
-  if (row.room_credits > 0) {
-    await save(wallet, { room_credits: row.room_credits - 1 });
-    return "room";
-  }
-  throw new Error(
-    `Opening a room needs a match key or a room pass. Claim the daily reward, or buy one for ${KEY_COST_NIM} NIM (key) or ${ROOM_COST_NIM} NIM (room pass).`,
-  );
+  return data;
 }
 
 /** Gives back whatever was spent to open a room. */
@@ -158,11 +176,11 @@ export async function refundRoomEntry(wallet: string, entry: RoomEntry): Promise
 }
 
 async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
-  const row = await loadRow(wallet);
-  await save(wallet, {
-    chat_credits: row.chat_credits + chats,
-    room_credits: row.room_credits + rooms,
-    match_keys: (row.match_keys ?? 0) + keys,
+  await callRpc("grant_credits", {
+    p_wallet: wallet,
+    p_chat: chats,
+    p_room: rooms,
+    p_key: keys,
   });
 }
 
@@ -194,19 +212,21 @@ type RawTx = {
   timestamp?: number;
 };
 
+function normalizeTx(tx: RawTx): ChainTx {
+  return {
+    hash: String(tx.hash ?? "").toLowerCase(),
+    from: normalizeAddress(tx.from ?? tx.sender ?? ""),
+    to: normalizeAddress(tx.to ?? tx.recipient ?? ""),
+    nim: (typeof tx.value === "number" ? tx.value : 0) / 100_000,
+    timestamp: typeof tx.timestamp === "number" ? tx.timestamp : 0,
+  };
+}
+
 /** Recent transactions sent by a wallet to the NimiqValley address. */
 async function recentPayments(wallet: string): Promise<ChainTx[]> {
   const raw = await rpc<RawTx[]>("getTransactionsByAddress", [normalizeAddress(wallet), 20]);
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((tx) => ({
-      hash: String(tx.hash ?? "").toLowerCase(),
-      from: normalizeAddress(tx.from ?? tx.sender ?? ""),
-      to: normalizeAddress(tx.to ?? tx.recipient ?? ""),
-      nim: (typeof tx.value === "number" ? tx.value : 0) / 100_000,
-      timestamp: typeof tx.timestamp === "number" ? tx.timestamp : 0,
-    }))
-    .filter((tx) => tx.hash.length >= 8);
+  return raw.map(normalizeTx).filter((tx) => tx.hash.length >= 8);
 }
 
 const PAYMENT_WINDOW_MS = 15 * 60_000;
@@ -216,37 +236,73 @@ const CONFIRM_INTERVAL_MS = 2_500;
  * is never swallowed by a cheap purchase. */
 const MAX_OVERPAY_NIM = 1;
 
+function paymentMatches(tx: ChainTx, wallet: string, expectedNim: number): boolean {
+  if (tx.to !== normalizeAddress(PAY_TO_ADDRESS)) return false;
+  if (tx.from !== normalizeAddress(wallet)) return false;
+  if (tx.nim + 0.001 < expectedNim || tx.nim > expectedNim + MAX_OVERPAY_NIM) return false;
+  if (tx.timestamp) {
+    const ms = tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp;
+    if (Date.now() - ms > PAYMENT_WINDOW_MS) return false;
+  }
+  return true;
+}
+
+async function paymentAlreadyUsed(hash: string): Promise<boolean> {
+  const { data: seen } = await supabaseAdmin
+    .from("nim_payments")
+    .select("id")
+    .eq("tx_hash", hash)
+    .maybeSingle();
+  return Boolean(seen);
+}
+
+/**
+ * Verifies the exact transaction the player submitted. Polling briefly while
+ * the transaction propagates through the network.
+ */
+async function findSubmittedPayment(
+  wallet: string,
+  txHash: string,
+  expectedNim: number,
+): Promise<ChainTx | null> {
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+  const wanted = txHash.trim().toLowerCase().replace(/^0x/, "");
+  for (;;) {
+    const raw = await rpc<RawTx>("getTransactionByHash", [wanted]);
+    if (raw) {
+      const tx = normalizeTx(raw);
+      if (
+        tx.hash &&
+        paymentMatches(tx, wallet, expectedNim) &&
+        !(await paymentAlreadyUsed(tx.hash))
+      ) {
+        return tx;
+      }
+      // The transaction exists but does not match this purchase — no retry helps.
+      if (tx.hash) return null;
+    }
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, CONFIRM_INTERVAL_MS));
+  }
+}
+
 /** Find a fresh, unused payment from this wallet that matches `expectedNim`. */
 async function findRecentPayment(wallet: string, expectedNim: number): Promise<ChainTx | null> {
   const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
-  const target = normalizeAddress(PAY_TO_ADDRESS);
-  const sender = normalizeAddress(wallet);
 
   for (;;) {
     const list = await recentPayments(wallet);
     const candidates = list
-      .filter(
-        (tx) =>
-          tx.to === target &&
-          tx.from === sender &&
-          tx.nim + 0.001 >= expectedNim &&
-          tx.nim <= expectedNim + MAX_OVERPAY_NIM,
-      )
-      .filter((tx) => {
-        if (!tx.timestamp) return true;
-        const ms = tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp;
-        return Date.now() - ms <= PAYMENT_WINDOW_MS;
-      })
+      .filter((tx) => paymentMatches(tx, wallet, expectedNim))
       // Closest amount first, then the most recent one.
-      .sort((a, b) => Math.abs(a.nim - expectedNim) - Math.abs(b.nim - expectedNim) || b.timestamp - a.timestamp);
+      .sort(
+        (a, b) =>
+          Math.abs(a.nim - expectedNim) - Math.abs(b.nim - expectedNim) ||
+          b.timestamp - a.timestamp,
+      );
 
     for (const tx of candidates) {
-      const { data: seen } = await supabaseAdmin
-        .from("nim_payments")
-        .select("id")
-        .eq("tx_hash", tx.hash)
-        .maybeSingle();
-      if (!seen) return tx;
+      if (!(await paymentAlreadyUsed(tx.hash))) return tx;
     }
 
     if (Date.now() >= deadline) return null;
@@ -288,34 +344,47 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
     expectedNim = count * ROOM_COST_NIM;
   }
 
-  const tx = await findRecentPayment(input.wallet, expectedNim);
+  // When the player submits a transaction hash, verify that exact transaction
+  // instead of guessing from recent payments — this never mixes payments up.
+  const tx = input.txHash
+    ? await findSubmittedPayment(input.wallet, input.txHash, expectedNim)
+    : await findRecentPayment(input.wallet, expectedNim);
   if (!tx) {
     throw new Error(
       `We could not find a payment of ${expectedNim} NIM from your wallet yet. If the wallet confirmed it, try again in a moment.`,
     );
   }
 
-  const { error } = await supabaseAdmin.from("nim_payments").insert({
-    tx_hash: tx.hash,
-    wallet: input.wallet,
-    kind: input.kind,
-    nim: expectedNim,
-    chat_credits: chats,
-    room_credits: rooms,
-    key_credits: keys,
+  // One atomic call records the payment AND grants the credits, so a failure
+  // can never leave a paid transaction marked "used" without credits.
+  const { data, error } = await callRpc<boolean>("redeem_nim_payment", {
+    p_tx_hash: tx.hash,
+    p_wallet: input.wallet,
+    p_kind: input.kind,
+    p_nim: expectedNim,
+    p_chat: chats,
+    p_room: rooms,
+    p_key: keys,
   });
-  if (error) throw new Error("This payment was already used.");
+  if (error) throw new Error("Could not add your credits. Please try again in a moment.");
+  if (data === false) throw new Error("This payment was already used.");
 
-  await grant(input.wallet, chats, rooms, keys);
   return getCredits(input.wallet);
 }
 
-/** Records that the player opened one of today's reward links. */
+/**
+ * Records that the player says they opened one of today's reward links.
+ * This is self-reported — there is no way to prove a visit to an external site
+ * — so it only stops the reward from being claimed more than once per day.
+ */
 export async function recordDailyVisit(wallet: string, linkId: string): Promise<void> {
   if (!DAILY_LINKS.some((link) => link.id === linkId)) throw new Error("Unknown reward link.");
   await supabaseAdmin
     .from("daily_visits")
-    .upsert({ wallet, link_id: linkId, visit_date: today() }, { onConflict: "wallet,link_id,visit_date" });
+    .upsert(
+      { wallet, link_id: linkId, visit_date: today() },
+      { onConflict: "wallet,link_id,visit_date" },
+    );
 }
 
 async function visitedAllToday(wallet: string) {
@@ -330,7 +399,8 @@ async function visitedAllToday(wallet: string) {
 
 /** Daily Twitter-visit reward: extra rooms and chat messages, once per day. */
 export async function claimDaily(wallet: string): Promise<CreditState> {
-  // The visits are checked on the server, not just in the dialog.
+  // Both links must have been reported before the claim; the reports themselves
+  // come from the player's own device and are not proof of a real visit.
   if (!(await visitedAllToday(wallet))) {
     throw new Error("Open both X links first, then claim the reward.");
   }
@@ -338,6 +408,6 @@ export async function claimDaily(wallet: string): Promise<CreditState> {
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
   if (error) throw new Error("You already claimed today's reward. Come back tomorrow.");
-  await grant(wallet, DAILY_REWARD.chats, 0, DAILY_REWARD.keys);
+  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms, DAILY_REWARD.keys);
   return getCredits(wallet);
 }
