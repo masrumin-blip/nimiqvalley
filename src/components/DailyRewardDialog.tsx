@@ -18,13 +18,14 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
   const [open, setOpen] = useState(false);
   const [visited, setVisited] = useState<string[]>([]);
   const { credits } = useCredits();
-  const { claimDaily } = useCreditActions();
+  const { claimDaily, markVisit } = useCreditActions();
 
   const allVisited = DAILY_LINKS.every((link) => visited.includes(link.id));
   const claimed = credits?.claimedToday ?? false;
 
   function visit(id: string, url: string) {
     window.open(url, "_blank", "noopener,noreferrer");
+    markVisit.mutate(id);
     setVisited((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }
 

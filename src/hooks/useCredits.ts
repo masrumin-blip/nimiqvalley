@@ -33,6 +33,7 @@ export function useCreditActions() {
   const queryClient = useQueryClient();
   const redeem = useServerFn(redeemPayment);
   const claim = useServerFn(claimDailyReward);
+  const visit = useServerFn(recordDailyVisit);
   const [phase, setPhase] = useState<PurchasePhase>("idle");
 
   const settle = (credits: CreditState) => {
