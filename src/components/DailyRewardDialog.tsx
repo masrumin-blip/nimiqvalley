@@ -41,9 +41,8 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
         <DialogHeader>
           <DialogTitle>Daily free reward</DialogTitle>
           <DialogDescription>
-            Visit both accounts on X, then claim {DAILY_REWARD.keys} match keys,{" "}
-            {DAILY_REWARD.rooms} free multiplayer rooms and {DAILY_REWARD.chats} extra AI chat
-            messages. Once per day.
+            Visit both accounts on X, then claim {DAILY_REWARD.keys} match keys and{" "}
+            {DAILY_REWARD.chats} extra AI chat messages. Once per day.
           </DialogDescription>
         </DialogHeader>
 

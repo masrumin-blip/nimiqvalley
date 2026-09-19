@@ -338,6 +338,6 @@ export async function claimDaily(wallet: string): Promise<CreditState> {
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
   if (error) throw new Error("You already claimed today's reward. Come back tomorrow.");
-  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms, DAILY_REWARD.keys);
+  await grant(wallet, DAILY_REWARD.chats, 0, DAILY_REWARD.keys);
   return getCredits(wallet);
 }
