@@ -397,7 +397,7 @@ async function visitedAllToday(wallet: string) {
   return DAILY_LINKS.every((link) => done.has(link.id));
 }
 
-/** Daily Twitter-visit reward: extra rooms and chat messages, once per day. */
+/** Daily Twitter-visit reward: extra match keys and chat messages, once per day. */
 export async function claimDaily(wallet: string): Promise<CreditState> {
   // Both links must have been reported before the claim; the reports themselves
   // come from the player's own device and are not proof of a real visit.
@@ -408,6 +408,6 @@ export async function claimDaily(wallet: string): Promise<CreditState> {
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
   if (error) throw new Error("You already claimed today's reward. Come back tomorrow.");
-  await grant(wallet, DAILY_REWARD.chats, DAILY_REWARD.rooms, DAILY_REWARD.keys);
+  await grant(wallet, DAILY_REWARD.chats, 0, DAILY_REWARD.keys);
   return getCredits(wallet);
 }

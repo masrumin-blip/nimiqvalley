@@ -57,10 +57,10 @@ export async function issuePlayerToken(wallet: string): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const token = crypto.randomUUID();
   const { error } = await supabaseAdmin.from("player_sessions").insert({
-    token_hash: await hashToken(token),
+    token: await hashToken(token),
     wallet,
     expires_at: new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
-  } as never);
+  });
   if (error) throw new Error("Could not start the player session.");
   return token;
 }
@@ -72,7 +72,7 @@ export async function revokeRequestToken() {
   await supabaseAdmin
     .from("player_sessions")
     .delete()
-    .eq("token_hash" as never, await hashToken(token));
+    .eq("token", await hashToken(token));
 }
 
 /** Signs the wallet out everywhere, not just on this device. */
@@ -93,7 +93,7 @@ export async function currentWallet(): Promise<string | null> {
   const { data } = await supabaseAdmin
     .from("player_sessions")
     .select("wallet, expires_at")
-    .eq("token_hash" as never, tokenHash)
+    .eq("token", tokenHash)
     .maybeSingle();
   if (!data) return null;
 
@@ -102,7 +102,7 @@ export async function currentWallet(): Promise<string | null> {
     await supabaseAdmin
       .from("player_sessions")
       .delete()
-      .eq("token_hash" as never, tokenHash);
+      .eq("token", tokenHash);
     return null;
   }
   // Rolling expiry: active players stay signed in, forgotten tokens die.
@@ -110,7 +110,7 @@ export async function currentWallet(): Promise<string | null> {
     await supabaseAdmin
       .from("player_sessions")
       .update({ expires_at: new Date(Date.now() + TOKEN_TTL_MS).toISOString() })
-      .eq("token_hash" as never, tokenHash);
+      .eq("token", tokenHash);
   }
   return data.wallet;
 }
