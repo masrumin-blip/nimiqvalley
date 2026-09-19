@@ -24,7 +24,6 @@ function sessionPassword(): string | null {
 export async function playerSession() {
   const password = sessionPassword();
   if (!password) return null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- useSession is TanStack Start's server session helper, not a React hook
   return useSession<PlayerSession>({
     password,
     name: "nimiqvalley-player",
@@ -43,21 +42,12 @@ function requestToken(): string | null {
   }
 }
 
-/**
- * Only the hash of a device token is stored: the token itself is a bearer
- * credential, so a leaked table must not be replayable.
- */
-async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /** Issue a device token for clients whose cookies are blocked (WebViews). */
 export async function issuePlayerToken(wallet: string): Promise<string> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const token = crypto.randomUUID();
   const { error } = await supabaseAdmin.from("player_sessions").insert({
-    token: await hashToken(token),
+    token,
     wallet,
     expires_at: new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
   });
@@ -69,10 +59,7 @@ export async function revokeRequestToken() {
   const token = requestToken();
   if (!token) return;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin
-    .from("player_sessions")
-    .delete()
-    .eq("token", await hashToken(token));
+  await supabaseAdmin.from("player_sessions").delete().eq("token", token);
 }
 
 /** Signs the wallet out everywhere, not just on this device. */
@@ -88,21 +75,17 @@ export async function currentWallet(): Promise<string | null> {
 
   const token = requestToken();
   if (!token) return null;
-  const tokenHash = await hashToken(token);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
     .from("player_sessions")
     .select("wallet, expires_at")
-    .eq("token", tokenHash)
+    .eq("token", token)
     .maybeSingle();
   if (!data) return null;
 
   const expiresAt = new Date(data.expires_at).getTime();
   if (expiresAt <= Date.now()) {
-    await supabaseAdmin
-      .from("player_sessions")
-      .delete()
-      .eq("token", tokenHash);
+    await supabaseAdmin.from("player_sessions").delete().eq("token", token);
     return null;
   }
   // Rolling expiry: active players stay signed in, forgotten tokens die.
@@ -110,7 +93,7 @@ export async function currentWallet(): Promise<string | null> {
     await supabaseAdmin
       .from("player_sessions")
       .update({ expires_at: new Date(Date.now() + TOKEN_TTL_MS).toISOString() })
-      .eq("token", tokenHash);
+      .eq("token", token);
   }
   return data.wallet;
 }
