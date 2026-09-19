@@ -211,8 +211,11 @@ async function recentPayments(wallet: string): Promise<ChainTx[]> {
 const PAYMENT_WINDOW_MS = 15 * 60_000;
 const CONFIRM_TIMEOUT_MS = 40_000;
 const CONFIRM_INTERVAL_MS = 2_500;
+/** A payment may only cover this much more than the price, so a big transfer
+ * is never swallowed by a cheap purchase. */
+const MAX_OVERPAY_NIM = 1;
 
-/** Find a fresh, unused payment from this wallet worth at least `expectedNim`. */
+/** Find a fresh, unused payment from this wallet that matches `expectedNim`. */
 async function findRecentPayment(wallet: string, expectedNim: number): Promise<ChainTx | null> {
   const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
   const target = normalizeAddress(PAY_TO_ADDRESS);
@@ -221,13 +224,20 @@ async function findRecentPayment(wallet: string, expectedNim: number): Promise<C
   for (;;) {
     const list = await recentPayments(wallet);
     const candidates = list
-      .filter((tx) => tx.to === target && tx.from === sender && tx.nim + 0.001 >= expectedNim)
+      .filter(
+        (tx) =>
+          tx.to === target &&
+          tx.from === sender &&
+          tx.nim + 0.001 >= expectedNim &&
+          tx.nim <= expectedNim + MAX_OVERPAY_NIM,
+      )
       .filter((tx) => {
         if (!tx.timestamp) return true;
         const ms = tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp;
         return Date.now() - ms <= PAYMENT_WINDOW_MS;
       })
-      .sort((a, b) => b.timestamp - a.timestamp);
+      // Closest amount first, then the most recent one.
+      .sort((a, b) => Math.abs(a.nim - expectedNim) - Math.abs(b.nim - expectedNim) || b.timestamp - a.timestamp);
 
     for (const tx of candidates) {
       const { data: seen } = await supabaseAdmin
@@ -299,8 +309,30 @@ export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
   return getCredits(input.wallet);
 }
 
+/** Records that the player opened one of today's reward links. */
+export async function recordDailyVisit(wallet: string, linkId: string): Promise<void> {
+  if (!DAILY_LINKS.some((link) => link.id === linkId)) throw new Error("Unknown reward link.");
+  await supabaseAdmin
+    .from("daily_visits")
+    .upsert({ wallet, link_id: linkId, visit_date: today() }, { onConflict: "wallet,link_id,visit_date" });
+}
+
+async function visitedAllToday(wallet: string) {
+  const { data } = await supabaseAdmin
+    .from("daily_visits")
+    .select("link_id")
+    .eq("wallet", wallet)
+    .eq("visit_date", today());
+  const done = new Set(((data ?? []) as Array<{ link_id: string }>).map((row) => row.link_id));
+  return DAILY_LINKS.every((link) => done.has(link.id));
+}
+
 /** Daily Twitter-visit reward: extra rooms and chat messages, once per day. */
 export async function claimDaily(wallet: string): Promise<CreditState> {
+  // The visits are checked on the server, not just in the dialog.
+  if (!(await visitedAllToday(wallet))) {
+    throw new Error("Open both X links first, then claim the reward.");
+  }
   const { error } = await supabaseAdmin
     .from("daily_claims")
     .insert({ wallet, claim_date: today() });
