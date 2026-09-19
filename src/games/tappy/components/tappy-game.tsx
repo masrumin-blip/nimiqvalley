@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
-import { Trophy, Medal, Play, RotateCcw, Loader2, Crown } from "lucide-react";
+import { Play, RotateCcw } from "lucide-react";
 import { reportScore } from "@/lib/report-score";
 
 // ---- Game constants (logical canvas units) ----
@@ -59,13 +59,6 @@ interface Particle {
   hue: number;
 }
 
-interface LeaderRow {
-  id: string;
-  player_name: string;
-  score: number;
-  created_at: string;
-}
-
 function randomGapY(gap: number, amp = 0) {
   const margin = 60 + amp;
   const span = H - GROUND_H - gap - margin * 2;
@@ -83,13 +76,6 @@ export function TappyGame() {
     if (typeof window === "undefined") return 0;
     return Number(localStorage.getItem("tappy-best") ?? 0);
   });
-  const [leaders, setLeaders] = useState<LeaderRow[]>([]);
-  const [loadingLeaders, setLoadingLeaders] = useState(false);
-  const [playerName, setPlayerName] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("tappy-name") ?? "";
-  });
-  const [submitState, setSubmitState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Mutable game state in a ref so the loop never re-subscribes
   const gs = useRef({
@@ -107,17 +93,6 @@ export function TappyGame() {
     nextVariant: 0,
   });
 
-  const fetchLeaders = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem("tappy-leaderboard");
-    setLeaders(saved ? (JSON.parse(saved) as LeaderRow[]) : []);
-    setLoadingLeaders(false);
-  }, []);
-
-  useEffect(() => {
-    fetchLeaders();
-  }, [fetchLeaders]);
-
   const startGame = useCallback(() => {
     const g = gs.current;
     g.phase = "playing";
@@ -133,7 +108,6 @@ export function TappyGame() {
     setScore(0);
     setLevel(1);
     setPhase("playing");
-    setSubmitState("idle");
     playSfx("start");
   }, []);
 
@@ -333,25 +307,6 @@ export function TappyGame() {
     return () => cancelAnimationFrame(raf);
   }, [die]);
 
-  const submitScore = async () => {
-    const name = playerName.trim().slice(0, 20);
-    if (!name || submitState === "saving") return;
-    setSubmitState("saving");
-    localStorage.setItem("tappy-name", name);
-    const row: LeaderRow = {
-      id: `${Date.now()}`,
-      player_name: name,
-      score: gs.current.score,
-      created_at: new Date().toISOString(),
-    };
-    const next = [row, ...leaders]
-      .sort((a, b) => b.score - a.score || a.created_at.localeCompare(b.created_at))
-      .slice(0, 10);
-    window.localStorage.setItem("tappy-leaderboard", JSON.stringify(next));
-    setLeaders(next);
-    setSubmitState("saved");
-  };
-
   const onCanvasPointer = (e: React.PointerEvent) => {
     e.preventDefault();
     flap();
@@ -440,30 +395,6 @@ export function TappyGame() {
                   </div>
                 </div>
 
-                {submitState === "saved" ? (
-                  <p className="rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary">
-                     Score saved to the leaderboard!
-                  </p>
-                ) : (
-                  <div className="flex w-full max-w-[260px] flex-col gap-2">
-                    <input
-                      value={playerName}
-                      onChange={(e) => setPlayerName(e.target.value)}
-                      maxLength={20}
-                       placeholder="Your name..."
-                      className="h-10 w-full rounded-lg border border-input bg-card px-3 text-center text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/40"
-                    />
-                    <button
-                      onClick={submitScore}
-                      disabled={submitState === "saving" || !playerName.trim()}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-secondary font-display text-sm font-semibold text-secondary-foreground transition hover:bg-secondary/80 disabled:opacity-50"
-                    >
-                      {submitState === "saving" && <Loader2 className="h-4 w-4 animate-spin" />}
-                       {submitState === "error" ? "Try again" : "Save score"}
-                    </button>
-                  </div>
-                )}
-
                 <button
                   onClick={startGame}
                   className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-6 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_25px_-5px] shadow-primary/60 transition hover:brightness-110"
@@ -475,58 +406,6 @@ export function TappyGame() {
           </div>
         </div>
 
-        {/* Leaderboard */}
-        <aside className="w-full max-w-[420px] lg:mt-24 lg:max-w-sm">
-          <div className="rounded-2xl border border-border/60 bg-card/80 p-5 backdrop-blur">
-            <div className="mb-4 flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              <h2 className="font-display text-lg font-bold tracking-wide">LEADERBOARD</h2>
-            </div>
-
-            {loadingLeaders ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : leaders.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                 No scores yet. Be the first coin collector!
-              </p>
-            ) : (
-              <ol className="space-y-1.5">
-                {leaders.map((row, i) => (
-                  <li
-                    key={row.id}
-                    className={
-                      i === 0
-                        ? "flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5"
-                        : "flex items-center gap-3 rounded-xl bg-secondary/40 px-3 py-2.5"
-                    }
-                  >
-                    <span className="flex w-7 shrink-0 justify-center">
-                      {i === 0 ? (
-                        <Crown className="h-5 w-5 text-primary" />
-                      ) : i < 3 ? (
-                        <Medal
-                          className={`h-5 w-5 ${i === 1 ? "text-muted-foreground" : "text-chart-4"}`}
-                        />
-                      ) : (
-                        <span className="font-display text-sm font-bold text-muted-foreground">
-                          {i + 1}
-                        </span>
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                      {row.player_name}
-                    </span>
-                    <span className="font-display text-base font-bold text-primary">
-                      {row.score}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-        </aside>
       </div>
     </div>
   );
