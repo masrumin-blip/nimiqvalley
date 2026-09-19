@@ -174,12 +174,15 @@ export const respondChallenge = createServerFn({ method: "POST" })
 
 export const startRoom = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ id: idSchema, durationMs: z.number().int().min(10_000).max(600_000) }).parse(input),
+    z
+      .object({ id: idSchema, durationMs: z.number().int().min(10_000).max(600_000).optional() })
+      .parse(input),
   )
   .handler(async ({ data }): Promise<RoomState> => {
     const wallet = await requireWallet();
     const cloud = await import("./mp/cloud.server");
-    return cloud.startRoom(wallet, data.id, data.durationMs);
+    // The round length comes from the server, not from the host's device.
+    return cloud.startRoom(wallet, data.id);
   });
 
 export const fetchRoom = createServerFn({ method: "GET" })
@@ -197,10 +200,10 @@ export const fetchRoom = createServerFn({ method: "GET" })
       ticks: PlayerTick[];
       serverNow: string;
     }> => {
-      await requireWallet();
+      const wallet = await requireWallet();
       const cloud = await import("./mp/cloud.server");
       const [room, moves, ticks] = await Promise.all([
-        cloud.getRoom(data.id),
+        cloud.getRoom(data.id, wallet),
         cloud.listMoves(data.id, data.since),
         data.withTicks ? cloud.listTicks(data.id) : Promise.resolve([]),
       ]);
@@ -230,9 +233,9 @@ export const skipTurn = createServerFn({ method: "POST" })
     z.object({ id: idSchema, turnNo: z.number().int().min(0) }).parse(input),
   )
   .handler(async ({ data }) => {
-    await requireWallet();
+    const wallet = await requireWallet();
     const cloud = await import("./mp/cloud.server");
-    return cloud.skipTurn(data.id, data.turnNo);
+    return cloud.skipTurn(wallet, data.id, data.turnNo);
   });
 
 export const pushTick = createServerFn({ method: "POST" })

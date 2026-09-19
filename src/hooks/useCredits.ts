@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
-import { claimDailyReward, fetchCredits, redeemPayment } from "@/lib/credits.functions";
+import {
+  claimDailyReward,
+  fetchCredits,
+  recordDailyVisit,
+  redeemPayment,
+} from "@/lib/credits.functions";
 import {
   KEY_COST_NIM,
   PAY_TO_ADDRESS,
@@ -28,6 +33,7 @@ export function useCreditActions() {
   const queryClient = useQueryClient();
   const redeem = useServerFn(redeemPayment);
   const claim = useServerFn(claimDailyReward);
+  const visit = useServerFn(recordDailyVisit);
   const [phase, setPhase] = useState<PurchasePhase>("idle");
 
   const settle = (credits: CreditState) => {
@@ -81,5 +87,10 @@ export function useCreditActions() {
     onSuccess: settle,
   });
 
-  return { buyChatPack, buyRooms, buyKeys, claimDaily, phase };
+  // The server records the visit; the dialog no longer decides on its own.
+  const markVisit = useMutation({
+    mutationFn: (linkId: string) => visit({ data: { linkId } }),
+  });
+
+  return { buyChatPack, buyRooms, buyKeys, claimDaily, markVisit, phase };
 }

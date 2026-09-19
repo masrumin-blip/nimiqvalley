@@ -191,6 +191,30 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_visits: {
+        Row: {
+          created_at: string
+          id: string
+          link_id: string
+          visit_date: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          link_id: string
+          visit_date?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          link_id?: string
+          visit_date?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       mp_moves: {
         Row: {
           created_at: string

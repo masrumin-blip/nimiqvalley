@@ -116,7 +116,7 @@ export const signInWithWallet = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not save the player profile");
 
     const session = await playerSession();
-    await session.update({ wallet });
+    await session?.update({ wallet });
     const { issuePlayerToken } = await import("./session.server");
     const token = await issuePlayerToken(wallet);
     return { wallet, displayName, token };
@@ -155,9 +155,14 @@ export const setDisplayName = createServerFn({ method: "POST" })
 
 /** Sign the player out. */
 export const signOutPlayer = createServerFn({ method: "POST" }).handler(async () => {
-  const { playerSession, revokeRequestToken } = await import("./session.server");
+  const { playerSession, revokeRequestToken, revokeAllSessions, currentWallet } = await import(
+    "./session.server"
+  );
+  const wallet = await currentWallet();
   const session = await playerSession();
-  await session.clear();
+  await session?.clear();
   await revokeRequestToken();
+  // Signing out ends every device session for this wallet, not just this one.
+  if (wallet) await revokeAllSessions(wallet);
   return { ok: true };
 });
