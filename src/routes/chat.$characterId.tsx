@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCredits } from "@/hooks/useCredits";
 import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
+import { PLAYER_TOKEN_HEADER, readPlayerToken } from "@/lib/player-token";
 
 export const Route = createFileRoute("/chat/$characterId")({
   loader: ({ params }) => {
