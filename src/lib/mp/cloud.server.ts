@@ -104,14 +104,59 @@ async function toState(row: RoomRow): Promise<RoomState> {
   return state!;
 }
 
+/** A match nobody has played for this long is closed by the server. */
+const ABANDON_TURN_MS = 3 * 60_000;
+/** Grace period after the round clock runs out, before the server closes it. */
+const ROUND_GRACE_MS = 15_000;
+/** Round lengths belong to the server, never to the host's device. */
+const ROUND_MS: Record<string, number> = { hexaman: 180_000, bomber: 180_000 };
+
+export function roundMsFor(gameSlug: string) {
+  return ROUND_MS[gameSlug] ?? 180_000;
+}
+
 async function getRow(id: string): Promise<RoomRow | null> {
   const { data } = await supabaseAdmin.from("mp_rooms").select(COLUMNS).eq("id", id).maybeSingle();
   return (data as RoomRow | null) ?? null;
 }
 
-export async function getRoom(id: string): Promise<RoomState | null> {
+/** Closes matches everyone walked away from, so they cannot hang forever. */
+async function sweep(row: RoomRow): Promise<RoomRow> {
+  if (row.status !== "playing") return row;
+  const now = Date.now();
+  const timedOut = row.ends_at ? new Date(row.ends_at).getTime() + ROUND_GRACE_MS <= now : false;
+  const stalled = now - new Date(row.turn_started_at).getTime() > ABANDON_TURN_MS;
+  if (!timedOut && !stalled) return row;
+  const { data } = await supabaseAdmin
+    .from("mp_rooms")
+    .update({ status: "finished", updated_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .eq("status", "playing")
+    .select(COLUMNS)
+    .maybeSingle();
+  return (data as RoomRow | null) ?? { ...row, status: "finished" };
+}
+
+/** Only players who actually sit in the room may act on it. */
+export async function requireMember(wallet: string, id: string): Promise<RoomRow> {
   const row = await getRow(id);
-  return row ? toState(row) : null;
+  if (!row) throw new Error("That match no longer exists.");
+  const { data } = await supabaseAdmin
+    .from("mp_room_players")
+    .select("status")
+    .eq("room_id", id)
+    .eq("wallet", wallet)
+    .maybeSingle();
+  const status = (data as { status?: string } | null)?.status;
+  if (!status || status === "left") throw new Error("You are not in this match.");
+  return row;
+}
+
+export async function getRoom(id: string, viewer?: string): Promise<RoomState | null> {
+  const row = await getRow(id);
+  if (!row) return null;
+  if (viewer) await requireMember(viewer, id);
+  return toState(await sweep(row));
 }
 
 export async function activeRoom(wallet: string, gameSlug: string): Promise<RoomState | null> {
@@ -181,6 +226,8 @@ export async function pushEvent(
   kind: string,
   payload: Record<string, number | string | boolean | null>,
 ) {
+  const room = await requireMember(wallet, id);
+  if (room.status !== "playing") throw new Error("The match is not running.");
   for (let attempt = 0; attempt < 4; attempt++) {
     const { data: last } = await supabaseAdmin
       .from("mp_moves")
@@ -410,10 +457,11 @@ export async function respondInvite(wallet: string, id: string, accept: boolean)
 }
 
 /** Host kicks off a lobby that waits for several players (hexaman). */
-export async function startRoom(wallet: string, id: string, durationMs: number) {
+export async function startRoom(wallet: string, id: string) {
   const row = await getRow(id);
   if (!row || row.host_wallet !== wallet) throw new Error("Only the host can start the round.");
   if (row.status !== "waiting") return toState(row);
+  const durationMs = roundMsFor(row.game_slug);
   const now = Date.now();
   const { data } = await supabaseAdmin
     .from("mp_rooms")
@@ -455,8 +503,8 @@ export async function submitMove(
   kind: string,
   payload: Record<string, number | string | boolean | null>,
 ) {
-  const row = await getRow(id);
-  if (!row || row.status !== "playing") throw new Error("The match is not running.");
+  const row = await requireMember(wallet, id);
+  if (row.status !== "playing") throw new Error("The match is not running.");
   // Carrom keeps the turn locally (a valid pocket shoots again), so those
   // rooms only rely on the move sequence number.
   const freeTurn = (row.settings as { freeTurn?: boolean } | null)?.freeTurn === true;
@@ -475,9 +523,9 @@ export async function submitMove(
   return { ok: true };
 }
 
-export async function skipTurn(id: string, turnNo: number) {
-  const row = await getRow(id);
-  if (!row || row.status !== "playing") return { ok: false };
+export async function skipTurn(wallet: string, id: string, turnNo: number) {
+  const row = await requireMember(wallet, id);
+  if (row.status !== "playing") return { ok: false };
   if (row.turn_no !== turnNo || !row.turn_wallet) return { ok: false };
   if (Date.now() - new Date(row.turn_started_at).getTime() < TURN_TIMEOUT_MS) return { ok: false };
   const { error } = await supabaseAdmin
@@ -498,6 +546,7 @@ export async function pushTick(
   id: string,
   tick: { x: number; y: number; dir: number; score: number; alive: boolean },
 ) {
+  await requireMember(wallet, id);
   const now = new Date().toISOString();
   await supabaseAdmin
     .from("mp_ticks")
@@ -515,31 +564,59 @@ export async function pushTick(
   return { ok: true };
 }
 
+const MAX_SCORE = 1_000_000;
+
+function clampNumber(value: number, max = MAX_SCORE) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-max, Math.min(max, Math.round(value)));
+}
+
 export async function saveStats(
   wallet: string,
   id: string,
   score: number,
   stats: Record<string, number>,
 ) {
+  await requireMember(wallet, id);
+  const safeStats: Record<string, number> = {};
+  for (const [key, value] of Object.entries(stats).slice(0, 12)) {
+    safeStats[key.slice(0, 24)] = clampNumber(value);
+  }
   await supabaseAdmin
     .from("mp_room_players")
-    .update({ score, stats, updated_at: new Date().toISOString() })
+    .update({ score: clampNumber(score), stats: safeStats, updated_at: new Date().toISOString() })
     .eq("room_id", id)
     .eq("wallet", wallet);
   return { ok: true };
 }
 
 export async function finishRoom(wallet: string, id: string, winner: string | null) {
-  const row = await getRow(id);
-  if (!row) return { ok: false };
+  const row = await requireMember(wallet, id);
+  // Already settled: the first report wins, repeats are ignored.
+  if (row.status === "finished") return { ok: true, by: wallet };
+
+  // The winner must be somebody who actually played in this room.
+  let winnerWallet: string | null = null;
+  if (winner) {
+    const { data } = await supabaseAdmin
+      .from("mp_room_players")
+      .select("wallet")
+      .eq("room_id", id)
+      .eq("wallet", winner)
+      .maybeSingle();
+    if (!data) throw new Error("That player is not in this match.");
+    winnerWallet = winner;
+  }
+
   await supabaseAdmin
     .from("mp_rooms")
     .update({
       status: "finished",
-      winner_wallet: winner,
+      winner_wallet: winnerWallet,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .neq("status", "finished");
   return { ok: true, by: wallet };
 }
 
