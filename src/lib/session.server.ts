@@ -6,9 +6,21 @@ export type PlayerSession = { wallet?: string };
 
 const TOKEN_TTL_MS = 60 * 60 * 24 * 60 * 1000;
 
+// h3 throws "Empty password" when the session secret is missing (e.g. the
+// sandbox dev server has not been restarted since the secret was added), which
+// blanks the whole app. Fall back to a stable local-only key instead.
+const FALLBACK_SESSION_SECRET = "nimiqvalley-local-dev-session-secret-0001";
+
+function sessionPassword(): string {
+  const secret = process.env["SESSION_SECRET"];
+  if (secret && secret.length >= 32) return secret;
+  console.warn("[session] SESSION_SECRET missing or too short; using local fallback key");
+  return FALLBACK_SESSION_SECRET;
+}
+
 function sessionConfig() {
   return {
-    password: process.env["SESSION_SECRET"]!,
+    password: sessionPassword(),
     name: "nimiqvalley-player",
     maxAge: 60 * 60 * 24 * 60,
     // The app runs inside the Lovable preview iframe (cross-site), so the
