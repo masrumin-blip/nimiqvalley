@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 import {
   CHAT_PACKS,
+  DAILY_LINKS,
   DAILY_REWARD,
   FREE_CHATS_PER_DAY,
   KEY_COST_NIM,

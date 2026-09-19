@@ -39,6 +39,17 @@ export const redeemPayment = createServerFn({ method: "POST" })
     return redeem({ wallet, ...data });
   });
 
+export const recordDailyVisit = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ linkId: z.string().trim().min(1).max(32) }).parse(input),
+  )
+  .handler(async ({ data }): Promise<{ ok: true }> => {
+    const wallet = await requireWallet();
+    const { recordDailyVisit: record } = await import("./credits.server");
+    await record(wallet, data.linkId);
+    return { ok: true };
+  });
+
 export const claimDailyReward = createServerFn({ method: "POST" }).handler(
   async (): Promise<CreditState> => {
     const wallet = await requireWallet();
