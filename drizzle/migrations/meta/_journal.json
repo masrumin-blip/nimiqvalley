@@ -99,6 +99,13 @@
       "when": 1789783630605,
       "tag": "0013_lock_match_data_and_daily_visits",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789785435133,
+      "tag": "0014_lock_chat_social_and_daily_claims",
+      "breakpoints": true
     }
   ]
 }
