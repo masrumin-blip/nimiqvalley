@@ -651,14 +651,20 @@ async function rankHint(wallet: string, gameSlug: string) {
   return Math.round(Number((data as { value?: number } | null)?.value ?? 0));
 }
 
+/** Drops abandoned searches and gives their match key back automatically. */
 async function clearStale(gameSlug: string) {
   const cutoff = new Date(Date.now() - STALE_MS).toISOString();
-  await supabaseAdmin
+  const { data } = await supabaseAdmin
     .from("mp_queue")
     .delete()
     .eq("game_slug", gameSlug)
     .is("room_id", null)
-    .lt("heartbeat_at", cutoff);
+    .lt("heartbeat_at", cutoff)
+    .select("wallet");
+  const rows = (data ?? []) as Array<{ wallet: string }>;
+  if (rows.length === 0) return;
+  const { refundKey } = await import("@/lib/credits.server");
+  for (const row of rows) await refundKey(row.wallet);
 }
 
 export async function joinQueue(
