@@ -30,6 +30,18 @@ npm run dev
 
 Then open http://localhost:8080 in your browser.
 
+## Configuration & secrets
+
+Copy `.env.example` to `.env` and point it at your own backend project.
+
+The values in `.env` are public by design: the backend URL, the project id and
+the publishable (anon) key are all sent to the browser anyway, and access is
+enforced by database row-level security rules, not by hiding these values.
+
+Private values are **never** stored in this repository. `SESSION_SECRET`, the
+service role key and any AI provider keys live in the hosting provider's secret
+store and are injected into the server at runtime. Never commit them.
+
 ## Scripts
 
 | Command | Description |
