@@ -70,6 +70,11 @@ function ChatRoom() {
       new DefaultChatTransport({
         api: "/api/chat",
         body: { characterId: character.id },
+        // Nimiq Pay's WebView drops cookies, so the session travels as a token.
+        headers: () => {
+          const token = readPlayerToken();
+          return token ? { [PLAYER_TOKEN_HEADER]: token } : {};
+        },
       }),
     [character.id],
   );
