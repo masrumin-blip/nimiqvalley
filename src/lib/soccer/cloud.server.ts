@@ -257,6 +257,8 @@ export async function submitMove(
 export async function skipTurn(wallet: string, id: string, turnNo: number) {
   const row = await getMatchRow(id);
   if (!row || row.status !== "playing") return { ok: false };
+  // Only the two players of this match may move its clock forward.
+  if (row.host_wallet !== wallet && row.guest_wallet !== wallet) return { ok: false };
   if (row.turn_no !== turnNo || !row.turn_wallet) return { ok: false };
   const elapsed = Date.now() - new Date(row.turn_started_at).getTime();
   if (elapsed < TURN_TIMEOUT_MS) return { ok: false };
@@ -281,9 +283,13 @@ export async function finishMatch(wallet: string, id: string, winnerWallet: stri
   const row = await getMatchRow(id);
   if (!row) return { ok: false };
   if (row.host_wallet !== wallet && row.guest_wallet !== wallet) return { ok: false };
+  // The winner has to be one of the two players, and the first report wins.
+  if (winnerWallet !== row.host_wallet && winnerWallet !== row.guest_wallet) return { ok: false };
+  if (row.status === "finished") return { ok: true };
   await supabaseAdmin
     .from("soccer_matches")
     .update({ status: "finished", winner_wallet: winnerWallet, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .neq("status", "finished");
   return { ok: true };
 }
