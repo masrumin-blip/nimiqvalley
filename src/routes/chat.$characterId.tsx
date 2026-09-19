@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCredits } from "@/hooks/useCredits";
 import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
+import { PLAYER_TOKEN_HEADER, readPlayerToken } from "@/lib/player-token";
 
 export const Route = createFileRoute("/chat/$characterId")({
   loader: ({ params }) => {
@@ -69,6 +70,11 @@ function ChatRoom() {
       new DefaultChatTransport({
         api: "/api/chat",
         body: { characterId: character.id },
+        // Nimiq Pay's WebView drops cookies, so the session travels as a token.
+        headers: () => {
+          const token = readPlayerToken();
+          return token ? { [PLAYER_TOKEN_HEADER]: token } : {};
+        },
       }),
     [character.id],
   );
@@ -92,7 +98,9 @@ function ChatRoom() {
       const m = err.message;
       if (m.includes("402") || m.toLowerCase().includes("credit")) {
         setError("You are out of chat messages. Buy a pack or claim the daily reward.");
-      } else if (m.includes("401") || m.includes("403")) {
+      } else if (m.toLowerCase().includes("sign in") || m.includes("401")) {
+        setError("Your session expired. Go back and sign in with your wallet again.");
+      } else if (m.includes("403")) {
         setError(m || "Lovable AI is currently unavailable for this workspace.");
       } else if (m.includes("429")) {
         setError("The valley is out of ink for now. Please try again in a moment.");
