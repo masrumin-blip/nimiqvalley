@@ -511,18 +511,21 @@ export type Database = {
           created_at: string
           expires_at: string
           token: string
+          token_hash: string | null
           wallet: string
         }
         Insert: {
           created_at?: string
           expires_at: string
-          token: string
+          token?: string
+          token_hash?: string | null
           wallet: string
         }
         Update: {
           created_at?: string
           expires_at?: string
           token?: string
+          token_hash?: string | null
           wallet?: string
         }
         Relationships: []
@@ -585,7 +588,9 @@ export type Database = {
           code: string | null
           created_at: string
           entry_cost: string
+          guest_seen_at: string
           guest_wallet: string | null
+          host_seen_at: string
           host_wallet: string
           id: string
           kind: string
@@ -601,7 +606,9 @@ export type Database = {
           code?: string | null
           created_at?: string
           entry_cost?: string
+          guest_seen_at?: string
           guest_wallet?: string | null
+          host_seen_at?: string
           host_wallet: string
           id?: string
           kind?: string
@@ -617,7 +624,9 @@ export type Database = {
           code?: string | null
           created_at?: string
           entry_cost?: string
+          guest_seen_at?: string
           guest_wallet?: string | null
+          host_seen_at?: string
           host_wallet?: string
           id?: string
           kind?: string
