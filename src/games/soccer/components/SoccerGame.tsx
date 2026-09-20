@@ -3,7 +3,7 @@ import { playSfx } from "@/lib/sfx";
 import { reportScore } from "@/lib/report-score";
 import { useOnlineSoccer } from "@/games/soccer/online/useOnlineSoccer";
 import { serverNow } from "@/lib/mp/clock";
-import { TURN_TIMEOUT_MS, type MatchMove, type MatchState } from "@/lib/soccer/types";
+import { type MatchMove, type MatchState } from "@/lib/soccer/types";
 import { useCredits, useCreditActions } from "@/hooks/useCredits";
 import { KEY_COST_NIM } from "@/lib/credits";
 
@@ -206,7 +206,9 @@ export default function SoccerGame() {
   const [mode, setMode] = useState<Mode>("cpu");
   const [menuTab, setMenuTab] = useState<Mode>("cpu");
   const [roomCode, setRoomCode] = useState("");
-  const [turnLeft, setTurnLeft] = useState(Math.round(TURN_TIMEOUT_MS / 1000));
+  // Official outcome of an online match (server decides, not the scoreline).
+  const [onlineResult, setOnlineResult] = useState<"win" | "loss" | "ended" | null>(null);
+  const [rivalLeft, setRivalLeft] = useState(false);
 
   const bodies = useRef<Body[]>(makeBodies());
   const sparks = useRef<Spark[]>([]);
@@ -293,6 +295,8 @@ export default function SoccerGame() {
       flipRef.current = !host;
       localTurnRef.current = 0;
       finishedRef.current = false;
+      setOnlineResult(null);
+      setRivalLeft(false);
       setConfirmExit(false);
       setTurnBoth("player");
       setBanner(host ? "YOUR TURN" : "RIVAL TURN");
@@ -345,36 +349,27 @@ export default function SoccerGame() {
         }
         return;
       }
-      const startedAt = onlineRef.current.match?.turnStartedAt;
-      const started = startedAt ? Date.parse(startedAt) : turnStartRef.current;
-      if (serverNow() - started > TURN_TIMEOUT_MS + 400) {
-        onlineRef.current.requestSkip(localTurnRef.current);
-      }
     }, 150);
     return () => window.clearInterval(id);
   }, [mode]);
 
-  // Turn countdown for the scoreboard.
-  useEffect(() => {
-    if (mode !== "online" || phase !== "aim") return;
-    const id = window.setInterval(() => {
-      const startedAt = onlineRef.current.match?.turnStartedAt;
-      const started = startedAt ? Date.parse(startedAt) : turnStartRef.current;
-      const left = Math.ceil((TURN_TIMEOUT_MS - (serverNow() - started)) / 1000);
-      setTurnLeft(Math.max(0, left));
-    }, 250);
-    return () => window.clearInterval(id);
-  }, [mode, phase, turn]);
 
-  // The rival closed the match.
+
+  // The match was closed on the server (rival left, signal lost, or a result).
   useEffect(() => {
     if (mode !== "online") return;
     if (!online.match || online.match.status !== "finished") return;
     if (finishedRef.current || phase === "over" || phase === "menu") return;
     finishedRef.current = true;
-    setBanner("RIVAL LEFT");
+    const winner = online.match.winnerWallet;
+    const me = online.wallet;
+    const result = !winner ? "ended" : winner === me ? "win" : "loss";
+    setOnlineResult(result);
+    setRivalLeft(true);
+    setBanner(result === "win" ? "RIVAL LEFT" : result === "loss" ? "RIVAL WINS" : "MATCH ENDED");
+    playSfx(result === "win" ? "win" : "lose", 0.9);
     setPhaseBoth("over");
-  }, [mode, online.match, phase]);
+  }, [mode, online.match, online.wallet, phase]);
 
   /* ---------- cpu ---------- */
 
@@ -498,6 +493,7 @@ export default function SoccerGame() {
         const mine = who === mineTeam();
         setBanner(mine ? "YOU WIN!" : modeRef.current === "online" ? "RIVAL WINS" : "CPU WINS");
         playSfx(mine ? "win" : "lose", 0.9);
+        if (modeRef.current === "online") setOnlineResult(mine ? "win" : "loss");
         setPhaseBoth("over");
         if (mine) {
           const wins = Number(localStorage.getItem("nimiq-soccer-wins") ?? 0) + 1;
@@ -808,7 +804,6 @@ export default function SoccerGame() {
               }`}
             >
               {myTurn ? "YOUR TURN" : `${rivalName.toUpperCase()} TURN`}
-              {mode === "online" && phase === "aim" ? ` · ${turnLeft}s` : ""}
             </div>
           </div>
           <div className="text-center">
@@ -1002,11 +997,26 @@ export default function SoccerGame() {
                       <div className="flex gap-2">
                         <input
                           value={roomCode}
-                          onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                          onChange={(e) =>
+                            setRoomCode(e.target.value.replace(/\s/g, "").toUpperCase())
+                          }
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === "Enter" &&
+                              roomCode.trim().length >= 4 &&
+                              !online.enterRoom.isPending
+                            ) {
+                              online.enterRoom.mutate(roomCode);
+                            }
+                          }}
                           placeholder="ROOM CODE"
                           aria-label="Room code"
                           maxLength={8}
-                          className="min-w-0 flex-1 rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-sm tracking-[0.2em] text-foreground placeholder:text-foreground/30"
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          style={{ WebkitTextFillColor: "var(--neon-yellow)" }}
+                          className="min-w-0 flex-1 rounded-xl border border-white/20 bg-black/30 px-3 py-2 text-base uppercase tracking-[0.3em] text-neon-yellow caret-neon-yellow placeholder:text-neon-yellow/40"
                         />
                         <button
                           onClick={() => online.enterRoom.mutate(roomCode)}
@@ -1128,36 +1138,53 @@ export default function SoccerGame() {
             </div>
           )}
 
-          {phase === "over" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/85 px-4 backdrop-blur-sm">
-              <div
-                className={`font-display text-center text-2xl tracking-[0.2em] sm:text-4xl ${
-                  myScore > rivalScore ? activeColor.textClass : "text-neon-red"
-                }`}
-              >
-                {myScore > rivalScore ? "YOU WIN!" : mode === "online" ? "RIVAL WINS" : "CPU WINS"}
-              </div>
-              <div className="text-lg text-muted-foreground">
-                {myScore} — {rivalScore}
-              </div>
-              <div className="flex flex-wrap justify-center gap-3">
-                {mode === "cpu" && (
-                  <button
-                    onClick={startMatch}
-                    className="rounded-xl bg-neon-yellow px-6 py-2 font-semibold text-black shadow-[0_0_25px_rgba(255,225,60,0.4)]"
+          {phase === "over" &&
+            (() => {
+              const won = mode === "online" ? onlineResult === "win" : myScore > rivalScore;
+              const headline =
+                mode === "online"
+                  ? onlineResult === "win"
+                    ? "YOU WIN!"
+                    : onlineResult === "loss"
+                      ? "RIVAL WINS"
+                      : "MATCH ENDED"
+                  : myScore > rivalScore
+                    ? "YOU WIN!"
+                    : "CPU WINS";
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/85 px-4 backdrop-blur-sm">
+                  <div
+                    className={`font-display text-center text-2xl tracking-[0.2em] sm:text-4xl ${
+                      won ? activeColor.textClass : "text-neon-red"
+                    }`}
                   >
-                    Play Again
-                  </button>
-                )}
-                <button
-                  onClick={exitToMenu}
-                  className="rounded-xl border border-white/20 px-6 py-2 font-semibold text-foreground/80"
-                >
-                  Main Menu
-                </button>
-              </div>
-            </div>
-          )}
+                    {headline}
+                  </div>
+                  {mode === "online" && rivalLeft ? (
+                    <div className="text-sm tracking-widest text-muted-foreground">RIVAL LEFT</div>
+                  ) : null}
+                  <div className="text-lg text-muted-foreground">
+                    {myScore} — {rivalScore}
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {mode === "cpu" && (
+                      <button
+                        onClick={startMatch}
+                        className="rounded-xl bg-neon-yellow px-6 py-2 font-semibold text-black shadow-[0_0_25px_rgba(255,225,60,0.4)]"
+                      >
+                        Play Again
+                      </button>
+                    )}
+                    <button
+                      onClick={exitToMenu}
+                      className="rounded-xl border border-white/20 px-6 py-2 font-semibold text-foreground/80"
+                    >
+                      Main Menu
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
           {confirmExit && (
             <div

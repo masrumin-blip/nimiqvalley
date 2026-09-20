@@ -6,11 +6,13 @@ import {
   DAILY_LINKS,
   DAILY_REWARD,
   FREE_CHATS_PER_DAY,
+  FREE_KEYS_PER_DAY,
   KEY_COST_NIM,
   PAY_TO_ADDRESS,
   ROOM_COST_NIM,
   type CreditState,
 } from "./credits";
+
 
 const RPC_URL = "https://rpc.nimiqwatch.com";
 
@@ -21,6 +23,7 @@ type CreditRow = {
   match_keys: number;
   free_chats_date: string | null;
   free_chats_used: number;
+  free_keys_date: string | null;
 };
 
 function today() {
@@ -31,24 +34,42 @@ function normalizeAddress(value: string) {
   return value.replace(/\s+/g, "").toUpperCase();
 }
 
+/**
+ * Every player starts each day with at least FREE_KEYS_PER_DAY match keys.
+ * Keys bought or left over are kept, but the free grant does not stack.
+ */
+async function topUpDailyKeys(row: CreditRow): Promise<CreditRow> {
+  if (row.free_keys_date === today()) return row;
+  const keys = Math.max(row.match_keys ?? 0, FREE_KEYS_PER_DAY);
+  await supabaseAdmin
+    .from("wallet_credits")
+    .update({ match_keys: keys, free_keys_date: today(), updated_at: new Date().toISOString() })
+    .eq("wallet", row.wallet);
+  return { ...row, match_keys: keys, free_keys_date: today() };
+}
+
 async function loadRow(wallet: string): Promise<CreditRow> {
   const { data } = await supabaseAdmin
     .from("wallet_credits")
-    .select("wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used")
+    .select(
+      "wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used, free_keys_date",
+    )
     .eq("wallet", wallet)
     .maybeSingle();
-  if (data) return data as CreditRow;
+  if (data) return topUpDailyKeys(data as CreditRow);
   const fresh: CreditRow = {
     wallet,
     chat_credits: 0,
     room_credits: 0,
-    match_keys: 0,
+    match_keys: FREE_KEYS_PER_DAY,
     free_chats_date: today(),
     free_chats_used: 0,
+    free_keys_date: today(),
   };
   await supabaseAdmin.from("wallet_credits").upsert({ ...fresh, updated_at: new Date().toISOString() });
   return fresh;
 }
+
 
 function freeLeft(row: CreditRow) {
   if (row.free_chats_date !== today()) return FREE_CHATS_PER_DAY;
@@ -115,7 +136,7 @@ export async function spendKey(wallet: string): Promise<void> {
   const row = await loadRow(wallet);
   if ((row.match_keys ?? 0) <= 0) {
     throw new Error(
-      `You need a match key to play online. Claim the daily reward or buy one for ${KEY_COST_NIM} NIM.`,
+      `You used all of today's match keys. You get ${FREE_KEYS_PER_DAY} free keys again tomorrow, or buy one now for ${KEY_COST_NIM} NIM.`,
     );
   }
   await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });

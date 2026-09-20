@@ -104,16 +104,8 @@ async function toState(row: RoomRow): Promise<RoomState> {
   return state!;
 }
 
-/** A match nobody has played for this long is closed by the server. */
-const ABANDON_TURN_MS = 3 * 60_000;
-/** Grace period after the round clock runs out, before the server closes it. */
-const ROUND_GRACE_MS = 15_000;
-/** Round lengths belong to the server, never to the host's device. */
-const ROUND_MS: Record<string, number> = { hexaman: 180_000, bomber: 180_000 };
-
-export function roundMsFor(gameSlug: string) {
-  return ROUND_MS[gameSlug] ?? 180_000;
-}
+/** A match nobody has touched for this long is closed so rooms cannot hang. */
+const ABANDON_TURN_MS = 30 * 60_000;
 
 async function getRow(id: string): Promise<RoomRow | null> {
   const { data } = await supabaseAdmin.from("mp_rooms").select(COLUMNS).eq("id", id).maybeSingle();
@@ -124,10 +116,10 @@ async function getRow(id: string): Promise<RoomRow | null> {
 async function sweep(row: RoomRow): Promise<RoomRow> {
   if (row.status !== "playing") return row;
   const now = Date.now();
-  const timedOut = row.ends_at ? new Date(row.ends_at).getTime() + ROUND_GRACE_MS <= now : false;
   const stalled = now - new Date(row.turn_started_at).getTime() > ABANDON_TURN_MS;
-  if (!timedOut && !stalled) return row;
+  if (!stalled) return row;
   const { data } = await supabaseAdmin
+
     .from("mp_rooms")
     .update({ status: "finished", updated_at: new Date().toISOString() })
     .eq("id", row.id)
@@ -152,11 +144,67 @@ export async function requireMember(wallet: string, id: string): Promise<RoomRow
   return row;
 }
 
+/** A seated player who stops polling for this long counts as gone. */
+const PRESENCE_TIMEOUT_MS = 15_000;
+
+/** Marks the viewer as still present in the room. */
+async function heartbeat(id: string, wallet: string) {
+  await supabaseAdmin
+    .from("mp_room_players")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("room_id", id)
+    .eq("wallet", wallet)
+    .neq("status", "left");
+}
+
+/**
+ * Closes a running match as soon as one of its players disappears (exit button,
+ * closed tab, lost signal), so the remaining player is not left waiting.
+ */
+async function dropAbsent(row: RoomRow): Promise<RoomRow> {
+  if (row.status !== "playing") return row;
+  const { data } = await supabaseAdmin
+    .from("mp_room_players")
+    .select("wallet, status, updated_at")
+    .eq("room_id", row.id)
+    .neq("status", "left");
+  const seated = (data ?? []) as Array<{ wallet: string; status: string; updated_at: string }>;
+  const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
+  const gone = seated.filter((p) => new Date(p.updated_at).getTime() < cutoff);
+  if (gone.length === 0) return row;
+
+  const now = new Date().toISOString();
+  await supabaseAdmin
+    .from("mp_room_players")
+    .update({ status: "left", updated_at: now })
+    .eq("room_id", row.id)
+    .in(
+      "wallet",
+      gone.map((p) => p.wallet),
+    );
+  const remaining = seated.filter((p) => !gone.some((g) => g.wallet === p.wallet));
+  const { data: updated } = await supabaseAdmin
+    .from("mp_rooms")
+    .update({
+      status: "finished",
+      winner_wallet: remaining.length === 1 ? remaining[0]!.wallet : row.winner_wallet,
+      updated_at: now,
+    })
+    .eq("id", row.id)
+    .eq("status", "playing")
+    .select(COLUMNS)
+    .maybeSingle();
+  return (updated as RoomRow | null) ?? { ...row, status: "finished" };
+}
+
 export async function getRoom(id: string, viewer?: string): Promise<RoomState | null> {
   const row = await getRow(id);
   if (!row) return null;
-  if (viewer) await requireMember(viewer, id);
-  return toState(await sweep(row));
+  if (viewer) {
+    await requireMember(viewer, id);
+    await heartbeat(id, viewer);
+  }
+  return toState(await dropAbsent(await sweep(row)));
 }
 
 export async function activeRoom(wallet: string, gameSlug: string): Promise<RoomState | null> {
@@ -456,22 +504,22 @@ export async function respondInvite(wallet: string, id: string, accept: boolean)
   return toState((data ?? row) as RoomRow);
 }
 
-/** Host kicks off a lobby that waits for several players (hexaman). */
+/** Host kicks off a lobby that waits for several players. */
 export async function startRoom(wallet: string, id: string) {
   const row = await getRow(id);
   if (!row || row.host_wallet !== wallet) throw new Error("Only the host can start the round.");
   if (row.status !== "waiting") return toState(row);
-  const durationMs = roundMsFor(row.game_slug);
   const now = Date.now();
   const { data } = await supabaseAdmin
     .from("mp_rooms")
     .update({
       status: "playing",
       started_at: new Date(now).toISOString(),
-      ends_at: new Date(now + durationMs).toISOString(),
+      ends_at: null,
       turn_started_at: new Date(now).toISOString(),
       updated_at: new Date(now).toISOString(),
     })
+
     .eq("id", id)
     .select(COLUMNS)
     .single();

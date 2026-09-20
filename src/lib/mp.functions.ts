@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { LobbyState, MoveRecord, PlayerTick, QueueState, RoomState } from "./mp/types";
 
 const idSchema = z.string().uuid();
-const slugSchema = z.enum(["checkers", "carrom", "hexaman", "bomber"]);
+const slugSchema = z.enum(["checkers", "carrom", "soccer"]);
 const settingsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({});
 const payloadSchema = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))

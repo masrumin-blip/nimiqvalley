@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useCreditActions, useCredits } from "@/hooks/useCredits";
-import { DAILY_LINKS, DAILY_REWARD } from "@/lib/credits";
+import { DAILY_LINKS, DAILY_REWARD, FREE_KEYS_PER_DAY } from "@/lib/credits";
 
 /** Daily free reward: visit both X accounts, then claim rooms and chat messages. */
 export function DailyRewardDialog({ className = "" }: { className?: string }) {
@@ -41,9 +41,11 @@ export function DailyRewardDialog({ className = "" }: { className?: string }) {
         <DialogHeader>
           <DialogTitle>Daily free reward</DialogTitle>
           <DialogDescription>
-            Visit both accounts on X, then claim {DAILY_REWARD.keys} match keys and{" "}
-            {DAILY_REWARD.chats} extra AI chat messages. Once per day.
+            You already get {FREE_KEYS_PER_DAY} free match keys every day. Visit both accounts on X
+            to also claim {DAILY_REWARD.keys} extra match keys and {DAILY_REWARD.chats} AI chat
+            messages. Once per day.
           </DialogDescription>
+
         </DialogHeader>
 
         <div className="space-y-2">

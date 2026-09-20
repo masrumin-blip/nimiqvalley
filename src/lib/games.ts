@@ -54,7 +54,7 @@ export const GAMES: GameEntry[] = [
     emoji: "👾",
     accent: "oklch(0.85 0.19 95)",
     cover: hexamanCover,
-    category: "multiplayer",
+    category: "arcade",
   },
   {
     slug: "mininja",
@@ -154,7 +154,7 @@ export const GAMES: GameEntry[] = [
     emoji: "💣",
     accent: "oklch(0.78 0.19 45)",
     cover: bomberCover,
-    category: "multiplayer",
+    category: "arcade",
   },
   {
     slug: "ship",

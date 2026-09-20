@@ -15,6 +15,10 @@ export const KEY_COST_NIM = 20;
 /** Extra rewards for the daily Twitter visit. */
 export const DAILY_REWARD = { chats: 3, keys: 2 } as const;
 
+/** Free match keys every player gets automatically each day. */
+export const FREE_KEYS_PER_DAY = 15;
+
+
 export type ChatPack = { id: string; nim: number; chats: number; label: string };
 
 export const CHAT_PACKS: ChatPack[] = [
