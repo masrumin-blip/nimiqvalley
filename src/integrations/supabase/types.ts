@@ -740,6 +740,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      grant_credits: {
+        Args: {
+          p_chat?: number
+          p_key?: number
+          p_room?: number
+          p_wallet: string
+        }
+        Returns: undefined
+      }
       moderate_chat_submission: {
         Args: {
           _is_profane: boolean
@@ -748,6 +757,37 @@ export type Database = {
         }
         Returns: Json
       }
+      redeem_nim_payment: {
+        Args: {
+          p_chat?: number
+          p_key?: number
+          p_kind: string
+          p_nim: number
+          p_room?: number
+          p_tx_hash: string
+          p_wallet: string
+        }
+        Returns: boolean
+      }
+      refund_chat_credit: {
+        Args: { p_source: string; p_wallet: string }
+        Returns: undefined
+      }
+      spend_chat_credit: {
+        Args: { p_free_limit: number; p_wallet: string }
+        Returns: {
+          chat_credits: number
+          free_chats_date: string
+          free_chats_used: number
+          match_keys: number
+          room_credits: number
+          source: string
+          wallet: string
+        }[]
+      }
+      spend_match_key: { Args: { p_wallet: string }; Returns: boolean }
+      spend_room_credit: { Args: { p_wallet: string }; Returns: boolean }
+      spend_room_entry: { Args: { p_wallet: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
