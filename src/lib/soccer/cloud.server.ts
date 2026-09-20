@@ -75,9 +75,49 @@ export async function getMatchRow(id: string): Promise<Row | null> {
   return (data as Row | null) ?? null;
 }
 
-export async function getMatch(id: string): Promise<MatchState | null> {
+/** A player who stops polling for this long counts as gone. */
+const PRESENCE_TIMEOUT_MS = 15_000;
+
+type PresenceRow = Row & { host_seen_at: string; guest_seen_at: string };
+
+/**
+ * Closes a running match when one side disappears (exit button, closed tab,
+ * lost signal) and hands the win to the player who stayed.
+ */
+async function dropAbsent(row: Row, viewer: string): Promise<Row> {
+  if (row.status !== "playing" || !row.guest_wallet) return row;
+  const now = new Date().toISOString();
+  if (row.host_wallet === viewer) {
+    await supabaseAdmin.from("soccer_matches").update({ host_seen_at: now }).eq("id", row.id);
+  } else if (row.guest_wallet === viewer) {
+    await supabaseAdmin.from("soccer_matches").update({ guest_seen_at: now }).eq("id", row.id);
+  }
+  const { data } = await supabaseAdmin
+    .from("soccer_matches")
+    .select("host_seen_at, guest_seen_at")
+    .eq("id", row.id)
+    .maybeSingle();
+  const seen = (data as Pick<PresenceRow, "host_seen_at" | "guest_seen_at"> | null) ?? null;
+  if (!seen) return row;
+  const cutoff = Date.now() - PRESENCE_TIMEOUT_MS;
+  const hostGone = new Date(seen.host_seen_at).getTime() < cutoff;
+  const guestGone = new Date(seen.guest_seen_at).getTime() < cutoff;
+  if (!hostGone && !guestGone) return row;
+  const winner = hostGone && guestGone ? null : hostGone ? row.guest_wallet : row.host_wallet;
+  const { data: updated } = await supabaseAdmin
+    .from("soccer_matches")
+    .update({ status: "finished", winner_wallet: winner, updated_at: now })
+    .eq("id", row.id)
+    .eq("status", "playing")
+    .select(COLUMNS)
+    .maybeSingle();
+  return (updated as Row | null) ?? { ...row, status: "finished", winner_wallet: winner };
+}
+
+export async function getMatch(id: string, viewer?: string): Promise<MatchState | null> {
   const row = await getMatchRow(id);
-  return row ? toState(row) : null;
+  if (!row) return null;
+  return toState(viewer ? await dropAbsent(row, viewer) : row);
 }
 
 export async function listMoves(id: string, since: number): Promise<MatchMove[]> {
@@ -169,6 +209,9 @@ async function startAsGuest(row: Row, wallet: string): Promise<MatchState> {
       turn_wallet: row.host_wallet,
       turn_started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      // Both sides start "seen now", so the absence check has a fair baseline.
+      host_seen_at: new Date().toISOString(),
+      guest_seen_at: new Date().toISOString(),
     })
     .eq("id", row.id)
     .in("status", ["waiting", "invited"])
@@ -197,15 +240,23 @@ export async function quickMatch(wallet: string, targetGoals: number): Promise<M
 }
 
 export async function joinRoom(wallet: string, code: string): Promise<MatchState> {
+  // Look the code up without a status filter so every case gets its own message.
   const { data } = await supabaseAdmin
     .from("soccer_matches")
     .select(COLUMNS)
-    .eq("code", code.toUpperCase())
-    .in("status", ["waiting"])
+    .eq("code", code.trim().toUpperCase())
+    .order("created_at", { ascending: false })
     .limit(1);
   const row = (data ?? [])[0] as Row | undefined;
-  if (!row) throw new Error("No open room with that code.");
-  if (row.host_wallet === wallet) throw new Error("This is your own room.");
+  if (!row) throw new Error("No room with that code.");
+  if (row.host_wallet === wallet || row.guest_wallet === wallet) {
+    // Rejoining a match you are already part of just returns it.
+    if (row.status === "playing") return toState(row);
+    if (row.host_wallet === wallet) throw new Error("This is your own room — wait for a rival.");
+  }
+  if (row.status === "finished") throw new Error("That room is already closed.");
+  if (row.guest_wallet && row.guest_wallet !== wallet)
+    throw new Error("That room is already full.");
   await abandonAll(wallet);
   return startAsGuest(row, wallet);
 }

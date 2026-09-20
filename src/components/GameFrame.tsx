@@ -14,6 +14,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { WalletGate } from "@/components/WalletGate";
+import { InGameChat } from "@/components/InGameChat";
+import { leaveActiveRoom } from "@/lib/active-room";
 
 /** Games that must fit a phone screen exactly, with no page scrolling. */
 const FIT_SLUGS = new Set([
@@ -33,7 +35,10 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const exitToHub = () => void navigate({ to: "/games" });
+  // Leaving the page also leaves the online room, so the rival is not left hanging.
+  const exitToHub = () => {
+    void leaveActiveRoom().finally(() => void navigate({ to: "/games" }));
+  };
 
   const exitButton = (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -69,6 +74,7 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
       <div className={`g-${slug} relative h-[100svh] w-full overflow-hidden overscroll-none bg-background`}>
         <WalletGate name={name}>
           {exitButton}
+          <InGameChat />
           <div className="h-full w-full overflow-hidden">{children}</div>
         </WalletGate>
       </div>
@@ -79,6 +85,7 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
     <div className={`g-${slug} relative min-h-screen bg-background`}>
       <WalletGate name={name}>
         {exitButton}
+        <InGameChat />
         {children}
       </WalletGate>
     </div>

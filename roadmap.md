@@ -16,3 +16,9 @@
 - [x] NIM payments: chat packs, 25 NIM room passes, daily X-visit reward.
 - [x] Shared matchmaking queue with widening skill window and 60s CPU suggestion.
 - [x] Nimiq Pay compatibility and mini-app security audit remediation.
+
+## Catatan setelah penggantian penuh dari zip (20 Sep 2026)
+- Kode aplikasi disamakan dengan zip: Hexaman kembali solo; mode demo, chat in-game, halaman privacy/terms, dan gerak halus rival Bomber dihapus.
+- Ditambahkan: 15 kunci pertandingan gratis per hari (`free_keys_date` di wallet_credits, migrasi 0015_daily_free_keys.sql).
+- Database masih memuat perubahan dari migrasi lama 0015-0017 (kredit atomik, redeem pembayaran atomik, token sesi di-hash) yang filenya tidak ada di zip. `src/lib/session.server.ts` dipertahankan memakai `token_hash` agar cocok dengan tabel `player_sessions`.
+- Kode kredit versi zip tidak memakai rutin database `spend_*`, jadi tidak ada bentrok di sana.

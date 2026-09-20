@@ -17,7 +17,6 @@ import { Menu } from "@/games/checkers/components/Menu";
 import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
-import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import { NEON_COLORS, OPPONENT_COLORS, type NeonColor } from "@/games/checkers/components/Piece";
 import { chooseMove, type Difficulty } from "@/games/checkers/lib/ai";
@@ -74,7 +73,6 @@ function CheckersGame() {
   const [thinking, setThinking] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   const [moveCounts, setMoveCounts] = useState({ y: 0, b: 0 });
-  const [clock, setClock] = useState(TURN_TIMEOUT_MS);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const online = useOnlineRoom({ gameSlug: "checkers", active: mode === "online", maxPlayers: 2 });
@@ -236,29 +234,26 @@ function CheckersGame() {
     [isOnline, online, room],
   );
 
-  // --- online turn clock: auto-plays the best move when time runs out ---
+
+  // --- online: the rival closed the match or walked away ---
+  const [rivalLeft, setRivalLeft] = useState(false);
   useEffect(() => {
-    if (!isOnline || outcome !== "playing" || screen !== "game") return;
-    const started = room ? new Date(room.turnStartedAt).getTime() : Date.now();
-    const id = setInterval(() => {
-      const left = Math.max(0, TURN_TIMEOUT_MS - (Date.now() - started));
-      setClock(left);
-      if (left === 0 && turn === mySide) {
-        const auto = chooseMove(board, mySide, "easy", repetitions);
-        if (auto) {
-          submitOnline(auto);
-          play(board, auto);
-        }
-      }
-    }, 250);
-    return () => clearInterval(id);
-  }, [isOnline, outcome, screen, room, turn, mySide, board, repetitions, submitOnline, play]);
+    if (!isOnline || !room || screen !== "game") return;
+    if (outcome !== "playing" || rivalLeft) return;
+    const gone = room.players.some((p) => p.wallet !== online.wallet && p.status === "left");
+    if (room.status !== "finished" && !gone) return;
+    setRivalLeft(true);
+  }, [isOnline, room, screen, outcome, rivalLeft, online.wallet]);
+
+  useEffect(() => {
+    setRivalLeft(false);
+  }, [room?.id, screen]);
 
   // --- online: publish the result once ---
   const reported = useRef(false);
   useEffect(() => {
     if (!isOnline || !room) return;
-    if (outcome === "playing") {
+    if (outcome === "playing" && !rivalLeft) {
       reported.current = false;
       return;
     }
@@ -266,11 +261,18 @@ function CheckersGame() {
     reported.current = true;
     const hostWallet = room.hostWallet;
     const guestWallet = room.players.find((p) => p.wallet !== hostWallet)?.wallet ?? null;
-    const winner = outcome === "draw" ? null : outcome === "y" ? hostWallet : guestWallet;
+    const winner = rivalLeft
+      ? (online.wallet ?? null)
+      : outcome === "draw"
+        ? null
+        : outcome === "y"
+          ? hostWallet
+          : guestWallet;
     online.finish(winner);
-  }, [isOnline, outcome, room, online]);
+  }, [isOnline, outcome, room, online, rivalLeft]);
 
   const handleSquare = (index: number) => {
+    if (rivalLeft) return;
     if (turn !== mySide || outcome !== "playing") return;
     if (isOnline && !online.myTurn) return;
     const target = targets.find((m) => m.to === index);
@@ -295,8 +297,9 @@ function CheckersGame() {
     ? (room?.players.find((p) => p.wallet !== online.wallet)?.name ?? "Rival")
     : "CPU";
 
-  const status =
-    outcome === mySide
+  const status = rivalLeft
+    ? `${rivalName} left the match — you win.`
+    : outcome === mySide
       ? "You win!"
       : outcome === oppSide
         ? `${rivalName} wins.`
@@ -414,7 +417,7 @@ function CheckersGame() {
                 </p>
                 {isOnline && outcome === "playing" && (
                   <p className="text-xs font-semibold text-neon-blue">
-                    {turn === mySide ? "Your move" : "Waiting"} · {Math.ceil(clock / 1000)}s
+                    {turn === mySide ? "Your move" : "Waiting"}
                   </p>
                 )}
                 {countdown !== null && (
@@ -461,8 +464,16 @@ function CheckersGame() {
             </p>
 
             <MatchResultDialog
-              open={isOnline && outcome !== "playing"}
-              title={outcome === "draw" ? "Draw" : outcome === mySide ? "You win!" : `${rivalName} wins`}
+              open={isOnline && (outcome !== "playing" || rivalLeft)}
+              title={
+                rivalLeft
+                  ? `${rivalName} left — you win!`
+                  : outcome === "draw"
+                    ? "Draw"
+                    : outcome === mySide
+                      ? "You win!"
+                      : `${rivalName} wins`
+              }
               subtitle="Final standings"
               rows={resultRows}
               onPlayAgain={exitToMenu}

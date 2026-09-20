@@ -4,7 +4,6 @@ import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialo
 import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
 import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
 import { serverNow } from "@/lib/mp/clock";
-import { TURN_TIMEOUT_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
 import {
   BOARD_B,
@@ -70,10 +69,31 @@ interface Spark {
   color: string;
 }
 
+/** Everything the two clients exchange while a board is running. */
+type NetEvent =
+  | { kind: "shot"; wallet: string; x: number; vx: number; vy: number }
+  | { kind: "sync"; wallet: string; state: string };
+
+/** Board state as seen from the seats, so both clients read it the same way. */
+interface Snapshot {
+  b: number;
+  p: Array<[number, number, number]>;
+  t: number;
+  c: PlayerColor | null;
+  qp: number | null;
+  qo: number | null;
+  d: [number, number];
+  m: [number, number];
+  w: [number, number];
+}
+
 const colorLabel = (c: PlayerColor | null) =>
   c === "white" ? "Yellow" : c === "orange" ? "Green" : "not claimed yet";
 const other = (c: PlayerColor): PlayerColor => (c === "white" ? "orange" : "white");
-const sideName = (s: Side) => (s === "you" ? "You" : "CPU");
+// Opponent wording follows the active mode: the CPU offline, the rival online.
+let opponentLabel = "CPU";
+const sideName = (s: Side) => (s === "you" ? "You" : opponentLabel);
+
 
 // ---------- CPU planning ----------
 function segmentBlocked(
@@ -201,6 +221,40 @@ export default function CarromGame() {
   const matchRef = useRef({ you: 0, cpu: 0, youBoards: 0, cpuBoards: 0 });
   const breakerRef = useRef<Side>("you");
 
+  // online seating: the room gives every player a seat, seat 0 always breaks
+  const seatRef = useRef(0);
+  const breakerSeatRef = useRef(0);
+  const boardNoRef = useRef(1);
+  const myWalletRef = useRef<string | null>(null);
+  const rivalWalletRef = useRef<string | null>(null);
+  /* Shots I make play straight away on my screen and are broadcast; the rival's
+     shots and the seat-0 state snapshots arrive here and play in order. */
+  const eventQueueRef = useRef<NetEvent[]>([]);
+  const pendingShotRef = useRef(false);
+  const myShotsSentRef = useRef(0);
+  /* Both clients simulate the very same world. Seat 1 simply sees the board
+     rotated half a turn, so each player always shoots from the near edge. */
+  const flipRef = useRef(false);
+  const baselineY = useCallback((side: Side) => {
+    const bottomIsMine = !flipRef.current;
+    const mine = side === "you";
+    return mine === bottomIsMine ? STRIKER_LINE_Y : CPU_STRIKER_LINE_Y;
+  }, []);
+  const viewToWorld = useCallback(
+    (p: { x: number; y: number }) =>
+      flipRef.current ? { x: 2 * CX - p.x, y: 2 * CY - p.y } : p,
+    [],
+  );
+  // seat <-> local side helpers: "you" means a different seat on each client
+  const sideToSeat = useCallback((s: Side) => (s === "you" ? seatRef.current : 1 - seatRef.current), []);
+  const seatToSide = useCallback(
+    (seat: number): Side => (seat === seatRef.current ? "you" : "cpu"),
+    [],
+  );
+
+
+
+
   const [phase, setPhase] = useState<Phase>("menu");
   const [mode, setMode] = useState<Mode>("training");
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
@@ -238,7 +292,8 @@ export default function CarromGame() {
   const resetBoardState = useCallback((breaker: Side) => {
     piecesRef.current = createPieces();
     const openingStriker = piecesRef.current.find((piece) => piece.kind === "striker");
-    if (openingStriker) openingStriker.y = breaker === "cpu" ? CPU_STRIKER_LINE_Y : STRIKER_LINE_Y;
+    if (openingStriker) openingStriker.y = baselineY(breaker);
+
     sparksRef.current = [];
     dragRef.current = null;
     shotPocketedRef.current = [];
@@ -256,20 +311,25 @@ export default function CarromGame() {
     setQueenTag("on board");
     setBoardResult(null);
     setRound((r) => r + 1);
-  }, []);
+  }, [baselineY]);
 
   const startGame = useCallback(
-    (m: Mode, d: Difficulty) => {
+    (m: Mode, d: Difficulty, breaker: Side = "you") => {
       modeRef.current = m;
       difficultyRef.current = d;
+      opponentLabel = m === "online" ? "Rival" : "CPU";
       setMode(m);
       setDifficulty(d);
       matchRef.current = { you: 0, cpu: 0, youBoards: 0, cpuBoards: 0 };
       setMatch({ you: 0, cpu: 0, youBoards: 0, cpuBoards: 0 });
-      breakerRef.current = "you";
+      breakerRef.current = breaker;
+      breakerSeatRef.current = 0;
+      eventQueueRef.current = [];
+      pendingShotRef.current = false;
+      boardNoRef.current = 1;
       setBoardNo(1);
       setShots(0);
-      resetBoardState("you");
+      resetBoardState(breaker);
       setStatus(
         m === "training"
           ? "Training: full carrom rules, no opponent."
@@ -277,20 +337,33 @@ export default function CarromGame() {
       );
       setExitOpen(false);
       exitOpenRef.current = false;
-      setPhaseBoth("guide");
+      setPhaseBoth(m === "online" ? "aim" : "guide");
     },
     [resetBoardState, setPhaseBoth],
   );
 
   const nextBoard = useCallback(() => {
-    breakerRef.current = breakerRef.current === "you" ? "cpu" : "you";
-    setBoardNo((n) => n + 1);
+    if (modeRef.current === "online") {
+      /* The breaking seat comes from the board number, so both clients always
+         reach the same answer even if one of them advanced a moment later. */
+      breakerSeatRef.current = boardNoRef.current % 2;
+      breakerRef.current = seatToSide(breakerSeatRef.current);
+    } else {
+      breakerRef.current = breakerRef.current === "you" ? "cpu" : "you";
+    }
+    eventQueueRef.current = [];
+    pendingShotRef.current = false;
+    boardNoRef.current += 1;
+    setBoardNo(boardNoRef.current);
     resetBoardState(breakerRef.current);
     setStatus(
-      breakerRef.current === "you" ? "New board — you break." : "New board — CPU breaks.",
+      breakerRef.current === "you"
+        ? "New board — you break."
+        : `New board — ${sideName("cpu")} breaks.`,
     );
     setPhaseBoth("aim");
   }, [resetBoardState, setPhaseBoth]);
+
 
   // ---- online play ----
   const navigate = useNavigate();
@@ -303,26 +376,135 @@ export default function CarromGame() {
   const room = online.room;
   const rivalName = room?.players.find((p) => p.wallet !== online.wallet)?.name ?? "Rival";
   const onlineResultOpen = mode === "online" && (phase === "won" || phase === "lost");
+  const mySeat = room?.players.find((p) => p.wallet === online.wallet)?.seat ?? 0;
+  const rivalWallet = room?.players.find((p) => p.wallet !== online.wallet)?.wallet ?? null;
+  const roomRef = useRef(room);
+
+  useEffect(() => {
+    roomRef.current = room;
+    seatRef.current = mySeat;
+    flipRef.current = mySeat === 1;
+    myWalletRef.current = online.wallet;
+    rivalWalletRef.current = rivalWallet;
+  }, [room, mySeat, online.wallet, rivalWallet]);
+
 
   const striker = () => piecesRef.current.find((p) => p.kind === "striker");
 
-  const sendShot = useCallback(
-    (x: number, vx: number, vy: number) => {
-      if (!room) return;
-      online.sendMove(room.turnNo, "shot", { x, vx, vy });
+  // Broadcasts keep their order on the server log, so no turn numbers are needed.
+  const sendEventRef = useRef(online.sendEvent);
+  sendEventRef.current = online.sendEvent;
+
+  /** Tell the rival about a shot I just played on my own screen. */
+  const sendShot = useCallback((x: number, vx: number, vy: number) => {
+    sendEventRef.current("shot", { x, vx, vy });
+  }, []);
+
+  /** Seat 0 is the reference board: it publishes the state after every turn. */
+  const buildSnapshot = useCallback((): string => {
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    const seat0Color: PlayerColor | null = youColorRef.current
+      ? seatRef.current === 0
+        ? youColorRef.current
+        : other(youColorRef.current)
+      : null;
+    const pointsOf = (seat: number) =>
+      seatToSide(seat) === "you" ? matchRef.current.you : matchRef.current.cpu;
+    const boardsOf = (seat: number) =>
+      seatToSide(seat) === "you" ? matchRef.current.youBoards : matchRef.current.cpuBoards;
+    const snap: Snapshot = {
+      b: boardNoRef.current,
+      p: piecesRef.current.map((p) => [round2(p.x), round2(p.y), p.alive ? 1 : 0]),
+      t: sideToSeat(turnRef.current),
+      c: seat0Color,
+      qp: queenPendingRef.current === null ? null : sideToSeat(queenPendingRef.current),
+      qo: queenOwnerRef.current === null ? null : sideToSeat(queenOwnerRef.current),
+      d: [dueRef.current[seatToSide(0)], dueRef.current[seatToSide(1)]],
+      m: [pointsOf(0), pointsOf(1)],
+      w: [boardsOf(0), boardsOf(1)],
+    };
+    return JSON.stringify(snap);
+  }, [seatToSide, sideToSeat]);
+
+  /** Seat 1 adopts the reference board whenever it differs from its own. */
+  const applySnapshot = useCallback(
+    (raw: string) => {
+      let snap: Snapshot;
+      try {
+        snap = JSON.parse(raw) as Snapshot;
+      } catch {
+        return;
+      }
+      if (!Array.isArray(snap.p)) return;
+      // a finished board or match keeps its own ending; only live play syncs
+      if (phaseRef.current !== "aim" && phaseRef.current !== "guide") return;
+      if (snap.b !== boardNoRef.current) return;
+      piecesRef.current.forEach((piece, i) => {
+        const row = snap.p[i];
+        if (!row) return;
+        piece.x = row[0];
+        piece.y = row[1];
+        piece.vx = 0;
+        piece.vy = 0;
+        piece.alive = row[2] === 1;
+      });
+      boardNoRef.current = snap.b;
+      setBoardNo(snap.b);
+      turnRef.current = seatToSide(snap.t);
+      setTurn(turnRef.current);
+      youColorRef.current = snap.c ? (seatRef.current === 0 ? snap.c : other(snap.c)) : null;
+      setYouColor(youColorRef.current);
+      queenPendingRef.current = snap.qp === null ? null : seatToSide(snap.qp);
+      queenOwnerRef.current = snap.qo === null ? null : seatToSide(snap.qo);
+      dueRef.current = {
+        you: snap.d[sideToSeat("you")] ?? 0,
+        cpu: snap.d[sideToSeat("cpu")] ?? 0,
+      };
+      setDue({ ...dueRef.current });
+      matchRef.current = {
+        you: snap.m[sideToSeat("you")] ?? 0,
+        cpu: snap.m[sideToSeat("cpu")] ?? 0,
+        youBoards: snap.w[sideToSeat("you")] ?? 0,
+        cpuBoards: snap.w[sideToSeat("cpu")] ?? 0,
+      };
+      setMatch({ ...matchRef.current });
+      const myColor = youColorRef.current;
+      setLeft(myColor ? piecesRef.current.filter((p) => p.alive && p.kind === myColor).length : 9);
+      setCpuLeft(
+        myColor
+          ? piecesRef.current.filter((p) => p.alive && p.kind === other(myColor)).length
+          : 9,
+      );
+      setQueenTag(
+        queenOwnerRef.current
+          ? `${sideName(queenOwnerRef.current)} covered`
+          : queenPendingRef.current
+            ? `${sideName(queenPendingRef.current)} must cover`
+            : "on board",
+      );
+      shotPocketedRef.current = [];
+      touchedRef.current = false;
+      dragRef.current = null;
+      pendingShotRef.current = false;
+      setBoardResult(null);
+      setPhaseBoth("aim");
     },
-    [online, room],
+    [seatToSide, setPhaseBoth, sideToSeat],
   );
 
-  // Start the board as soon as both players are seated.
+  // Start the board as soon as both players are seated; seat 0 breaks.
+  const startedRoomRef = useRef<string | null>(null);
   useEffect(() => {
-    if (room?.status === "playing" && (phase === "online" || phase === "menu")) {
-      startGame("online", difficulty);
-      setPhaseBoth("aim");
-    }
-  }, [room?.status, phase, startGame, difficulty, setPhaseBoth]);
+    if (!room || room.status !== "playing") return;
+    if (startedRoomRef.current === room.id) return;
+    startedRoomRef.current = room.id;
+    seatRef.current = mySeat;
+    flipRef.current = mySeat === 1;
+    startGame("online", difficulty, mySeat === 0 ? "you" : "cpu");
+    setStatus(mySeat === 0 ? "You break — your turn." : `${rivalName} breaks — waiting…`);
+  }, [room, mySeat, rivalName, startGame, difficulty]);
 
-  // Replay the rival's shot, mirrored through the board centre.
+  // Queue everything from the server log; the loop applies it between turns.
   const appliedShots = useRef(0);
   useEffect(() => {
     if (mode !== "online") return;
@@ -330,59 +512,51 @@ export default function CarromGame() {
     if (fresh.length === 0) return;
     appliedShots.current = online.moves.length;
     for (const rec of fresh) {
-      if (rec.wallet === online.wallet || rec.kind !== "shot") continue;
-      const s = striker();
-      if (!s) continue;
-      s.x = Math.min(Math.max(2 * CX - Number(rec.payload["x"]), STRIKER_MIN_X), STRIKER_MAX_X);
-      s.y = CPU_STRIKER_LINE_Y;
-      s.vx = -Number(rec.payload["vx"]);
-      s.vy = -Number(rec.payload["vy"]);
-      s.alive = true;
-      shotPocketedRef.current = [];
-      touchedRef.current = false;
-      turnRef.current = "cpu";
-      setTurn("cpu");
-      playSfx("flick", 0.7);
-      setPhaseBoth("moving");
+      if (rec.kind === "shot") {
+        eventQueueRef.current.push({
+          kind: "shot",
+          wallet: rec.wallet,
+          x: Number(rec.payload["x"]),
+          vx: Number(rec.payload["vx"]),
+          vy: Number(rec.payload["vy"]),
+        });
+      } else if (rec.kind === "sync") {
+        eventQueueRef.current.push({
+          kind: "sync",
+          wallet: rec.wallet,
+          state: String(rec.payload["state"] ?? ""),
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online.moves, mode]);
 
+
   useEffect(() => {
     appliedShots.current = 0;
+    eventQueueRef.current = [];
+    pendingShotRef.current = false;
   }, [room?.id]);
 
-  // Ten seconds per shot: an automatic stroke keeps both boards in sync.
+  // The rival closed the match or left the room: stop the board right away.
+  const rivalLeftRef = useRef(false);
   useEffect(() => {
-    if (mode !== "online" || phase !== "aim" || turn !== "you") return;
-    // Anchored to the server turn clock so both boards time out together.
-    const started = room?.turnStartedAt ? Date.parse(room.turnStartedAt) : serverNow();
-    const remaining = Math.max(0, TURN_TIMEOUT_MS - (serverNow() - started));
-    const timer = setTimeout(() => {
-      if (phaseRef.current !== "aim" || turnRef.current !== "you") return;
-      const s = striker();
-      if (!s) return;
-      const shot = planCpuShot(
-        piecesRef.current,
-        youColorRef.current,
-        "easy",
-        queenPendingRef.current === "you",
-        STRIKER_LINE_Y,
-      );
-      if (!shot) return;
-      s.x = shot.strikerX;
-      s.y = STRIKER_LINE_Y;
-      s.vx = shot.vx;
-      s.vy = shot.vy;
-      sendShot(s.x, s.vx, s.vy);
-      shotPocketedRef.current = [];
-      touchedRef.current = false;
-      setShots((v) => v + 1);
-      playSfx("flick", 0.8);
-      setPhaseBoth("moving");
-    }, remaining);
-    return () => clearTimeout(timer);
-  }, [mode, phase, turn, room?.turnStartedAt, setPhaseBoth, sendShot]);
+    if (mode !== "online" || !room) {
+      rivalLeftRef.current = false;
+      return;
+    }
+    if (phase !== "aim" && phase !== "moving" && phase !== "board") return;
+    if (!startedRoomRef.current) return;
+    const rivalGone = room.players.some(
+      (p) => p.wallet !== online.wallet && p.status === "left",
+    );
+    if (room.status !== "finished" && !rivalGone) return;
+    if (rivalLeftRef.current) return;
+    rivalLeftRef.current = true;
+    setStatus(`${rivalName} left the match — you win.`);
+    setPhaseBoth("won");
+  }, [mode, phase, room, online.wallet, rivalName, setPhaseBoth]);
+
 
   // Publish the winner once the match ends.
   const reportedRef = useRef(false);
@@ -433,13 +607,25 @@ export default function CarromGame() {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    return {
+    // pointer is in view space; seat 1 sees the board rotated half a turn
+    return viewToWorld({
       x: ((e.clientX - rect.left) / rect.width) * GAME_W,
       y: ((e.clientY - rect.top) / rect.height) * GAME_H,
-    };
+    });
   };
 
-  const canControl = () => phaseRef.current === "aim" && (modeRef.current === "training" || turnRef.current === "you");
+
+  const canControl = () => {
+    if (phaseRef.current !== "aim") return false;
+    if (modeRef.current === "training") return true;
+    if (turnRef.current !== "you") return false;
+    if (modeRef.current === "online") {
+      // no aiming while my shot is going out or the rival's is waiting to play
+      if (pendingShotRef.current || eventQueueRef.current.length > 0) return false;
+    }
+    return true;
+  };
+
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (!canControl()) return;
@@ -447,13 +633,14 @@ export default function CarromGame() {
     const s = striker();
     if (!point || !s) return;
     const { x, y } = point;
-    if (Math.hypot(x - s.x, y - s.y) < STRIKER_R * 3) {
+    // Only a deliberate grab on the striker starts a drag: tapping elsewhere
+    // never teleports it, so the striker only moves when you move it.
+    if (Math.hypot(x - s.x, y - s.y) < STRIKER_R * 3.2) {
       (e.target as Element).setPointerCapture(e.pointerId);
-      dragRef.current = { active: true, mode: "position", x: s.x, y: STRIKER_LINE_Y };
-    } else if (y > STRIKER_LINE_Y - 90) {
-      s.x = Math.min(Math.max(x, STRIKER_MIN_X), STRIKER_MAX_X);
+      dragRef.current = { active: true, mode: "position", x: s.x, y: baselineY("you") };
     }
   };
+
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -461,24 +648,29 @@ export default function CarromGame() {
     const point = toGame(e);
     const s = striker();
     if (!point || !s) return;
+    const myLine = baselineY("you");
     if (d.mode === "position") {
-      if (Math.abs(point.y - STRIKER_LINE_Y) > AIM_ACTIVATION_DISTANCE) {
+      if (Math.abs(point.y - myLine) > AIM_ACTIVATION_DISTANCE) {
         d.mode = "aim";
         d.x = point.x;
         d.y = point.y;
       } else {
         s.x = Math.min(Math.max(point.x, STRIKER_MIN_X), STRIKER_MAX_X);
         d.x = s.x;
-        d.y = STRIKER_LINE_Y;
+        d.y = myLine;
       }
     } else {
       // aim is limited to forward of the shooting line — never along or behind it,
       // so pieces behind the line can only be reached with bank shots
       const minSlope = Math.tan(Math.asin(MIN_FORWARD_RATIO));
+      const reach = Math.abs(point.x - s.x) * minSlope;
       d.x = point.x;
-      d.y = Math.max(point.y, s.y + Math.abs(point.x - s.x) * minSlope);
+      d.y = flipRef.current
+        ? Math.min(point.y, s.y - reach)
+        : Math.max(point.y, s.y + reach);
     }
   };
+
 
   const onPointerUp = () => {
     const d = dragRef.current;
@@ -491,16 +683,29 @@ export default function CarromGame() {
     const dy = s.y - d.y;
     const dist = Math.hypot(dx, dy);
     if (dist < MIN_SHOT_PULL) return;
-    const power = Math.min(dist / 170, 1) * MAX_POWER * 0.9;
-    s.vx = (dx / dist) * power;
-    s.vy = (dy / dist) * power;
-    if (modeRef.current === "online") sendShot(s.x, s.vx, s.vy);
+    // Gentler, longer pull curve so short slips stay weak and aiming is precise.
+    const t = Math.min((dist - MIN_SHOT_PULL) / 220, 1);
+    const power = (0.18 + 0.82 * t * t) * MAX_POWER * 0.85;
+
+    const vx = (dx / dist) * power;
+    const vy = (dy / dist) * power;
+
+    if (modeRef.current === "online") {
+      /* My shot plays right away here and is broadcast; the rival plays the
+         very same numbers, so both tables end up in the same position. */
+      myShotsSentRef.current += 1;
+      sendShot(s.x, vx, vy);
+    }
+
+    s.vx = vx;
+    s.vy = vy;
     shotPocketedRef.current = [];
     touchedRef.current = false;
     setShots((v) => v + 1);
     playSfx("flick", 0.9);
     setPhaseBoth("moving");
   };
+
 
   // ---- CPU turn ----
   useEffect(() => {
@@ -634,7 +839,7 @@ export default function CarromGame() {
        // striker returns to the shooter's own baseline
       s.alive = true;
       s.x = Math.min(Math.max(s.x, STRIKER_MIN_X), STRIKER_MAX_X);
-       s.y = shooter === "cpu" ? CPU_STRIKER_LINE_Y : STRIKER_LINE_Y;
+       s.y = baselineY(shooter);
       s.vx = 0;
       s.vy = 0;
 
@@ -746,12 +951,49 @@ export default function CarromGame() {
       }
 
       const next: Side = opponent;
-       s.y = next === "cpu" ? CPU_STRIKER_LINE_Y : STRIKER_LINE_Y;
+       s.y = baselineY(next);
       turnRef.current = next;
       setTurn(next);
-      setStatus(`${message} ${next === "you" ? "Your turn." : "CPU is thinking…"}`.trim());
+      const waiting = modeRef.current === "online" ? `${sideName("cpu")}'s turn…` : "CPU is thinking…";
+      setStatus(`${message} ${next === "you" ? "Your turn." : waiting}`.trim());
       setPhaseBoth("aim");
+      // Seat 0 publishes the reference board after every finished turn.
+      if (modeRef.current === "online" && seatRef.current === 0) {
+        sendEventRef.current("sync", { state: buildSnapshot() });
+      }
     };
+
+    /**
+     * Apply the next thing that came from the rival: a shot to play, or the
+     * reference board from seat 0 when the two tables drifted apart.
+     */
+    const applyNextEvent = () => {
+      const next = eventQueueRef.current[0];
+      if (!next) return;
+      eventQueueRef.current.shift();
+      const mine = next.wallet === myWalletRef.current;
+      if (next.kind === "sync") {
+        // seat 0 is the reference: it never adopts anyone else's board
+        if (!mine && seatRef.current !== 0) applySnapshot(next.state);
+        return;
+      }
+      // my own shots already played on this screen when I released them
+      if (mine) return;
+      const s = striker();
+      if (!s) return;
+      turnRef.current = "cpu";
+      setTurn("cpu");
+      s.x = Math.min(Math.max(next.x, STRIKER_MIN_X), STRIKER_MAX_X);
+      s.y = baselineY("cpu");
+      s.vx = next.vx;
+      s.vy = next.vy;
+      s.alive = true;
+      shotPocketedRef.current = [];
+      touchedRef.current = false;
+      playSfx("flick", 0.7);
+      setPhaseBoth("moving");
+    };
+
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -759,8 +1001,20 @@ export default function CarromGame() {
       const dt =
         modeRef.current === "online" ? 1 / 60 : Math.min((now - last) / 1000, 0.033);
       last = now;
+      // The exit dialog must never freeze an online table on one side only.
+      const paused = exitOpenRef.current && modeRef.current !== "online";
 
-      if (phaseRef.current === "moving" && !exitOpenRef.current) {
+      if (
+        modeRef.current === "online" &&
+        phaseRef.current !== "moving" &&
+        phaseRef.current !== "menu" &&
+        phaseRef.current !== "online" &&
+        eventQueueRef.current.length > 0
+      ) {
+        applyNextEvent();
+      }
+
+      if (phaseRef.current === "moving" && !paused) {
         let moving = false;
         for (let i = 0; i < 3; i++) {
           const res = stepPhysics(piecesRef.current, dt / 3);
@@ -797,12 +1051,22 @@ export default function CarromGame() {
         sparksRef.current,
         dragRef.current,
         phaseRef.current,
-        modeRef.current === "cpu" ? turnRef.current : "you",
+        baselineY(modeRef.current === "training" ? "you" : turnRef.current),
+        flipRef.current,
       );
+
     };
+
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [round, setPhaseBoth]);
+  }, [round, setPhaseBoth, baselineY, applySnapshot, buildSnapshot]);
+
+  // Online boards roll on by themselves so both tables advance together.
+  useEffect(() => {
+    if (mode !== "online" || phase !== "board") return;
+    const timer = setTimeout(() => nextBoard(), 3200);
+    return () => clearTimeout(timer);
+  }, [mode, phase, nextBoard]);
 
   const openExit = () => {
     exitOpenRef.current = true;
@@ -866,12 +1130,14 @@ export default function CarromGame() {
                 <p className="truncate text-base text-muted-foreground">{status}</p>
               </div>
               <div className="pointer-events-auto flex shrink-0 gap-2">
-                <button
-                  onClick={() => startGame(mode, difficulty)}
-                  className="rounded-full border border-neon-cyan/50 px-4 py-2 text-sm font-semibold text-neon-cyan"
-                >
-                  Restart
-                </button>
+                {mode !== "online" && (
+                  <button
+                    onClick={() => startGame(mode, difficulty)}
+                    className="rounded-full border border-neon-cyan/50 px-4 py-2 text-sm font-semibold text-neon-cyan"
+                  >
+                    Restart
+                  </button>
+                )}
                 <button
                   onClick={openExit}
                   className="rounded-full border border-neon-pink/50 px-4 py-2 text-sm font-semibold text-neon-pink"
@@ -881,16 +1147,20 @@ export default function CarromGame() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-3 text-lg font-bold">
-              {mode === "cpu" ? (
+              {mode !== "training" ? (
                 <>
                   <span className="rounded-xl bg-card/60 px-4 py-2 text-neon-lime">
-                    {turn === "you" ? "Your turn" : "CPU turn"}
+                    {turn === "you"
+                      ? "Your turn"
+                      : mode === "online"
+                        ? `${rivalName}'s turn`
+                        : "CPU turn"}
                   </span>
                   <span className="rounded-xl bg-card/60 px-4 py-2 text-neon-amber">
                     You {left} left · {match.you} pts
                   </span>
                   <span className="rounded-xl bg-card/60 px-4 py-2 text-neon-cyan">
-                    CPU {cpuLeft} left · {match.cpu} pts
+                    {mode === "online" ? rivalName : "CPU"} {cpuLeft} left · {match.cpu} pts
                   </span>
                 </>
               ) : (
@@ -901,6 +1171,7 @@ export default function CarromGame() {
                   </span>
                 </>
               )}
+
               <span className="rounded-xl bg-card/60 px-4 py-2 text-neon-pink">Queen: {queenTag}</span>
               <span className="rounded-xl bg-card/60 px-4 py-2 text-foreground">
                 Your colour: {colorLabel(youColor)}
@@ -976,7 +1247,7 @@ export default function CarromGame() {
           <Overlay>
             <h2 className="text-4xl font-black text-neon-lime">ONLINE MATCH</h2>
             <p className="mt-2 max-w-sm text-center text-muted-foreground">
-              Take turns with a real rival. Ten seconds per shot.
+              Take turns with a real rival — no clock, shoot when you are ready.
             </p>
             <div className="mt-6 w-full max-w-sm">
               <OnlinePanel
@@ -1048,21 +1319,28 @@ export default function CarromGame() {
         {phase === "board" && boardResult && (
           <Overlay>
             <h2 className="text-4xl font-black text-neon-cyan">
-              {boardResult.winner === "you" ? "You win the board" : "CPU wins the board"}
+              {boardResult.winner === "you"
+                ? "You win the board"
+                : `${mode === "online" ? rivalName : "CPU"} wins the board`}
             </h2>
             <p className="mt-3 max-w-md text-center text-muted-foreground">{boardResult.reason}</p>
             <p className="mt-4 text-2xl font-bold text-foreground">
               +{boardResult.points} points
             </p>
             <p className="mt-2 text-lg text-muted-foreground">
-              Match: You {match.you} ({match.youBoards} boards) · CPU {match.cpu} ({match.cpuBoards} boards)
+              Match: You {match.you} ({match.youBoards} boards) ·{" "}
+              {mode === "online" ? rivalName : "CPU"} {match.cpu} ({match.cpuBoards} boards)
             </p>
-            <button
-              onClick={nextBoard}
-              className="mt-8 rounded-full bg-neon-lime px-8 py-3 text-lg font-black text-background"
-            >
-              Next Board
-            </button>
+            {mode === "online" ? (
+              <p className="mt-8 text-lg font-bold text-neon-lime">Next board starting…</p>
+            ) : (
+              <button
+                onClick={nextBoard}
+                className="mt-8 rounded-full bg-neon-lime px-8 py-3 text-lg font-black text-background"
+              >
+                Next Board
+              </button>
+            )}
           </Overlay>
         )}
 
@@ -1152,7 +1430,8 @@ function draw(
   sparks: Spark[],
   drag: { active: boolean; x: number; y: number } | null,
   phase: Phase,
-  activeSide: Side,
+  activeLineY: number,
+  flip: boolean,
 ) {
   ctx.clearRect(0, 0, GAME_W, GAME_H);
   const bg = ctx.createLinearGradient(0, 0, GAME_W, GAME_H);
@@ -1161,7 +1440,16 @@ function draw(
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, GAME_W, GAME_H);
 
+  // seat 1 looks at the same world from the other end of the table
+  ctx.save();
+  if (flip) {
+    ctx.translate(CX, CY);
+    ctx.rotate(Math.PI);
+    ctx.translate(-CX, -CY);
+  }
+
   // board
+
   ctx.save();
   ctx.shadowColor = "#39e6ff";
   ctx.shadowBlur = 32;
@@ -1192,9 +1480,9 @@ function draw(
   ctx.restore();
 
   // Opponents shoot from opposite baselines, as on a real carrom board.
-  for (const side of ["cpu", "you"] as const) {
-    const lineY = side === "cpu" ? CPU_STRIKER_LINE_Y : STRIKER_LINE_Y;
-    const active = side === activeSide;
+  for (const lineY of [CPU_STRIKER_LINE_Y, STRIKER_LINE_Y]) {
+    const active = lineY === activeLineY;
+
     ctx.save();
     ctx.strokeStyle = active ? "rgba(138,255,193,0.72)" : "rgba(160,107,255,0.24)";
     ctx.shadowColor = active ? "#8affc1" : "#a06bff";
@@ -1244,7 +1532,7 @@ function draw(
       ctx.restore();
 
       // power meter
-      const power = Math.min(dist / 170, 1);
+      const power = Math.min(Math.max(dist - MIN_SHOT_PULL, 0) / 220, 1);
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.15)";
       ctx.lineWidth = 10;
@@ -1315,7 +1603,10 @@ function draw(
     ctx.stroke();
     ctx.restore();
   }
+
+  ctx.restore();
 }
+
 
 function firstAimHit(strikerPiece: Piece, pieces: Piece[], dx: number, dy: number) {
   const wallTimes = [

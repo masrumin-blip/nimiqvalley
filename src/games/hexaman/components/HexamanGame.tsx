@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { MatchResultDialog, type ResultRow } from "@/components/MatchResultDialog";
-import { OnlinePanel } from "@/games/_shared/online/OnlinePanel";
-import { useOnlineRoom } from "@/games/_shared/online/useOnlineRoom";
-import { serverNow } from "@/lib/mp/clock";
-import { HEXAMAN_ROUND_MS, TICK_POLL_MS } from "@/lib/mp/types";
 import { playSfx } from "@/lib/sfx";
+
 import {
   buildGrid,
   COLS,
@@ -223,126 +218,20 @@ export function HexamanGame() {
     publish();
   }, [countPellets, publish, resetPositions]);
 
-  const startGame = useCallback(
-    (online = false) => {
-      const g = game.current;
-      g.grid = buildGrid();
-      g.pellets = countPellets();
-      g.score = 0;
-      // Online runs are single-life: dying puts you out of the round.
-      g.lives = online ? 1 : 3;
-      g.level = 1;
-      g.floaters = [];
-      resetPositions();
-      g.status = "playing";
-      publish();
-    },
-    [countPellets, publish, resetPositions],
-  );
+  const startGame = useCallback(() => {
+    const g = game.current;
+    g.grid = buildGrid();
+    g.pellets = countPellets();
+    g.score = 0;
+    g.lives = 3;
+    g.level = 1;
+    g.floaters = [];
+    resetPositions();
+    g.status = "playing";
+    publish();
+  }, [countPellets, publish, resetPositions]);
 
-  // ---- online run ----
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<"solo" | "online">("solo");
-  const [lobbyOpen, setLobbyOpen] = useState(false);
-  const [resultOpen, setResultOpen] = useState(false);
-  const online = useOnlineRoom({
-    gameSlug: "hexaman",
-    active: lobbyOpen || mode === "online",
-    maxPlayers: 4,
-    withTicks: true,
-  });
-  const room = online.room;
-  const rivalsRef = useRef<
-    { name: string; x: number; y: number; alive: boolean }[]
-  >([]);
-  rivalsRef.current =
-    mode === "online"
-      ? online.ticks
-          .filter((t) => t.wallet !== online.wallet)
-          .map((t) => ({
-            name:
-              room?.players.find((p) => p.wallet === t.wallet)?.name ??
-              t.wallet.slice(0, 2),
-            x: t.x,
-            y: t.y,
-            alive: t.alive,
-          }))
-      : [];
 
-  // Start the run once the host opens the round.
-  useEffect(() => {
-    if (room?.status !== "playing" || mode === "online") return;
-    setMode("online");
-    setLobbyOpen(false);
-    setResultOpen(false);
-    startGame(true);
-  }, [room?.status, mode, startGame]);
-
-  // Stream my position; no collision checks between players anywhere.
-  useEffect(() => {
-    if (mode !== "online" || !room || room.status !== "playing") return;
-    const id = window.setInterval(() => {
-      const g = game.current;
-      online.sendTick({
-        x: Number(g.player.c.toFixed(2)),
-        y: Number(g.player.r.toFixed(2)),
-        dir: g.player.dir.x + g.player.dir.y * 2,
-        score: g.score,
-        alive: g.status !== "over",
-      });
-    }, TICK_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [mode, room, online]);
-
-  // Report my final score once, then close the round when one runner is left
-  // (or when the three minute timer runs out).
-  const reportedRef = useRef(false);
-  useEffect(() => {
-    if (mode !== "online" || !room || room.status !== "playing") return;
-    if (hud.status === "over" && !reportedRef.current) {
-      reportedRef.current = true;
-      online.reportStats(hud.score, { level: hud.level });
-      online.sendTick({
-        x: game.current.player.c,
-        y: game.current.player.r,
-        dir: 0,
-        score: hud.score,
-        alive: false,
-      });
-    }
-    const meAlive = hud.status !== "over";
-    const alive = [
-      ...online.ticks.filter((t) => t.wallet !== online.wallet && t.alive),
-      ...(meAlive ? [{ wallet: online.wallet ?? "me" }] : []),
-    ];
-    const timeUp = room.endsAt ? serverNow() > Date.parse(room.endsAt) : false;
-    if (alive.length <= 1 || timeUp) {
-      const best = [...room.players].sort((a, b) => b.score - a.score)[0];
-      const winner = alive.length === 1 ? (alive[0]?.wallet ?? null) : (best?.wallet ?? null);
-      online.finish(winner);
-    }
-  }, [mode, room, hud.status, hud.score, hud.level, online]);
-
-  useEffect(() => {
-    if (mode === "online" && room?.status === "finished") setResultOpen(true);
-  }, [mode, room?.status]);
-
-  const winnerName =
-    room?.winnerWallet === online.wallet
-      ? "You"
-      : (room?.players.find((p) => p.wallet === room?.winnerWallet)?.name ?? "Nobody");
-
-  const resultRows: ResultRow[] = [...(room?.players ?? [])]
-    .sort((a, b) => b.score - a.score)
-    .map((p) => ({
-      wallet: p.wallet,
-      name: p.name,
-      isYou: p.wallet === online.wallet,
-      stats: [
-        { label: "Score", value: String(p.score) },
-        { label: "Status", value: p.wallet === room?.winnerWallet ? "survivor" : "out" },
-      ],
-    }));
 
 
   const setDir = useCallback((d: Dir) => {
@@ -837,28 +726,6 @@ export function HexamanGame() {
         ctx.restore();
       }
 
-      // rival runners (online only) — drawn as ghosts of other players.
-      // They never collide with anyone; only the viruses are dangerous.
-      for (const rival of rivalsRef.current) {
-        if (!rival.alive) continue;
-        const rx = rival.x * CELL + CELL / 2;
-        const ry = rival.y * CELL + CELL / 2;
-        ctx.save();
-        ctx.globalAlpha = 0.65;
-        ctx.shadowColor = PALETTE.frightenedFlash;
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = PALETTE.frightenedFlash;
-        ctx.beginPath();
-        hexagon(rx, ry, CELL * 0.4);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = PALETTE.bg;
-        ctx.textAlign = "center";
-        ctx.font = "bold 10px ui-monospace, monospace";
-        ctx.fillText(rival.name.slice(0, 2).toUpperCase(), rx, ry + 3.5);
-        ctx.restore();
-      }
 
       // orange hexagon player with a wedge mouth and a directional eye
 
@@ -979,7 +846,7 @@ export function HexamanGame() {
           style={{ aspectRatio: `${W} / ${H}` }}
           className="h-[80%] max-h-[80%] w-auto max-w-full touch-none rounded-xl"
         />
-        {(hud.status === "ready" || hud.status === "over") && !lobbyOpen && (
+        {(hud.status === "ready" || hud.status === "over") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm">
             <h2 className="font-display text-2xl font-black uppercase tracking-[0.2em] text-primary drop-shadow-[0_0_12px_var(--color-primary)]">
               {hud.status === "over" ? "System Down" : "Ready"}
@@ -995,49 +862,10 @@ export function HexamanGame() {
             >
               {hud.status === "over" ? "Reboot" : "Start"}
             </Button>
-            <Button
-              onClick={() => setLobbyOpen(true)}
-              className="h-11 rounded-full border border-primary/60 bg-primary/10 px-6 font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary transition hover:bg-primary/20 shadow-neon-sm"
-            >
-              Online
-            </Button>
           </div>
         )}
 
-        {lobbyOpen && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto rounded-2xl bg-background/90 p-4 backdrop-blur-sm">
-            <h2 className="font-display text-xl font-black uppercase tracking-[0.2em] text-primary">
-              Online run
-            </h2>
-            <p className="max-w-[90%] text-center font-mono text-[10px] text-muted-foreground">
-              Up to 4 runners, one life each, three minute round. Players pass
-              through each other — only the viruses bite. Last one running wins.
-            </p>
-            <div className="w-full max-w-xs">
-              <OnlinePanel
-                online={online}
-                maxPlayers={4}
-                manualStart
-                roundMs={HEXAMAN_ROUND_MS}
-                onBack={() => setLobbyOpen(false)}
-              />
-            </div>
-          </div>
-        )}
 
-        <MatchResultDialog
-          open={resultOpen}
-          title={winnerName === "You" ? "You survived!" : `${winnerName} wins`}
-          subtitle="Run results"
-          rows={resultRows}
-          onPlayAgain={() => {
-            online.leave.mutate();
-            setMode("solo");
-            setResultOpen(false);
-            setLobbyOpen(true);
-          }}
-          onExit={() => navigate({ to: "/games" })}
-        />
 
       </div>
 

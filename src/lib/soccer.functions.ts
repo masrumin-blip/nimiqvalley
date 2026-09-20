@@ -103,10 +103,10 @@ export const fetchMatch = createServerFn({ method: "GET" })
     async ({
       data,
     }): Promise<{ match: MatchState | null; moves: MatchMove[]; serverNow: string }> => {
-      await requireWallet();
+      const wallet = await requireWallet();
       const cloud = await import("./soccer/cloud.server");
       const [match, moves] = await Promise.all([
-        cloud.getMatch(data.id),
+        cloud.getMatch(data.id, wallet),
         cloud.listMoves(data.id, data.since),
       ]);
       return { match, moves, serverNow: new Date().toISOString() };

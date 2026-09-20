@@ -33,6 +33,7 @@ import {
   type RoomState,
 } from "@/lib/mp/types";
 import { usePlayer } from "@/hooks/usePlayer";
+import { setActiveRoom } from "@/lib/active-room";
 
 export type GameSlug = "checkers" | "carrom" | "hexaman" | "bomber";
 
@@ -215,6 +216,25 @@ export function useOnlineRoom({
     [moveFn, roomId],
   );
 
+  /** Same as sendMove, but tells the caller whether the server accepted it. */
+  const sendMoveAck = useCallback(
+    async (
+      turnNo: number,
+      kind: string,
+      payload: Record<string, number | string | boolean | null>,
+    ): Promise<boolean> => {
+      if (!roomId) return false;
+      try {
+        await moveFn({ data: { id: roomId, turnNo, kind, payload } });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [moveFn, roomId],
+  );
+
+
   /** Fire-and-forget action event (bomb dropped, detonation) with no turn order. */
   const sendEvent = useCallback(
     (kind: string, payload: Record<string, number | string | boolean | null>) => {
@@ -256,6 +276,15 @@ export function useOnlineRoom({
     [finishFn, roomId],
   );
 
+  // Publish the room so the in-game Exit button and chat overlay can use it.
+  const activeCode = room && room.status !== "finished" ? (room.code ?? null) : null;
+  const inRoom = Boolean(room && room.status !== "finished");
+  useEffect(() => {
+    if (!inRoom) return;
+    setActiveRoom({ code: activeCode, leave: () => leaveFn({ data: { gameSlug } }) });
+    return () => setActiveRoom(null);
+  }, [activeCode, gameSlug, inRoom, leaveFn]);
+
   const me = room?.players.find((p) => p.wallet === wallet) ?? null;
 
   return {
@@ -278,6 +307,8 @@ export function useOnlineRoom({
     start,
     leave,
     sendMove,
+    sendMoveAck,
+
     sendEvent,
     requestSkip,
     sendTick,

@@ -18,6 +18,7 @@ import {
 import { setServerOffset } from "@/lib/mp/clock";
 import { LOBBY_POLL_MS, MATCH_POLL_MS, type MatchMove, type MatchState } from "@/lib/soccer/types";
 import { usePlayer } from "@/hooks/usePlayer";
+import { setActiveRoom } from "@/lib/active-room";
 
 /**
  * Lobby + live match sync for online Nimiq Soccer.
@@ -55,12 +56,27 @@ export function useOnlineSoccer(active: boolean) {
 
   const lobbyMatchId = lobby.data?.match?.id ?? null;
   useEffect(() => {
+    const lobbyMatch = lobby.data?.match ?? null;
     if (lobbyMatchId && lobbyMatchId !== matchId) {
       setMatchId(lobbyMatchId);
       setMoves([]);
       lastTurn.current = -1;
+      setMatch(lobbyMatch);
+      return;
     }
-    if (!lobbyMatchId && !matchId) setMatch(lobby.data?.match ?? null);
+    if (!lobbyMatchId && !matchId) {
+      setMatch(lobbyMatch);
+      return;
+    }
+    // Same match: keep the lobby copy as a fallback so a missed match poll
+    // cannot leave the host stuck on "waiting for a rival".
+    if (lobbyMatch && lobbyMatchId === matchId) {
+      setMatch((prev) =>
+        !prev || prev.status !== lobbyMatch.status || prev.guestWallet !== lobbyMatch.guestWallet
+          ? lobbyMatch
+          : prev,
+      );
+    }
   }, [lobby.data?.match, lobbyMatchId, matchId]);
 
   useQuery({
@@ -144,6 +160,15 @@ export function useOnlineSoccer(active: boolean) {
     },
     [finishFn, matchId],
   );
+
+  // Publish the match so the in-game Exit button and chat overlay can use it.
+  const activeCode = match && match.status !== "finished" ? (match.code ?? null) : null;
+  const inMatch = Boolean(match && match.status !== "finished");
+  useEffect(() => {
+    if (!inMatch) return;
+    setActiveRoom({ code: activeCode, leave: () => leaveFn() });
+    return () => setActiveRoom(null);
+  }, [activeCode, inMatch, leaveFn]);
 
   return {
     wallet,

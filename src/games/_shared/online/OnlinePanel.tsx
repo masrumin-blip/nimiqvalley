@@ -194,19 +194,31 @@ export function OnlinePanel({ online, maxPlayers, manualStart, roundMs, onBack }
       <div className="flex gap-2">
         <Input
           value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onChange={(e) => setCode(e.target.value.replace(/\s/g, "").toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && code.trim().length >= 4 && !online.enterRoom.isPending) {
+              online.enterRoom.mutate(code);
+            }
+          }}
           placeholder="ROOM CODE"
           maxLength={8}
-          className="font-mono tracking-[0.25em]"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          style={{ WebkitTextFillColor: "var(--neon-yellow)" }}
+          className="font-mono text-lg uppercase tracking-[0.3em] text-neon-yellow caret-neon-yellow placeholder:text-neon-yellow/40"
         />
         <Button
           variant="secondary"
-          disabled={busy || code.trim().length < 4}
+          disabled={online.enterRoom.isPending || code.trim().length < 4}
           onClick={() => online.enterRoom.mutate(code)}
         >
           Join
         </Button>
       </div>
+      {code.trim().length > 0 && code.trim().length < 4 ? (
+        <p className="-mt-2 text-xs text-muted-foreground">Room codes are 5 characters.</p>
+      ) : null}
 
       {invites.length > 0 ? (
         <div className="space-y-2">
