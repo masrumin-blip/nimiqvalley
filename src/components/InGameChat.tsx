@@ -117,7 +117,7 @@ export function InGameChat() {
                 aria-label="Close chat"
                 onClick={() => setOpen(false)}
               >
-                <X className="size-4 text-neon-yellow" />
+                <X className="size-4 text-neon-green" />
               </Button>
             </div>
 
