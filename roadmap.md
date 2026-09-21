@@ -16,6 +16,7 @@
 - [x] NIM payments: chat packs, 25 NIM room passes, daily X-visit reward.
 - [x] Shared matchmaking queue with widening skill window and 60s CPU suggestion.
 - [x] Nimiq Pay compatibility and mini-app security audit remediation.
+- [x] Align Nimiq Village house and tree collisions with their visible footprints; make the in-game chat close icon green.
 
 ## Catatan setelah penggantian penuh dari zip (20 Sep 2026)
 - Kode aplikasi disamakan dengan zip: Hexaman kembali solo; mode demo, chat in-game, halaman privacy/terms, dan gerak halus rival Bomber dihapus.

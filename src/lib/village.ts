@@ -36,6 +36,47 @@ export interface RestSpot {
   radius: number;
 }
 
+export interface HouseSpriteSpec {
+  crop: [number, number, number, number];
+  width: number;
+  height: number;
+  footprint: { width: number; height: number; bottom: number };
+}
+
+/** Rendering and solid footprint share one source of truth for every house tier. */
+export const HOUSE_SPRITES: Record<TierId, HouseSpriteSpec> = {
+  poor: {
+    crop: [70, 405, 285, 305],
+    width: 128,
+    height: 138,
+    footprint: { width: 89, height: 42, bottom: 12 },
+  },
+  normal: {
+    crop: [390, 360, 360, 370],
+    width: 164,
+    height: 168,
+    footprint: { width: 149, height: 48, bottom: 12 },
+  },
+  cool: {
+    crop: [65, 805, 525, 610],
+    width: 235,
+    height: 273,
+    footprint: { width: 211, height: 58, bottom: 12 },
+  },
+  sultan: {
+    crop: [620, 775, 550, 675],
+    width: 246,
+    height: 302,
+    footprint: { width: 227, height: 64, bottom: 12 },
+  },
+};
+
+export const TREE_SPRITES: Record<Tree["kind"], { crop: [number, number, number, number]; width: number; height: number; footprint: { width: number; height: number } }> = {
+  0: { crop: [0, 0, 240, 300], width: 112, height: 159, footprint: { width: 46, height: 24 } },
+  1: { crop: [240, 0, 200, 300], width: 91, height: 139, footprint: { width: 30, height: 22 } },
+  2: { crop: [455, 0, 135, 150], width: 77, height: 86, footprint: { width: 65, height: 20 } },
+};
+
 export const POND = { x: 2050, y: 1370, rx: 300, ry: 180 };
 
 export const REST_SPOTS: RestSpot[] = [
@@ -113,11 +154,25 @@ export function buildTrees(): Tree[] {
 
 export const LANTERNS: Lantern[]=[{x:1120,y:800},{x:1480,y:800},{x:1120,y:1120},{x:1480,y:1120},{x:420,y:960},{x:2250,y:960}];
 
-export function buildColliders():Rect[]{
+export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
   const rects:Rect[]=[];
-  for(const h of [...NEIGHBOR_HOUSES,{...PLAYER_HOUSE,tier:"poor" as const,owner:"you"}]) rects.push({x:h.x-82,y:h.y-48,w:164,h:104});
+  for(const h of [...NEIGHBOR_HOUSES,{...PLAYER_HOUSE,tier:playerHouseTier,owner:"you"}]) {
+    const { footprint } = HOUSE_SPRITES[h.tier];
+    rects.push({
+      x: h.x - footprint.width / 2,
+      y: h.y + footprint.bottom - footprint.height,
+      w: footprint.width,
+      h: footprint.height,
+    });
+  }
   for(const b of BUILDINGS){const [ox,oy,w,h]=b.collider;rects.push({x:b.x+ox,y:b.y+oy,w,h});}
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
+  for (const tree of trees) {
+    const { footprint } = TREE_SPRITES[tree.kind];
+    const width = footprint.width * tree.scale;
+    const height = footprint.height * tree.scale;
+    rects.push({ x: tree.x - width / 2, y: tree.y - height, w: width, h: height });
+  }
   return rects;
 }
 export function circleBlocked(x:number,y:number,radius:number,rects:Rect[]):boolean{

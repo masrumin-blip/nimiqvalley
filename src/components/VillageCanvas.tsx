@@ -20,12 +20,14 @@ import {
   buildColliders,
   buildTrees,
   circleBlocked,
+  HOUSE_SPRITES,
   LANTERNS,
   NEIGHBORS,
   NEIGHBOR_HOUSES,
   PLAYER_HOUSE,
   POND,
   REST_SPOTS,
+  TREE_SPRITES,
   WORLD_H,
   WORLD_W,
   VILLAGE_NPCS,
@@ -120,13 +122,8 @@ function drawHouseSprite(
   mine: boolean,
   t: number,
 ) {
-  const crops: Record<TierId, [number, number, number, number, number, number]> = {
-    poor: [70, 405, 285, 305, 128, 138],
-    normal: [390, 360, 360, 370, 164, 168],
-    cool: [65, 805, 525, 610, 235, 273],
-    sultan: [620, 775, 550, 675, 246, 302],
-  };
-  const [sx, sy, sw, sh, dw, dh] = crops[tier];
+  const { crop, width: dw, height: dh } = HOUSE_SPRITES[tier];
+  const [sx, sy, sw, sh] = crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = "rgba(30,60,40,0.18)";
@@ -397,22 +394,8 @@ function updateNpcState(npc: NpcState, t: number, dt: number, colliders: ReturnT
 }
 
 function drawTreeSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, scale: number, kind: 0 | 1 | 2) {
-  const crops: Array<[number, number, number, number]> = [
-    [0, 0, 240, 300],
-    [240, 0, 200, 300],
-    [455, 0, 135, 150],
-  ];
-  const crop = crops[kind];
-  if (!crop) return;
+  const { crop, width: baseWidth, height: baseHeight } = TREE_SPRITES[kind];
   const [sx, sy, sw, sh] = crop;
-  const sizes: Array<[number, number]> = [
-    [112, 159],
-    [91, 139],
-    [77, 86],
-  ];
-  const size = sizes[kind];
-  if (!size) return;
-  const [baseWidth, baseHeight] = size;
   const width = baseWidth * scale;
   const height = baseHeight * scale;
   ctx.save();
@@ -543,7 +526,8 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     objectImage.src = objectSprites;
     const houseImage = new Image();
     houseImage.src = houseTierSprites;
-    const colliders = buildColliders();
+    let colliderTier = tiersRef.current.houseTier;
+    let colliders = buildColliders(colliderTier, trees);
     const keys = new Set<string>();
     let nearby: Neighbor | null = null;
     let nearbyViewpoint: RestSpot | null = null;
@@ -592,6 +576,10 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       const viewW = vw / CAMERA_ZOOM;
       const viewH = vh / CAMERA_ZOOM;
       const s = stateRef.current;
+      if (colliderTier !== tiersRef.current.houseTier) {
+        colliderTier = tiersRef.current.houseTier;
+        colliders = buildColliders(colliderTier, trees);
+      }
       const dt = lastTime === 0 ? 16 : Math.min(t - lastTime, 50);
       lastTime = t;
 
