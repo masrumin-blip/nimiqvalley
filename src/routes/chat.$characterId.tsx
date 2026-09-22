@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatCredits } from "@/components/ChatCredits";
 import { Button } from "@/components/ui/button";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAiHistory } from "@/lib/ai-chat.functions";
 import { useCredits } from "@/hooks/useCredits";
 import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
