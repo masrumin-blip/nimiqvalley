@@ -99,16 +99,22 @@ function ChatRoomBody({ history }: { history: { id: string; role: "user" | "assi
     [character.id],
   );
 
-  const greeting = useMemo<UIMessage[]>(
-    () => [
+  const initialMessages = useMemo<UIMessage[]>(() => {
+    if (history.length > 0) {
+      return history.map((row) => ({
+        id: row.id,
+        role: row.role,
+        parts: [{ type: "text", text: row.text }],
+      }));
+    }
+    return [
       {
         id: `${character.id}-greeting`,
         role: "assistant",
         parts: [{ type: "text", text: character.greeting }],
       },
-    ],
-    [character.id, character.greeting],
-  );
+    ];
+  }, [character.id, character.greeting, history]);
 
   const { messages, sendMessage, status } = useChat({
     id: character.id,
