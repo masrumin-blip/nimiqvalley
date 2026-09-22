@@ -61,6 +61,26 @@ export const Route = createFileRoute("/api/chat")({
           "Keep replies to 1-3 short sentences, conversational, with no markdown headings or bullet lists.",
         ].join("\n\n");
 
+        const { listAiMessages, saveAiMessage } = await import("@/lib/ai-chat.server");
+        const uiMessages = messages as UIMessage[];
+        const lastUser = [...uiMessages].reverse().find((m) => m.role === "user");
+        const lastUserText = lastUser
+          ? lastUser.parts
+              .map((part) => (part.type === "text" ? part.text : ""))
+              .join("")
+              .trim()
+          : "";
+        if (lastUserText) await saveAiMessage(wallet, character.id, "user", lastUserText);
+
+        // The saved conversation is the source of truth, so the model always
+        // sees every earlier turn even after a reload.
+        const stored = await listAiMessages(wallet, character.id);
+        const modelMessages = stored.map((row) => ({
+          id: row.id,
+          role: row.role,
+          parts: [{ type: "text" as const, text: row.text }],
+        })) as UIMessage[];
+
         try {
           const result = streamText({
             model: lovable.responses("openai/gpt-6-astra"),
