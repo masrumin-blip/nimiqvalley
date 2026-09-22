@@ -118,7 +118,7 @@ function ChatRoomBody({ history }: { history: { id: string; role: "user" | "assi
 
   const { messages, sendMessage, status } = useChat({
     id: character.id,
-    messages: greeting,
+    messages: initialMessages,
     transport,
     onError: (err) => {
       const m = err.message;
