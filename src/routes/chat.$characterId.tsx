@@ -194,7 +194,7 @@ function ChatRoomBody({ history }: { history: { id: string; role: "user" | "assi
             <div className="mx-auto mb-2 max-w-sm text-center">
               <p className="font-display text-2xl font-semibold">Story room</p>
               <p className="mt-1 text-xs leading-relaxed text-ink/45">
-                This conversation is not saved; it fades when you leave the room.
+                This conversation is saved to your wallet, so you can pick it up any time.
               </p>
             </div>
 
