@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_messages: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          role: string
+          text: string
+          wallet: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          text: string
+          wallet: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          text?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       chat_dms: {
         Row: {
           created_at: string
