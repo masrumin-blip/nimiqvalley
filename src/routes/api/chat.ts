@@ -103,8 +103,15 @@ export const Route = createFileRoute("/api/chat")({
 
           return withLovableAiGatewayRunIdHeader(
             result.toUIMessageStreamResponse({
-              originalMessages: messages as UIMessage[],
+              originalMessages: uiMessages,
               sendReasoning: true,
+              onFinish: async ({ responseMessage }) => {
+                const text = responseMessage.parts
+                  .map((part) => (part.type === "text" ? part.text : ""))
+                  .join("")
+                  .trim();
+                if (text) await saveAiMessage(wallet, character.id, "assistant", text);
+              },
               headers: getLovableAiGatewayResponseHeaders(undefined, {
                 ...(initialRunId ? { "X-Lovable-AIG-Run-ID": initialRunId } : {}),
               }),
