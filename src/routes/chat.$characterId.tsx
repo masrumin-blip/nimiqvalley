@@ -57,6 +57,25 @@ function reasoningText(message: UIMessage) {
 
 function ChatRoom() {
   const character = Route.useLoaderData();
+  const historyQuery = useQuery({
+    queryKey: ["ai-history", character.id],
+    queryFn: () => fetchAiHistory({ data: { characterId: character.id } }),
+    staleTime: Infinity,
+  });
+
+  if (historyQuery.isPending) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-parchment text-sm text-ink/50">
+        Opening the story room…
+      </main>
+    );
+  }
+
+  return <ChatRoomBody history={historyQuery.data ?? []} />;
+}
+
+function ChatRoomBody({ history }: { history: { id: string; role: "user" | "assistant"; text: string }[] }) {
+  const character = Route.useLoaderData();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
