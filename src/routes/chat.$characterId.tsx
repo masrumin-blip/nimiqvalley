@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatCredits } from "@/components/ChatCredits";
 import { Button } from "@/components/ui/button";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchAiHistory } from "@/lib/ai-chat.functions";
 import { useCredits } from "@/hooks/useCredits";
 import { totalChatsLeft } from "@/lib/credits";
 import { getCharacter } from "@/lib/characters";
@@ -57,6 +58,25 @@ function reasoningText(message: UIMessage) {
 
 function ChatRoom() {
   const character = Route.useLoaderData();
+  const historyQuery = useQuery({
+    queryKey: ["ai-history", character.id],
+    queryFn: () => fetchAiHistory({ data: { characterId: character.id } }),
+    staleTime: Infinity,
+  });
+
+  if (historyQuery.isPending) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-parchment text-sm text-ink/50">
+        Opening the story room…
+      </main>
+    );
+  }
+
+  return <ChatRoomBody history={historyQuery.data ?? []} />;
+}
+
+function ChatRoomBody({ history }: { history: { id: string; role: "user" | "assistant"; text: string }[] }) {
+  const character = Route.useLoaderData();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -79,20 +99,26 @@ function ChatRoom() {
     [character.id],
   );
 
-  const greeting = useMemo<UIMessage[]>(
-    () => [
+  const initialMessages = useMemo<UIMessage[]>(() => {
+    if (history.length > 0) {
+      return history.map((row) => ({
+        id: row.id,
+        role: row.role,
+        parts: [{ type: "text", text: row.text }],
+      }));
+    }
+    return [
       {
         id: `${character.id}-greeting`,
         role: "assistant",
         parts: [{ type: "text", text: character.greeting }],
       },
-    ],
-    [character.id, character.greeting],
-  );
+    ];
+  }, [character.id, character.greeting, history]);
 
   const { messages, sendMessage, status } = useChat({
     id: character.id,
-    messages: greeting,
+    messages: initialMessages,
     transport,
     onError: (err) => {
       const m = err.message;
@@ -168,7 +194,7 @@ function ChatRoom() {
             <div className="mx-auto mb-2 max-w-sm text-center">
               <p className="font-display text-2xl font-semibold">Story room</p>
               <p className="mt-1 text-xs leading-relaxed text-ink/45">
-                This conversation is not saved; it fades when you leave the room.
+                This conversation is saved to your wallet, so you can pick it up any time.
               </p>
             </div>
 
