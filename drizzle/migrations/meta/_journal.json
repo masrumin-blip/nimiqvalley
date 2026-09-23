@@ -127,6 +127,13 @@
       "when": 1790042265067,
       "tag": "0017_create_ai_chat_history",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790127265160,
+      "tag": "0018_create_game_run_sessions",
+      "breakpoints": true
     }
   ]
 }

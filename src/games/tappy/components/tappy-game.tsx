@@ -1,53 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
 import { Play, RotateCcw } from "lucide-react";
-import { reportScore } from "@/lib/report-score";
-
-// ---- Game constants (logical canvas units) ----
-const W = 400;
-const H = 640;
-const BIRD_X = 96;
-const BIRD_R = 14;
-const GRAVITY = 1500; // px/s^2
-const FLAP = -430; // px/s
-const TREE_W = 68;
-const GAP = 165;
-const GAP_MIN = 112;
-const SPEED = 170; // px/s
-const SPEED_MAX = 330;
-const SPAWN_EVERY = 1.45; // seconds
-const SPAWN_MIN = 0.95;
-const GROUND_H = 70;
-
-// ---- Progressive difficulty ----
-// Level naik setiap 5 poin; makin tinggi level makin cepat & celah makin sempit.
-function levelFor(score: number) {
-  return Math.floor(score / 5) + 1;
-}
-function difficultyFor(score: number) {
-  const t = Math.min(1, score / 50); // penuh pada skor 50
-  const e = t * t * (3 - 2 * t); // smoothstep
-  return {
-    speed: SPEED + (SPEED_MAX - SPEED) * e,
-    gap: GAP - (GAP - GAP_MIN) * e,
-    spawn: SPAWN_EVERY - (SPAWN_EVERY - SPAWN_MIN) * e,
-    wobble: e, // pohon bergerak naik-turun di level tinggi
-  };
-}
+import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import {
+  BIRD_R,
+  BIRD_X,
+  GROUND_H,
+  H,
+  MAX_TICKS,
+  SPEED,
+  TICK_DT,
+  TREE_W,
+  W,
+  createRng,
+  createSimState,
+  levelFor,
+  stepSim,
+  type SimState,
+} from "@/games/tappy/tappy-sim";
 
 type Phase = "ready" | "playing" | "dead";
 
-interface FutureTree {
-  x: number;
-  gapY: number; // center of gap
-  baseY: number;
-  gap: number;
-  amp: number; // amplitudo gerak vertikal
-  phase: number;
-  variant: number;
-  coinY: number;
-  coinCollected: boolean;
-}
+// Re-exported shape for the renderer below; the authoritative version lives in tappy-sim.ts.
+type FutureTree = SimState["trees"][number];
 
 interface Particle {
   x: number;
@@ -57,12 +32,6 @@ interface Particle {
   life: number; // 0..1
   size: number;
   hue: number;
-}
-
-function randomGapY(gap: number, amp = 0) {
-  const margin = 60 + amp;
-  const span = H - GROUND_H - gap - margin * 2;
-  return margin + gap / 2 + Math.random() * Math.max(20, span);
 }
 
 export function TappyGame() {
@@ -77,39 +46,81 @@ export function TappyGame() {
     return Number(localStorage.getItem("tappy-best") ?? 0);
   });
 
-  // Mutable game state in a ref so the loop never re-subscribes
+  // Mutable game state in a ref so the loop never re-subscribes.
+  // `sim` (from tappy-sim.ts) is the only thing that decides score/collisions.
+  // Everything else here (particles, flash, shake, rot, idle birdY) is
+  // cosmetic and never affects the verified result.
   const gs = useRef({
     phase: "ready" as Phase,
-    birdY: H / 2,
+    sim: null as SimState | null,
+    rng: null as (() => number) | null,
+    simAcc: 0, // fixed-timestep accumulator
+    simTickCount: 0,
+    pendingFlap: false,
+    inputTicks: [] as number[],
+    sessionId: null as string | null, // null = local practice run, not submitted for verification
+    birdY: H / 2, // mirrors sim.birdY while playing; free-runs during idle bob otherwise
     vel: 0,
     rot: 0,
     trees: [] as FutureTree[],
-    spawnT: 0,
-    score: 0,
     time: 0,
     flash: 0,
     particles: [] as Particle[],
     shake: 0,
-    nextVariant: 0,
   });
+
+  // A run's seed always comes from the server so a player can never pick a
+  // seed that's easy to farm. Pre-fetched ahead of time so tapping "start"
+  // feels instant.
+  const nextSessionRef = useRef<{ sessionId: string; seed: number } | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+
+  const prefetchSession = useCallback(async () => {
+    try {
+      const session = await startGameRun({ data: { slug: "tappy" } });
+      nextSessionRef.current = session;
+      setSessionReady(true);
+    } catch {
+      // Not signed in, or the request failed — the game still works locally,
+      // it just won't be eligible for the leaderboard until a session exists.
+      nextSessionRef.current = null;
+      setSessionReady(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void prefetchSession();
+  }, [prefetchSession]);
 
   const startGame = useCallback(() => {
     const g = gs.current;
+    const session = nextSessionRef.current;
+    // Use the server-issued seed when we have one (verified run); otherwise
+    // fall back to a local-only seed so guests can still play and practice.
+    const seed = session?.seed ?? Math.floor(Math.random() * 2 ** 31);
+    g.sessionId = session?.sessionId ?? null;
+    nextSessionRef.current = null;
+    setSessionReady(false);
+    void prefetchSession(); // line up the next run in the background
+
     g.phase = "playing";
-    g.birdY = H / 2;
-    g.vel = FLAP * 0.6;
+    g.rng = createRng(seed);
+    g.sim = createSimState(g.rng);
+    g.simAcc = 0;
+    g.simTickCount = 0;
+    g.pendingFlap = false;
+    g.inputTicks = [];
+    g.birdY = g.sim.birdY;
+    g.vel = g.sim.vel;
     g.trees = [];
-    g.spawnT = 0.9;
-    g.score = 0;
     g.flash = 0;
     g.particles = [];
     g.shake = 0;
-    g.nextVariant = Math.floor(Math.random() * 4);
     setScore(0);
     setLevel(1);
     setPhase("playing");
     playSfx("start");
-  }, []);
+  }, [prefetchSession]);
 
   const die = useCallback(() => {
     const g = gs.current;
@@ -132,12 +143,29 @@ export function TappyGame() {
     }
     playSfx("gameover");
     setPhase("dead");
-    reportScore("tappy", g.score);
-    setBest((prev) => {
-      const nb = Math.max(prev, g.score);
-      localStorage.setItem("tappy-best", String(nb));
-      return nb;
-    });
+
+    // Verification happens here: we send the seed's session id and the
+    // ticks we flapped on, never the score itself. The server replays the
+    // exact same simulation and writes whatever score *that* run produces.
+    const sessionId = g.sessionId;
+    const inputs = g.inputTicks;
+    g.sessionId = null;
+    if (sessionId) {
+      void submitGameRun({ data: { slug: "tappy", sessionId, inputs } })
+        .then((res) => {
+          if (res.saved) {
+            setBest((prev) => {
+              const nb = Math.max(prev, res.score);
+              localStorage.setItem("tappy-best", String(nb));
+              return nb;
+            });
+          }
+        })
+        .catch(() => {
+          /* Leaderboard write is best-effort from the client's point of view;
+             the server remains the sole source of truth either way. */
+        });
+    }
   }, []);
 
   const flap = useCallback(() => {
@@ -147,7 +175,10 @@ export function TappyGame() {
       return;
     }
     if (g.phase === "playing") {
-      g.vel = FLAP;
+      // The actual velocity change only takes effect on the next fixed tick
+      // (see the loop below) — this just marks the request and plays the
+      // instant feedback so input still feels responsive.
+      g.pendingFlap = true;
       playSfx("jump", 0.6);
       // flap burst
       for (let i = 0; i < 6; i++) {
@@ -192,85 +223,56 @@ export function TappyGame() {
       const g = gs.current;
       g.time += dt;
 
-      if (g.phase === "playing") {
-        const d = difficultyFor(g.score);
-        g.vel += GRAVITY * dt;
-        g.birdY += g.vel * dt;
-        g.rot = Math.max(-0.5, Math.min(1.3, g.vel / 500));
+      if (g.phase === "playing" && g.sim) {
+        // Fixed-timestep simulation: physics/spawn/collisions always advance
+        // in exact 1/60s increments regardless of the render frame rate, so
+        // a run replays identically no matter what device it was played on.
+        g.simAcc += dt;
+        while (g.simAcc >= TICK_DT) {
+          g.simAcc -= TICK_DT;
+          const flapThisTick = g.pendingFlap;
+          g.pendingFlap = false;
+          if (flapThisTick) g.inputTicks.push(g.simTickCount);
 
-        // spawn futuristic trees
-        g.spawnT -= dt;
-        if (g.spawnT <= 0) {
-          const amp = g.score >= 15 ? d.wobble * 42 : 0;
-          const baseY = randomGapY(d.gap, amp);
-          g.trees.push({
-            x: W + TREE_W,
-            gapY: baseY,
-            baseY,
-            gap: d.gap,
-            amp,
-            phase: Math.random() * Math.PI * 2,
-            variant: g.nextVariant,
-            coinY: baseY + (Math.random() - 0.5) * Math.min(44, d.gap * 0.28),
-            coinCollected: false,
-          });
-          g.nextVariant = (g.nextVariant + 1 + Math.floor(Math.random() * 3)) % 4;
-          g.spawnT = d.spawn;
-        }
+          const stepped = stepSim(g.sim, g.rng!, flapThisTick);
+          g.sim = stepped.state;
+          g.simTickCount += 1;
 
-        // move futuristic trees
-        for (const p of g.trees) {
-          p.x -= d.speed * dt;
-          p.gapY = p.amp > 0 ? p.baseY + Math.sin(g.time * 1.6 + p.phase) * p.amp : p.baseY;
-          p.coinY = p.gapY;
-        }
-        g.trees = g.trees.filter((p) => p.x + TREE_W > -20);
-
-        // Coins are the only source of score.
-        for (const p of g.trees) {
-          if (p.coinCollected) continue;
-          const coinX = p.x + TREE_W / 2;
-          const dx = BIRD_X - coinX;
-          const dy = g.birdY - p.coinY;
-          if (dx * dx + dy * dy < (BIRD_R + 15) * (BIRD_R + 15)) {
-            p.coinCollected = true;
-            g.score += 1;
-            setScore(g.score);
-            setLevel(levelFor(g.score));
+          if (stepped.events.coins.length > 0) {
+            setScore(g.sim.score);
+            setLevel(levelFor(g.sim.score));
             playSfx("coin", 0.5);
-            for (let i = 0; i < 14; i++) {
-              const a = (Math.PI * 2 * i) / 14;
-              g.particles.push({
-                x: coinX,
-                y: p.coinY,
-                vx: Math.cos(a) * (55 + Math.random() * 80),
-                vy: Math.sin(a) * (55 + Math.random() * 80),
-                life: 0.9,
-                size: 2 + Math.random() * 2.5,
-                hue: 48 + Math.random() * 10,
-              });
-            }
-          }
-        }
-
-        // collisions
-        if (g.birdY + BIRD_R >= H - GROUND_H || g.birdY - BIRD_R <= 0) {
-          die();
-        } else {
-          for (const p of g.trees) {
-            const inX = BIRD_X + BIRD_R > p.x && BIRD_X - BIRD_R < p.x + TREE_W;
-            if (inX) {
-              const top = p.gapY - p.gap / 2;
-              const bottom = p.gapY + p.gap / 2;
-              if (g.birdY - BIRD_R < top || g.birdY + BIRD_R > bottom) {
-                die();
-                break;
+            for (const coin of stepped.events.coins) {
+              for (let i = 0; i < 14; i++) {
+                const a = (Math.PI * 2 * i) / 14;
+                g.particles.push({
+                  x: coin.x,
+                  y: coin.y,
+                  vx: Math.cos(a) * (55 + Math.random() * 80),
+                  vy: Math.sin(a) * (55 + Math.random() * 80),
+                  life: 0.9,
+                  size: 2 + Math.random() * 2.5,
+                  hue: 48 + Math.random() * 10,
+                });
               }
             }
           }
+
+          if (stepped.events.died || g.simTickCount >= MAX_TICKS) {
+            g.birdY = g.sim.birdY;
+            g.trees = g.sim.trees;
+            die();
+            break;
+          }
+        }
+        if (g.sim) {
+          g.birdY = g.sim.birdY;
+          g.vel = g.sim.vel;
+          g.trees = g.sim.trees;
+          g.rot = Math.max(-0.5, Math.min(1.3, g.sim.vel / 500));
         }
       } else if (g.phase === "ready") {
-        // idle bobbing
+        // idle bobbing (purely cosmetic, not part of any run)
         g.birdY = H / 2 + Math.sin(g.time * 3) * 10;
         g.rot = Math.sin(g.time * 3) * 0.12;
       }
@@ -374,6 +376,11 @@ export function TappyGame() {
                 {best > 0 && (
                   <span className="text-sm text-muted-foreground">
                     Your best: <b className="text-primary">{best} coins</b>
+                  </span>
+                )}
+                {!sessionReady && (
+                  <span className="text-xs text-muted-foreground/70">
+                    Connect your wallet for a verified, leaderboard-eligible run
                   </span>
                 )}
               </button>
@@ -860,11 +867,8 @@ const importState = {
   vel: 0,
   rot: 0,
   trees: [] as FutureTree[],
-  spawnT: 0,
-  score: 0,
   time: 0,
   flash: 0,
   particles: [] as Particle[],
   shake: 0,
-  nextVariant: 0,
 };
