@@ -242,6 +242,36 @@ export type Database = {
         }
         Relationships: []
       }
+      game_run_sessions: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          game_slug: string
+          id: string
+          seed: number
+          wallet: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          game_slug: string
+          id?: string
+          seed: number
+          wallet: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          game_slug?: string
+          id?: string
+          seed?: number
+          wallet?: string
+        }
+        Relationships: []
+      }
       mp_moves: {
         Row: {
           created_at: string
