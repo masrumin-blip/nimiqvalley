@@ -141,6 +141,13 @@
       "when": 1790208233313,
       "tag": "0019_create_village_letters",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790208255228,
+      "tag": "0020_letters_usdt_to",
+      "breakpoints": true
     }
   ]
 }

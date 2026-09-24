@@ -753,6 +753,7 @@ export type Database = {
           to_chain: string
           token: string
           tx_hash: string | null
+          usdt_to: string | null
         }
         Insert: {
           amount?: number
@@ -765,6 +766,7 @@ export type Database = {
           to_chain?: string
           token?: string
           tx_hash?: string | null
+          usdt_to?: string | null
         }
         Update: {
           amount?: number
@@ -777,6 +779,7 @@ export type Database = {
           to_chain?: string
           token?: string
           tx_hash?: string | null
+          usdt_to?: string | null
         }
         Relationships: []
       }
