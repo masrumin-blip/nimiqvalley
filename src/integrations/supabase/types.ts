@@ -741,6 +741,45 @@ export type Database = {
           },
         ]
       }
+      village_letters: {
+        Row: {
+          amount: number
+          created_at: string
+          from_wallet: string
+          id: string
+          message: string
+          opened_at: string | null
+          to_address: string
+          to_chain: string
+          token: string
+          tx_hash: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          from_wallet: string
+          id?: string
+          message: string
+          opened_at?: string | null
+          to_address: string
+          to_chain?: string
+          token?: string
+          tx_hash?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          from_wallet?: string
+          id?: string
+          message?: string
+          opened_at?: string | null
+          to_address?: string
+          to_chain?: string
+          token?: string
+          tx_hash?: string | null
+        }
+        Relationships: []
+      }
       wallet_credits: {
         Row: {
           chat_credits: number
