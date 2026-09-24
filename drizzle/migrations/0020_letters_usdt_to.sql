@@ -1,0 +1,1 @@
+ALTER TABLE public.village_letters ADD COLUMN usdt_to text;

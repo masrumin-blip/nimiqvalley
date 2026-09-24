@@ -25,6 +25,7 @@ import {
   NEIGHBORS,
   NEIGHBOR_HOUSES,
   PLAYER_HOUSE,
+  POST_OFFICE,
   POND,
   REST_SPOTS,
   TREE_SPRITES,
@@ -54,6 +55,9 @@ interface Props {
   onNearbyChange: (n: Neighbor | null) => void;
   onViewpointChange: (spot: RestSpot | null) => void;
   paused?: boolean;
+  onPostOfficeChange?: (near: boolean) => void;
+  postBadgeRef?: MutableRefObject<number>;
+  spawnAtPostOffice?: boolean;
 }
 
 interface NpcState extends VillageNpc {
@@ -493,7 +497,7 @@ function drawRestSpot(ctx: CanvasRenderingContext2D, spot: RestSpot, t: number) 
   ctx.restore();
 }
 
-export default function VillageCanvas({ characterTier, houseTier, moveRef, onNearbyChange, onViewpointChange, paused = false }: Props) {
+export default function VillageCanvas({ characterTier, houseTier, moveRef, onNearbyChange, onViewpointChange, paused = false, onPostOfficeChange, postBadgeRef, spawnAtPostOffice = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef({
     x: 1300,
@@ -502,6 +506,13 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     direction: "down" as Direction,
     lastSide: "right" as "left" | "right",
   });
+  const spawnedRef = useRef(false);
+  if (spawnAtPostOffice && !spawnedRef.current) {
+    spawnedRef.current = true;
+    stateRef.current.x = POST_OFFICE.door.x;
+    stateRef.current.y = POST_OFFICE.door.y;
+    stateRef.current.direction = "up";
+  }
   const tiersRef = useRef({ characterTier, houseTier });
   tiersRef.current = { characterTier, houseTier };
 
@@ -531,6 +542,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     const keys = new Set<string>();
     let nearby: Neighbor | null = null;
     let nearbyViewpoint: RestSpot | null = null;
+    let nearPost = false;
     let raf = 0;
     let lastTime = 0;
     const npcStates: NpcState[] = VILLAGE_NPCS.map((npc) => ({
@@ -619,6 +631,12 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       if (foundViewpoint?.id !== nearbyViewpoint?.id) {
         nearbyViewpoint = foundViewpoint;
         onViewpointChange(foundViewpoint);
+      }
+
+      const isNearPost = Math.hypot(POST_OFFICE.door.x - s.x, POST_OFFICE.door.y - s.y) < POST_OFFICE.radius;
+      if (isNearPost !== nearPost) {
+        nearPost = isNearPost;
+        onPostOfficeChange?.(isNearPost);
       }
 
       const camX = Math.max(0, Math.min(WORLD_W - viewW, s.x - viewW / 2));
@@ -809,6 +827,41 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       });
       drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw());
 
+      // Post office sign + mail badge (drawn on top)
+      {
+        const px = POST_OFFICE.x;
+        const py = POST_OFFICE.y - 175 + Math.sin(t / 450) * 4;
+        ctx.save();
+        ctx.fillStyle = "#7a4a22";
+        ctx.fillRect(px - 44, POST_OFFICE.y - 128, 88, 24);
+        ctx.fillStyle = "#fff4d6";
+        ctx.font = "bold 13px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("POST", px, POST_OFFICE.y - 116);
+        ctx.fillStyle = "#fffaf0";
+        ctx.strokeStyle = "#8a5a2b";
+        ctx.lineWidth = 3;
+        ctx.fillRect(px - 20, py - 13, 40, 26);
+        ctx.strokeRect(px - 20, py - 13, 40, 26);
+        ctx.beginPath();
+        ctx.moveTo(px - 20, py - 13);
+        ctx.lineTo(px, py + 3);
+        ctx.lineTo(px + 20, py - 13);
+        ctx.stroke();
+        const unread = postBadgeRef?.current ?? 0;
+        if (unread > 0) {
+          ctx.fillStyle = "#e5484d";
+          ctx.beginPath();
+          ctx.arc(px + 22, py - 14, 11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillText(unread > 9 ? "9+" : String(unread), px + 22, py - 13);
+        }
+        ctx.restore();
+      }
+
       ctx.restore();
       raf = requestAnimationFrame(frame);
     };
@@ -821,7 +874,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       window.removeEventListener("resize", resize);
       ro.disconnect();
     };
-  }, [moveRef, onNearbyChange, onViewpointChange, paused]);
+  }, [moveRef, onNearbyChange, onViewpointChange, paused, onPostOfficeChange, postBadgeRef]);
 
   return <canvas ref={canvasRef} className="h-full w-full touch-none" aria-label="Village map" />;
 }

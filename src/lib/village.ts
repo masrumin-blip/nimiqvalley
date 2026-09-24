@@ -181,3 +181,5 @@ export function circleBlocked(x:number,y:number,radius:number,rects:Rect[]):bool
   const px=(x-POND.x)/POND.rx,py=(y-POND.y)/POND.ry;
   return px*px+py*py<1;
 }
+/** The small shed on the west side serves as the village post office. */
+export const POST_OFFICE = { buildingId: "shed", x: 330, y: 820, door: { x: 330, y: 885 }, radius: 130 };
