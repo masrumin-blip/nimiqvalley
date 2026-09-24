@@ -259,3 +259,22 @@ export async function readUsdtBalance(address: string): Promise<number> {
   const [value] = decodeAbiParameters(parseAbiParameters("uint256"), raw as `0x${string}`);
   return Number(value) / 10 ** USDT_DECIMALS;
 }
+
+/** Send USDT on Polygon through the EVM wallet. Returns the transaction hash. */
+export async function sendUsdtPolygon(to: string, amount: number): Promise<{ hash: string; from: string }> {
+  const eth = getEthereum();
+  if (!eth) throw new Error("No Ethereum wallet found in this browser.");
+  const from = await connectPolygon();
+  const data = encodeFunctionData({
+    abi: erc20Abi,
+    functionName: "transfer",
+    args: [to as `0x${string}`, BigInt(Math.round(amount * 10 ** USDT_DECIMALS))],
+  });
+  const hash = await withTimeout(
+    eth.request({ method: "eth_sendTransaction", params: [{ from, to: USDT_POLYGON, data }] }),
+    WALLET_TIMEOUT_MS,
+    "The wallet did not answer in time. Please try again.",
+  );
+  if (typeof hash !== "string") throw new Error("The wallet did not confirm the transfer.");
+  return { hash, from };
+}
