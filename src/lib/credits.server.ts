@@ -14,7 +14,6 @@ import {
 } from "./credits";
 
 
-const RPC_URL = "https://rpc.nimiqwatch.com";
 
 type CreditRow = {
   wallet: string;
@@ -30,9 +29,6 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function normalizeAddress(value: string) {
-  return value.replace(/\s+/g, "").toUpperCase();
-}
 
 /**
  * Every player starts each day with at least FREE_KEYS_PER_DAY match keys.
@@ -185,150 +181,6 @@ async function grant(wallet: string, chats: number, rooms: number, keys = 0) {
     room_credits: row.room_credits + rooms,
     match_keys: (row.match_keys ?? 0) + keys,
   });
-}
-
-type ChainTx = { hash: string; from: string; to: string; nim: number; timestamp: number };
-
-async function rpc<T>(method: string, params: unknown[]): Promise<T | null> {
-  try {
-    const res = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { result?: { data?: T } & T };
-    return (json.result?.data ?? json.result ?? null) as T | null;
-  } catch {
-    return null;
-  }
-}
-
-type RawTx = {
-  hash?: string;
-  from?: string;
-  sender?: string;
-  to?: string;
-  recipient?: string;
-  value?: number;
-  timestamp?: number;
-};
-
-/** Recent transactions sent by a wallet to the NimiqValley address. */
-async function recentPayments(wallet: string): Promise<ChainTx[]> {
-  const raw = await rpc<RawTx[]>("getTransactionsByAddress", [normalizeAddress(wallet), 20]);
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((tx) => ({
-      hash: String(tx.hash ?? "").toLowerCase(),
-      from: normalizeAddress(tx.from ?? tx.sender ?? ""),
-      to: normalizeAddress(tx.to ?? tx.recipient ?? ""),
-      nim: (typeof tx.value === "number" ? tx.value : 0) / 100_000,
-      timestamp: typeof tx.timestamp === "number" ? tx.timestamp : 0,
-    }))
-    .filter((tx) => tx.hash.length >= 8);
-}
-
-const PAYMENT_WINDOW_MS = 15 * 60_000;
-const CONFIRM_TIMEOUT_MS = 40_000;
-const CONFIRM_INTERVAL_MS = 2_500;
-/** A payment may only cover this much more than the price, so a big transfer
- * is never swallowed by a cheap purchase. */
-const MAX_OVERPAY_NIM = 1;
-
-/** Find a fresh, unused payment from this wallet that matches `expectedNim`. */
-async function findRecentPayment(wallet: string, expectedNim: number): Promise<ChainTx | null> {
-  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
-  const target = normalizeAddress(PAY_TO_ADDRESS);
-  const sender = normalizeAddress(wallet);
-
-  for (;;) {
-    const list = await recentPayments(wallet);
-    const candidates = list
-      .filter(
-        (tx) =>
-          tx.to === target &&
-          tx.from === sender &&
-          tx.nim + 0.001 >= expectedNim &&
-          tx.nim <= expectedNim + MAX_OVERPAY_NIM,
-      )
-      .filter((tx) => {
-        if (!tx.timestamp) return true;
-        const ms = tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp;
-        return Date.now() - ms <= PAYMENT_WINDOW_MS;
-      })
-      // Closest amount first, then the most recent one.
-      .sort((a, b) => Math.abs(a.nim - expectedNim) - Math.abs(b.nim - expectedNim) || b.timestamp - a.timestamp);
-
-    for (const tx of candidates) {
-      const { data: seen } = await supabaseAdmin
-        .from("nim_payments")
-        .select("id")
-        .eq("tx_hash", tx.hash)
-        .maybeSingle();
-      if (!seen) return tx;
-    }
-
-    if (Date.now() >= deadline) return null;
-    await new Promise((resolve) => setTimeout(resolve, CONFIRM_INTERVAL_MS));
-  }
-}
-
-type RedeemInput = {
-  wallet: string;
-  txHash?: string | undefined;
-  kind: "chat" | "room" | "key";
-  packId?: string | undefined;
-  rooms?: number | undefined;
-  keys?: number | undefined;
-};
-
-/**
- * Turns a confirmed NIM transaction into credits.
- * The hash is unique in the database, so the same payment can never be used twice.
- */
-export async function redeemPayment(input: RedeemInput): Promise<CreditState> {
-  let chats = 0;
-  let rooms = 0;
-  let keys = 0;
-  let expectedNim = 0;
-
-  if (input.kind === "chat") {
-    const pack = CHAT_PACKS.find((p) => p.id === input.packId);
-    if (!pack) throw new Error("Unknown chat pack.");
-    chats = pack.chats;
-    expectedNim = pack.nim;
-  } else if (input.kind === "key") {
-    const count = Math.max(1, Math.min(10, Math.round(input.keys ?? 1)));
-    keys = count;
-    expectedNim = count * KEY_COST_NIM;
-  } else {
-    const count = Math.max(1, Math.min(10, Math.round(input.rooms ?? 1)));
-    rooms = count;
-    expectedNim = count * ROOM_COST_NIM;
-  }
-
-  const tx = await findRecentPayment(input.wallet, expectedNim);
-  if (!tx) {
-    throw new Error(
-      `We could not find a payment of ${expectedNim} NIM from your wallet yet. If the wallet confirmed it, try again in a moment.`,
-    );
-  }
-
-  const { error } = await supabaseAdmin.from("nim_payments").insert({
-    tx_hash: tx.hash,
-    wallet: input.wallet,
-    kind: input.kind,
-    nim: expectedNim,
-    chat_credits: chats,
-    room_credits: rooms,
-    key_credits: keys,
-  });
-  if (error) throw new Error("This payment was already used.");
-
-  await grant(input.wallet, chats, rooms, keys);
-  return getCredits(input.wallet);
 }
 
 /** Records that the player opened one of today's reward links. */

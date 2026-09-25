@@ -44,7 +44,7 @@ function useFrameScale() {
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
     const update = () => {
-      const s = Math.min(1, window.innerWidth / FRAME_W, window.innerHeight / FRAME_H);
+      const s = Math.min(1, window.innerWidth / FRAME_W, (window.innerHeight - 48) / FRAME_H);
       setScale(s);
     };
     update();
@@ -340,7 +340,7 @@ function CheckersGame() {
   }, [you.total, them.total, moveCounts, mySide, oppSide, rivalName, online.wallet]);
 
   return (
-    <main className="fixed inset-0 flex h-[100dvh] w-screen items-center justify-center overflow-hidden bg-arena">
+    <main className="relative flex h-[calc(100dvh-3rem)] w-full items-center justify-center overflow-hidden bg-arena">
       <div
         style={{
           width: FRAME_W,

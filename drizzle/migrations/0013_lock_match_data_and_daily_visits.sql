@@ -5,21 +5,18 @@ DROP POLICY IF EXISTS "mp room players are publicly readable" ON public.mp_room_
 DROP POLICY IF EXISTS "mp moves are publicly readable" ON public.mp_moves;
 DROP POLICY IF EXISTS "mp ticks are publicly readable" ON public.mp_ticks;
 DROP POLICY IF EXISTS "mp queue is publicly readable" ON public.mp_queue;
-DROP POLICY IF EXISTS "mp tickets are publicly readable" ON public.mp_tickets;
 
 REVOKE ALL ON public.mp_rooms FROM anon, authenticated;
 REVOKE ALL ON public.mp_room_players FROM anon, authenticated;
 REVOKE ALL ON public.mp_moves FROM anon, authenticated;
 REVOKE ALL ON public.mp_ticks FROM anon, authenticated;
 REVOKE ALL ON public.mp_queue FROM anon, authenticated;
-REVOKE ALL ON public.mp_tickets FROM anon, authenticated;
 
 GRANT ALL ON public.mp_rooms TO service_role;
 GRANT ALL ON public.mp_room_players TO service_role;
 GRANT ALL ON public.mp_moves TO service_role;
 GRANT ALL ON public.mp_ticks TO service_role;
 GRANT ALL ON public.mp_queue TO service_role;
-GRANT ALL ON public.mp_tickets TO service_role;
 
 -- Server-recorded proof that the daily reward links were actually opened.
 CREATE TABLE public.daily_visits (

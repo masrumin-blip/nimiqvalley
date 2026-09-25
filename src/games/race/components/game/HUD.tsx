@@ -69,7 +69,7 @@ export function HUD() {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 select-none">
+    <div className="pointer-events-none absolute inset-0 z-10 select-none">
       <Button
         type="button"
         variant="destructive"

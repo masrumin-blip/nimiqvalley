@@ -1,19 +1,23 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import type { TierId } from "@/lib/tiers";
-import playerSpritesAsset from "@/assets/player-sprites.png.asset.json";
-const playerSprites = playerSpritesAsset.url;
-import npcSpritesAsset from "@/assets/npc-sprites-final.png.asset.json";
-const npcSprites = npcSpritesAsset.url;
-import animalSpritesAsset from "@/assets/village-animals.png.asset.json";
-const animalSprites = animalSpritesAsset.url;
-import buildingSpritesAAsset from "@/assets/village-buildings-a.png.asset.json";
-const buildingSpritesA = buildingSpritesAAsset.url;
-import buildingSpritesBAsset from "@/assets/village-buildings-b.png.asset.json";
-const buildingSpritesB = buildingSpritesBAsset.url;
-import objectSpritesAsset from "@/assets/village-objects.png.asset.json";
-const objectSprites = objectSpritesAsset.url;
-import houseTierSpritesAsset from "@/assets/village-house-tiers.png.asset.json";
-const houseTierSprites = houseTierSpritesAsset.url;
+import playerPoor from "@/assets/player-poor.png";
+import playerNormal from "@/assets/player-normal.png";
+import playerCool from "@/assets/player-cool.png";
+import playerSultan from "@/assets/player-sultan.png";
+import npcKai from "@/assets/npc-kai.png";
+import npcLani from "@/assets/npc-lani.png";
+import npcPipi from "@/assets/npc-pipi.png";
+import npcMomo from "@/assets/npc-momo.png";
+import npcElder from "@/assets/npc-elder.png";
+import npcQueen from "@/assets/npc-queen.png";
+import animalSprites from "@/assets/village-animals.png";
+import buildingSpritesA from "@/assets/village-buildings-a.png";
+import buildingSpritesB from "@/assets/village-buildings-b.png";
+import postOfficeSprite from "@/assets/village-post-office.png";
+import barnSprite from "@/assets/village-barn.png";
+import houseWindmillSprite from "@/assets/village-house-windmill.png";
+import objectSprites from "@/assets/village-objects.png";
+import houseTierSprites from "@/assets/village-house-tiers.png";
 import {
   ANIMALS,
   BUILDINGS,
@@ -41,12 +45,18 @@ import {
 
 type Direction = "down" | "left" | "right" | "up";
 
-const SPRITE_COLS = 16;
-const SPRITE_ROWS = 4;
-const NPC_SPRITE_ROWS = 6;
+const CHARACTER_SPRITES: Record<TierId, string> = {
+  poor: playerPoor,
+  normal: playerNormal,
+  cool: playerCool,
+  sultan: playerSultan,
+};
+const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen];
+const SPRITE_CELL_W = 144;
+const SPRITE_CELL_H = 224;
+const CHARACTER_HEIGHT = 66;
+const CHARACTER_WIDTH = CHARACTER_HEIGHT * SPRITE_CELL_W / SPRITE_CELL_H;
 const CAMERA_ZOOM = 0.85;
-const TIER_ROW: Record<TierId, number> = { poor: 0, normal: 1, cool: 2, sultan: 3 };
-const DIRECTION_COL: Record<Direction, number> = { down: 0, left: 4, right: 8, up: 12 };
 
 interface Props {
   characterTier: TierId;
@@ -65,6 +75,7 @@ interface NpcState extends VillageNpc {
   walking: boolean;
   direction: Direction;
   waitUntil: number;
+  stuckMs: number;
 }
 
 const PALETTE = {
@@ -271,23 +282,20 @@ function drawPerson(
   ctx.restore();
 }
 
-function drawPlayerSprite(
+function drawCharacterSprite(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
   x: number,
   y: number,
-  tier: TierId,
   direction: Direction,
   t: number,
   walking: boolean,
 ) {
-  const cellW = image.naturalWidth / SPRITE_COLS;
-  const cellH = image.naturalHeight / SPRITE_ROWS;
-  const idleFrame = direction === "left" || direction === "right" ? 3 : 0;
-  const frame = walking ? Math.floor(t / 150) % 4 : idleFrame;
-  const sourceX = (DIRECTION_COL[direction] + frame) * cellW;
-  const sourceY = TIER_ROW[tier] * cellH;
-  const bob = walking ? Math.abs(Math.sin(t / 150)) * 2 : 0;
+  const row = !walking && (direction === "left" || direction === "right")
+    ? 4
+    : { right: 0, left: 1, down: 2, up: 3 }[direction];
+  const frame = walking ? Math.floor(t / 150) % (row < 2 ? 4 : 2) : direction === "left" ? 1 : 0;
+  const bob = walking && Math.floor(t / 150) % 2 === 1 ? 1 : 0;
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -295,50 +303,16 @@ function drawPlayerSprite(
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 13, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(image, sourceX, sourceY, cellW, cellH, x - 25, y - 60 - bob, 50, 66);
-  ctx.restore();
-}
-
-function drawNpcSprite(
-  ctx: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  row: number,
-  direction: Direction,
-  t: number,
-  walking: boolean,
-) {
-  const drawWidth = 45;
-  const drawHeight = 59.4;
-  const groundY = y + 5;
-  const cellW = image.naturalWidth / SPRITE_COLS;
-  const cellH = image.naturalHeight / NPC_SPRITE_ROWS;
-  const idleFrame = direction === "left" || direction === "right" ? 3 : 0;
-  const frame = walking ? Math.floor(t / 150) % 4 : idleFrame;
-  const safeRow = Math.max(0, Math.min(NPC_SPRITE_ROWS - 1, row));
-  const sourceX = (DIRECTION_COL[direction] + frame) * cellW;
-  const sourceY = safeRow * cellH;
-  const phase = walking ? Math.floor(t / 150) % 4 : 0;
-  const bob = walking && phase % 2 === 1 ? 1 : 0;
-
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "rgba(30,60,40,0.22)";
-  ctx.beginPath();
-  ctx.ellipse(x, groundY + 1, 11, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.translate(x, groundY - bob);
   ctx.drawImage(
     image,
-    sourceX,
-    sourceY,
-    cellW,
-    cellH,
-    -drawWidth / 2,
-    -drawHeight,
-    drawWidth,
-    drawHeight,
+    frame * SPRITE_CELL_W,
+    row * SPRITE_CELL_H,
+    SPRITE_CELL_W,
+    SPRITE_CELL_H,
+    x - CHARACTER_WIDTH / 2,
+    y + 5 - CHARACTER_HEIGHT - bob,
+    CHARACTER_WIDTH,
+    CHARACTER_HEIGHT,
   );
   ctx.restore();
 }
@@ -390,10 +364,15 @@ function updateNpcState(npc: NpcState, t: number, dt: number, colliders: ReturnT
     moved = true;
   }
 
+  const remaining = Math.hypot(target.x - npc.x, target.y - npc.y);
+  const meaningfulProgress = dist - remaining > step * 0.15;
+  npc.stuckMs = meaningfulProgress ? 0 : npc.stuckMs + dt;
   npc.walking = moved;
-  if (!moved) {
+  if (!moved || npc.stuckMs > 900) {
     npc.targetIndex = (npc.targetIndex + 1) % npc.path.length;
     npc.waitUntil = t + npc.idleMs;
+    npc.stuckMs = 0;
+    npc.walking = false;
   }
 }
 
@@ -440,7 +419,14 @@ function drawAnimalSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement
   const [dw, dh] = sizes[animal.kind];
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(image, sx, sy, sw, sh, animal.x + ox - dw / 2, animal.y + oy - dh, dw, dh);
+  const drawX = animal.x + ox;
+  if (animal.kind === "frog" && Math.cos((t + animal.phase) / 1250) < 0) {
+    ctx.translate(drawX, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(image, sx, sy, sw, sh, -dw / 2, animal.y + oy - dh, dw, dh);
+  } else {
+    ctx.drawImage(image, sx, sy, sw, sh, drawX - dw / 2, animal.y + oy - dh, dw, dh);
+  }
   ctx.restore();
 }
 
@@ -523,16 +509,30 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     if (!ctx) return;
 
     const trees = buildTrees();
-    const playerImage = new Image();
-    playerImage.src = playerSprites;
-    const npcImage = new Image();
-    npcImage.src = npcSprites;
+    const playerImages = Object.fromEntries(
+      Object.entries(CHARACTER_SPRITES).map(([tier, src]) => {
+        const image = new Image();
+        image.src = src;
+        return [tier, image];
+      }),
+    ) as Record<TierId, HTMLImageElement>;
+    const npcImages = NPC_SPRITES.map((src) => {
+      const image = new Image();
+      image.src = src;
+      return image;
+    });
     const animalImage = new Image();
     animalImage.src = animalSprites;
     const buildingImageA = new Image();
     buildingImageA.src = buildingSpritesA;
     const buildingImageB = new Image();
     buildingImageB.src = buildingSpritesB;
+    const houseWindmillImage = new Image();
+    houseWindmillImage.src = houseWindmillSprite;
+    const postOfficeImage = new Image();
+    postOfficeImage.src = postOfficeSprite;
+    const barnImage = new Image();
+    barnImage.src = barnSprite;
     const objectImage = new Image();
     objectImage.src = objectSprites;
     const houseImage = new Image();
@@ -551,6 +551,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       walking: false,
       direction: "down",
       waitUntil: 0,
+      stuckMs: 0,
     }));
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -762,7 +763,10 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
           drawHouseSprite(ctx, houseImage, PLAYER_HOUSE.x, PLAYER_HOUSE.y, tiersRef.current.houseTier, true, t),
       });
       for (const building of BUILDINGS)
-        drawables.push({ y: building.y, draw: () => drawBuildingSprite(ctx, building.sheet === "a" ? buildingImageA : buildingImageB, building) });
+        drawables.push({ y: building.y, draw: () => {
+          const image = building.sheet === "post" ? postOfficeImage : building.sheet === "barn" ? barnImage : building.sheet === "house-windmill" ? houseWindmillImage : building.sheet === "a" ? buildingImageA : buildingImageB;
+          if (image.complete && image.naturalWidth > 0) drawBuildingSprite(ctx, image, building);
+        } });
       for (const tr of trees)
         drawables.push({ y: tr.y, draw: () => drawTreeSprite(ctx, objectImage, tr.x, tr.y, tr.scale, tr.kind) });
       for (const animal of ANIMALS)
@@ -799,8 +803,9 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         drawables.push({
           y: npc.y,
           draw: () => {
-            if (npcImage.complete && npcImage.naturalWidth > 0) {
-              drawNpcSprite(ctx, npcImage, npc.x, npc.y, npc.spriteRow, npc.direction, t, npc.walking);
+            const image = npcImages[npc.spriteRow];
+            if (image?.complete && image.naturalWidth > 0) {
+              drawCharacterSprite(ctx, image, npc.x, npc.y, npc.direction, t, npc.walking);
             } else {
               drawPerson(ctx, npc.x, npc.y, "normal", t, npc.walking);
             }
@@ -809,13 +814,13 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       drawables.push({
         y: s.y,
         draw: () => {
-          if (playerImage.complete && playerImage.naturalWidth > 0) {
-            drawPlayerSprite(
+          const image = playerImages[tiersRef.current.characterTier];
+          if (image?.complete && image.naturalWidth > 0) {
+            drawCharacterSprite(
               ctx,
-              playerImage,
+              image,
               s.x,
               s.y,
-              tiersRef.current.characterTier,
               s.direction,
               t,
               s.walking,
@@ -827,18 +832,11 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       });
       drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw());
 
-      // Post office sign + mail badge (drawn on top)
+      // The building image already carries its own POST OFFICE sign; only float the unread mail badge.
       {
         const px = POST_OFFICE.x;
-        const py = POST_OFFICE.y - 175 + Math.sin(t / 450) * 4;
+        const py = POST_OFFICE.y - 226 + Math.sin(t / 450) * 4;
         ctx.save();
-        ctx.fillStyle = "#7a4a22";
-        ctx.fillRect(px - 44, POST_OFFICE.y - 128, 88, 24);
-        ctx.fillStyle = "#fff4d6";
-        ctx.font = "bold 13px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("POST", px, POST_OFFICE.y - 116);
         ctx.fillStyle = "#fffaf0";
         ctx.strokeStyle = "#8a5a2b";
         ctx.lineWidth = 3;
@@ -849,6 +847,8 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         ctx.lineTo(px, py + 3);
         ctx.lineTo(px + 20, py - 13);
         ctx.stroke();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
         const unread = postBadgeRef?.current ?? 0;
         if (unread > 0) {
           ctx.fillStyle = "#e5484d";

@@ -5,7 +5,11 @@ import { containsProfanity } from "./chat/moderation.server";
 import type { Letter, SendLetterInput } from "./letters";
 
 const NIM_RPC = "https://rpc.nimiqwatch.com";
-const POLYGON_RPCS = ["https://polygon-rpc.com", "https://polygon.llamarpc.com"];
+const POLYGON_RPCS = [
+  "https://polygon.drpc.org",
+  "https://polygon.gateway.tenderly.co",
+  "https://polygon-rpc.com",
+];
 const USDT = "0xc2132d05d31c914a87c6611c10748aeb04b58e8f";
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const DAILY_LIMIT = 10;
@@ -61,25 +65,69 @@ async function nimRpc<T>(method: string, params: unknown[]): Promise<T | null> {
   }
 }
 
-type RawTx = { hash?: string; from?: string; sender?: string; to?: string; recipient?: string; value?: number; timestamp?: number };
+type RawTx = {
+  hash?: string;
+  from?: string;
+  sender?: string;
+  to?: string;
+  recipient?: string;
+  value?: number;
+  timestamp?: number;
+  data?: string;
+  recipientData?: string;
+  senderData?: string;
+};
 
-/** Find a fresh NIM transfer from sender to recipient with the exact amount. */
-async function findNimTransfer(sender: string, recipient: string, nim: number): Promise<string | null> {
-  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+function hexToText(hex: string): string {
+  try {
+    const clean = hex.replace(/^0x/, "");
+    if (!/^[0-9a-fA-F]*$/.test(clean) || clean.length % 2) return "";
+    let out = "";
+    for (let i = 0; i < clean.length; i += 2) out += String.fromCharCode(parseInt(clean.slice(i, i + 2), 16));
+    return out;
+  } catch {
+    return "";
+  }
+}
+
+function txMemo(tx: RawTx): string {
+  return hexToText(tx.recipientData ?? "") || hexToText(tx.data ?? "") || hexToText(tx.senderData ?? "");
+}
+
+/**
+ * Find a fresh NIM transfer to the recipient with the exact amount.
+ * When opts.memo is given, the recipient's incoming transactions are searched and the
+ * transfer must carry that memo (sender does not need to match — the memo proves intent).
+ * Otherwise the sender's transactions are searched and the sender must match.
+ */
+export async function findNimTransfer(
+  sender: string,
+  recipient: string,
+  nim: number,
+  isUsed: (hash: string) => Promise<boolean> = hashUsed,
+  opts: { maxAgeMs?: number; timeoutMs?: number; memo?: string } = {},
+): Promise<string | null> {
+  const deadline = Date.now() + (opts.timeoutMs ?? CONFIRM_TIMEOUT_MS);
+  const maxAge = opts.maxAgeMs ?? 15 * 60_000;
+  const byRecipient = Boolean(opts.memo);
+  const memoNeedle = (opts.memo ?? "").toLowerCase();
   for (;;) {
-    const raw = await nimRpc<RawTx[]>("getTransactionsByAddress", [norm(sender), 20]);
+    const raw = await nimRpc<RawTx[]>("getTransactionsByAddress", [norm(byRecipient ? recipient : sender), 50, null]);
     if (Array.isArray(raw)) {
       for (const tx of raw) {
         const hash = String(tx.hash ?? "").toLowerCase();
         const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
         const ts = typeof tx.timestamp === "number" ? (tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp) : Date.now();
+        const senderOk = byRecipient ? true : norm(tx.from ?? tx.sender ?? "") === norm(sender);
+        const memoOk = byRecipient ? txMemo(tx).toLowerCase().includes(memoNeedle) : true;
         if (
           hash.length >= 8 &&
-          norm(tx.from ?? tx.sender ?? "") === norm(sender) &&
+          senderOk &&
           norm(tx.to ?? tx.recipient ?? "") === norm(recipient) &&
           Math.abs(value - nim) < 0.00001 &&
-          Date.now() - ts < 15 * 60_000 &&
-          !(await hashUsed(hash))
+          memoOk &&
+          Date.now() - ts < maxAge &&
+          !(await isUsed(hash))
         )
           return hash;
       }
@@ -89,12 +137,32 @@ async function findNimTransfer(sender: string, recipient: string, nim: number): 
   }
 }
 
+/**
+ * Checks one NIM transaction by hash. Returns "ok" when it matches, "bad" when it
+ * exists but does not match, and "unknown" when the network has not seen it yet.
+ */
+export async function verifyNimTx(
+  hash: string,
+  sender: string,
+  recipient: string,
+  nim: number,
+  memo?: string,
+): Promise<"ok" | "bad" | "unknown"> {
+  const tx = await nimRpc<RawTx>("getTransactionByHash", [hash.replace(/^0x/, "")]);
+  if (!tx || typeof tx !== "object" || !(tx.to ?? tx.recipient)) return "unknown";
+  const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
+  const senderOk = norm(tx.from ?? tx.sender ?? "") === norm(sender);
+  const memoOk = memo ? txMemo(tx).toLowerCase().includes(memo.toLowerCase()) : false;
+  const ok = (senderOk || memoOk) && norm(tx.to ?? tx.recipient ?? "") === norm(recipient) && Math.abs(value - nim) < 0.00001;
+  return ok ? "ok" : "bad";
+}
+
 async function polygonReceipt(hash: string) {
   for (const url of POLYGON_RPCS) {
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "user-agent": "NimiqValley/1.0" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [hash] }),
         signal: AbortSignal.timeout(8_000),
       });
@@ -110,22 +178,27 @@ async function polygonReceipt(hash: string) {
   return null;
 }
 
-async function verifyUsdt(hash: string, to: string, amount: number): Promise<boolean> {
-  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+export async function verifyUsdtTx(hash: string, to: string, amount: number): Promise<"ok" | "bad" | "unknown"> {
   const target = to.toLowerCase().replace(/^0x/, "").padStart(64, "0");
   const units = BigInt(Math.round(amount * 1_000_000));
+  const receipt = await polygonReceipt(hash);
+  if (!receipt) return "unknown";
+  if (receipt.status !== "0x1") return "bad";
+  const matches = (receipt.logs ?? []).some(
+    (log) =>
+      log.address.toLowerCase() === USDT &&
+      log.topics[0]?.toLowerCase() === TRANSFER_TOPIC &&
+      (log.topics[2] ?? "").toLowerCase().replace(/^0x/, "") === target &&
+      BigInt(log.data) === units,
+  );
+  return matches ? "ok" : "bad";
+}
+
+export async function verifyUsdt(hash: string, to: string, amount: number): Promise<boolean> {
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
   for (;;) {
-    const receipt = await polygonReceipt(hash);
-    if (receipt) {
-      if (receipt.status !== "0x1") return false;
-      return (receipt.logs ?? []).some(
-        (log) =>
-          log.address.toLowerCase() === USDT &&
-          log.topics[0] === TRANSFER_TOPIC &&
-          (log.topics[2] ?? "").toLowerCase().replace(/^0x/, "") === target &&
-          BigInt(log.data) === units,
-      );
-    }
+    const result = await verifyUsdtTx(hash, to, amount);
+    if (result !== "unknown") return result === "ok";
     if (Date.now() >= deadline) return false;
     await sleep(3_000);
   }

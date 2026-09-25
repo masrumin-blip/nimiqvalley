@@ -10,7 +10,7 @@ function GamePage() {
   let screen;
   if (phase === "race") {
     screen = (
-      <div className="fixed inset-0 bg-sky">
+      <div className="relative h-full min-h-0 w-full bg-sky">
         <GameCanvas />
         <HUD />
       </div>
@@ -21,7 +21,11 @@ function GamePage() {
     screen = <Menu />;
   }
 
-  return screen;
+  return phase === "race" ? screen : (
+    <div className="h-full min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
+      {screen}
+    </div>
+  );
 }
 
 export default GamePage;

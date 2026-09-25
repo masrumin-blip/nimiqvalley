@@ -26,7 +26,7 @@ const menuItems = [
     to: "/village",
     icon: Home,
     title: "Nimiq Village",
-    copy: "Walk around the village, meet neighbours, and connect with Nimiq wallet tools.",
+    copy: "An interactive portfolio built as a village — walk in and see the views inside.",
     action: "Enter village",
     label: "Explore",
   },

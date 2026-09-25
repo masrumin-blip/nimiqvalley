@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
 import { Play, RotateCcw } from "lucide-react";
 import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
 import {
   BIRD_R,
   BIRD_X,
@@ -23,6 +24,9 @@ type Phase = "ready" | "playing" | "dead";
 
 // Re-exported shape for the renderer below; the authoritative version lives in tappy-sim.ts.
 type FutureTree = SimState["trees"][number];
+
+// Each obstacle keeps its spawned variant for its entire lifetime.
+const coreColors = ["#c478ff", "#42e8f5", "#ff75c7", "#58f0aa"];
 
 interface Particle {
   x: number;
@@ -77,7 +81,7 @@ export function TappyGame() {
 
   const prefetchSession = useCallback(async () => {
     try {
-      const session = await startGameRun({ data: { slug: "tappy" } });
+      const session = await startGameRun({ data: { slug: "tappy", leagueId: currentLeagueId() } });
       nextSessionRef.current = session;
       setSessionReady(true);
     } catch {
@@ -315,17 +319,17 @@ export function TappyGame() {
   };
 
   return (
-    <div className="min-h-screen bg-background bg-grid relative overflow-hidden">
+    <div className="min-h-full bg-background bg-grid relative overflow-hidden">
       <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center gap-6 px-4 py-8 lg:flex-row lg:items-start lg:justify-center lg:gap-10 lg:py-14">
+      <div className="relative mx-auto flex min-h-full w-full max-w-5xl flex-col items-center gap-3 px-4 py-4 lg:flex-row lg:items-start lg:justify-center lg:gap-10 lg:py-14">
         {/* Game column */}
-        <div className="flex w-full max-w-[420px] flex-col items-center gap-4">
+        <div className="flex w-full max-w-[420px] flex-col items-center gap-2 lg:gap-4">
           <header className="text-center">
-            <h1 className="font-display text-4xl font-bold tracking-tight text-glow sm:text-5xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight text-glow sm:text-5xl">
               NIMIQ <span className="text-primary">TAPPY</span>
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">
               Tap, click, or press space to fly. Collect coins and dodge every obstacle.
             </p>
           </header>
@@ -506,20 +510,22 @@ function draw(ctx: CanvasRenderingContext2D, g: typeof importState) {
   // parallax skyline — far layer
   const farOff = g.phase === "playing" ? (g.time * SPEED * 0.15) % 200 : 0;
   ctx.fillStyle = "#111637";
-  for (let x = -200 - farOff; x < W + 200; x += 200) {
+  for (let block = -2; block * 200 - farOff < W + 200; block++) {
+    const x = block * 200 - farOff;
     for (let b = 0; b < 4; b++) {
       const bw = 34 + ((b * 53) % 26);
-      const bh = 60 + ((b * 97 + Math.floor(x)) % 90);
+      const bh = 60 + (((b * 97 + block * 41) % 90 + 90) % 90);
       ctx.fillRect(x + b * 52, H - GROUND_H - bh, bw, bh);
     }
   }
   // near layer with lit windows
   const nearOff = g.phase === "playing" ? (g.time * SPEED * 0.35) % 260 : 0;
-  for (let x = -260 - nearOff; x < W + 260; x += 260) {
+  for (let block = -2; block * 260 - nearOff < W + 260; block++) {
+    const x = block * 260 - nearOff;
     for (let b = 0; b < 3; b++) {
       const bx = x + b * 88;
       const bw = 52 + ((b * 31) % 20);
-      const bh = 34 + ((b * 71 + Math.floor(x * 0.7)) % 60);
+      const bh = 34 + (((b * 71 + block * 29) % 60 + 60) % 60);
       ctx.fillStyle = "#0b0e26";
       ctx.fillRect(bx, H - GROUND_H - bh, bw, bh);
       // windows
@@ -536,8 +542,8 @@ function draw(ctx: CanvasRenderingContext2D, g: typeof importState) {
   for (const p of g.trees) {
     const top = p.gapY - p.gap / 2;
     const bottom = p.gapY + p.gap / 2;
-    drawObstacle(ctx, p.x, 0, top, true, g.time, p.variant);
-    drawObstacle(ctx, p.x, bottom, H - GROUND_H - bottom, false, g.time, p.variant);
+    drawObstacle(ctx, p.x, 0, top, true, p.variant);
+    drawObstacle(ctx, p.x, bottom, H - GROUND_H - bottom, false, p.variant);
     if (!p.coinCollected) drawCoin(ctx, p.x + TREE_W / 2, p.coinY, g.time);
   }
 
@@ -688,134 +694,72 @@ function drawObstacle(
   y: number,
   h: number,
   isTop: boolean,
-  time: number,
   variant: number,
 ) {
   if (h <= 0) return;
-
-  const palettes = [
-    { dark: "#123c30", mid: "#1c8057", light: "#83ffc0", glow: "#39ff88" },
-    { dark: "#173b57", mid: "#287b8d", light: "#91f5ff", glow: "#44d9ff" },
-    { dark: "#4d294c", mid: "#a23c77", light: "#ff91c8", glow: "#ff4fa3" },
-    { dark: "#313466", mid: "#6553b5", light: "#c7a6ff", glow: "#9f72ff" },
-  ];
-  const palette = palettes[variant % palettes.length] ?? {
-    dark: "#07512d",
-    mid: "#16b867",
-    light: "#6effaa",
-    glow: "#39ff88",
-  };
-
-  ctx.save();
-  ctx.shadowColor = palette.glow;
-  ctx.shadowBlur = 14;
-
-  // Organic luminous trunk, deliberately unlike an industrial pipe.
-  const grad = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
-  grad.addColorStop(0, palette.dark);
-  grad.addColorStop(0.2, palette.mid);
-  grad.addColorStop(0.5, palette.light);
-  grad.addColorStop(0.8, palette.mid);
-  grad.addColorStop(1, palette.dark);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(x + 9, y);
-  ctx.bezierCurveTo(x - 1, y + h * 0.25, x + 14, y + h * 0.62, x + 5, y + h);
-  ctx.lineTo(x + TREE_W - 5, y + h);
-  ctx.bezierCurveTo(x + TREE_W - 15, y + h * 0.62, x + TREE_W + 2, y + h * 0.24, x + TREE_W - 9, y);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // Animated surface pattern: diagonal, circuit, armored, or crystal.
+  const color = coreColors[variant % coreColors.length] ?? coreColors[0] ?? "#c478ff";
+  const center = x + TREE_W / 2;
+  const mouthY = isTop ? y + h : y;
+  const inward = isTop ? -1 : 1;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(x - 8, y, TREE_W + 16, h);
+  ctx.rect(x, y, TREE_W, h);
   ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.13)";
-  const stripeOff = (time * 40) % 26;
-  if (variant % 4 === 0) {
-    for (let sy = y - 30 + stripeOff; sy < y + h + 30; sy += 26) {
-      ctx.beginPath();
-      ctx.moveTo(x, sy);
-      ctx.lineTo(x + TREE_W, sy - 14);
-      ctx.lineTo(x + TREE_W, sy - 9);
-      ctx.lineTo(x, sy + 5);
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else if (variant % 4 === 1) {
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 2;
-    for (let sy = y + 18; sy < y + h; sy += 34) {
-      ctx.beginPath();
-      ctx.moveTo(x + 8, sy);
-      ctx.lineTo(x + 28, sy);
-      ctx.lineTo(x + 36, sy + 9);
-      ctx.lineTo(x + TREE_W - 8, sy + 9);
-      ctx.stroke();
-    }
-  } else if (variant % 4 === 2) {
-    for (let sy = y + 8; sy < y + h; sy += 30) {
-      roundRect(ctx, x + 7, sy, TREE_W - 14, 18, 9);
-      ctx.fill();
-    }
-  } else {
-    for (let sy = y + 10; sy < y + h; sy += 34) {
-      ctx.beginPath();
-      ctx.moveTo(x + TREE_W / 2, sy - 8);
-      ctx.lineTo(x + TREE_W - 8, sy + 7);
-      ctx.lineTo(x + TREE_W / 2, sy + 18);
-      ctx.lineTo(x + 8, sy + 7);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-  // center highlight
-  const shine = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
-  shine.addColorStop(0, "rgba(255,255,255,0)");
-  shine.addColorStop(0.5, "rgba(255,255,255,0.16)");
-  shine.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = shine;
-  ctx.fillRect(x + 7, y, TREE_W - 14, h);
-  ctx.restore();
 
-  // glowing crown and branching roots face the flight gap
-  const crownH = 32;
-  const crownY = isTop ? y + h - crownH : y;
-  ctx.save();
-  ctx.shadowColor = palette.glow;
-  ctx.shadowBlur = 18;
-  const capGrad = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
-  capGrad.addColorStop(0, palette.dark);
-  capGrad.addColorStop(0.5, palette.light);
-  capGrad.addColorStop(1, palette.dark);
-  ctx.fillStyle = capGrad;
-  for (let i = 0; i < 7; i++) {
-    const cx = x - 8 + i * ((TREE_W + 16) / 6);
-    const cy = isTop ? crownY + crownH - Math.abs(i - 3) * 3 : crownY + Math.abs(i - 3) * 3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 13 + (i % 2) * 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  // A fixed, canvas-drawn energy cylinder. Everything stays within the
+  // simulation's collision rectangle; the variant only chooses its color.
+  const body = ctx.createLinearGradient(x, 0, x + TREE_W, 0);
+  body.addColorStop(0, "#46536e");
+  body.addColorStop(0.09, "#1a2543");
+  body.addColorStop(0.22, "#0c132c");
+  body.addColorStop(0.5, "#080e24");
+  body.addColorStop(0.78, "#0c132c");
+  body.addColorStop(0.91, "#1a2543");
+  body.addColorStop(1, "#46536e");
+  ctx.fillStyle = body;
+  ctx.fillRect(x, y, TREE_W, h);
 
-  // neon rim on the gap-facing edge
-  ctx.save();
-  ctx.shadowColor = palette.glow;
-  ctx.shadowBlur = 10;
-  ctx.fillStyle = palette.light;
-  const rimY = isTop ? y + h - 4 : y;
-  ctx.fillRect(x - 8, rimY, TREE_W + 16, 4);
-  ctx.restore();
+  // Recessed light well: a broad transparent bloom around a narrow solid core.
+  const well = ctx.createLinearGradient(center - 20, 0, center + 20, 0);
+  well.addColorStop(0, "transparent");
+  well.addColorStop(0.5, color);
+  well.addColorStop(1, "transparent");
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = well;
+  ctx.fillRect(center - 20, y, 40, h);
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = color;
+  ctx.fillRect(center - 8, y, 16, h);
+  ctx.globalAlpha = 1;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = color;
+  ctx.fillRect(center - 2, y, 4, h);
+  ctx.shadowBlur = 0;
 
-  // fine energy veins make each tree feel alive
-  ctx.strokeStyle = palette.light;
-  ctx.globalAlpha = 0.5;
-  ctx.lineWidth = 2;
+  // Slim metal rails and their colored inner reflections give the cylinder
+  // shape without introducing a busy repeating pattern as it moves.
+  ctx.fillStyle = "#8094b3";
+  ctx.globalAlpha = 0.7;
+  ctx.fillRect(x + 3, y, 2, h);
+  ctx.fillRect(x + TREE_W - 5, y, 2, h);
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.25;
+  ctx.fillRect(x + 10, y, 2, h);
+  ctx.fillRect(x + TREE_W - 12, y, 2, h);
+  ctx.globalAlpha = 1;
+
+  // The solid end cap points into the gap; no glow extends into safe space.
+  ctx.fillStyle = "#263450";
+  ctx.fillRect(x, isTop ? mouthY - 12 : mouthY, TREE_W, 12);
+  ctx.fillStyle = "#0a1028";
   ctx.beginPath();
-  ctx.moveTo(x + TREE_W / 2, isTop ? y : y + h);
-  ctx.bezierCurveTo(x + 15, y + h * 0.35, x + TREE_W - 12, y + h * 0.62, x + TREE_W / 2, isTop ? y + h : y);
+  ctx.ellipse(center, mouthY + inward * 6, TREE_W / 2 - 4, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 9;
   ctx.stroke();
   ctx.restore();
 }
@@ -841,23 +785,6 @@ function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number, time: num
   ctx.fill();
   ctx.stroke();
   ctx.restore();
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
 }
 
 // helper type for draw signature

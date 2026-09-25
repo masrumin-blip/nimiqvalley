@@ -512,7 +512,7 @@ export default function SlideGame() {
       ctx.fillRect(0, horizon - 80, W, 200);
 
       // salju utama (terpotong di jurang)
-      const snowCol = hexLerp("#f6ede4", "#c9c2d4", t);
+      const snowCol = "#f6ede4";
       const gaps = obstacles
         .filter((o): o is Chasm => o.kind === "chasm")
         .filter((o) => o.x1 > scroll && o.x0 < scroll + W / ZOOM)
@@ -806,9 +806,9 @@ export default function SlideGame() {
   }, []);
 
   return (
-    <div className="fixed inset-0 flex select-none items-center justify-center overflow-hidden bg-[#171225]">
+    <div className="relative flex h-full w-full select-none items-center justify-center overflow-hidden bg-background">
       {/* Bingkai 778 × 972, mengecil proporsional di layar sempit */}
-      <div className="relative aspect-[778/972] w-[min(100vw,80.04vh,778px)] overflow-hidden shadow-2xl">
+      <div className="relative aspect-[778/972] w-[min(100vw,calc((100svh-3rem)*0.8004),778px)] max-h-full overflow-hidden shadow-2xl">
         <canvas ref={canvasRef} className="h-full w-full touch-none" />
 
         {/* HUD */}

@@ -2,42 +2,33 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button";
 import { Pause, Play, RotateCcw, Shield, Zap } from "lucide-react";
 import { playSfx } from "@/lib/sfx";
-import { reportScore } from "@/lib/report-score";
-
-const W = 400;
-const H = 720;
-const GRAVITY = 0.35;
-const JUMP_V = -11.5;
-const SPRING_V = -25;
-const MOVE_SPEED = 4.7;
-const PLAYER_Y = H * 0.66;
+import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
+import {
+  H,
+  MOVE_SPEED,
+  TICK_MS,
+  W,
+  createJumpSim,
+  createRng,
+  encodeJumpInput,
+  finalJumpScore,
+  stepJump,
+  type Buffs,
+  type FxColor,
+  type Hazard,
+  type Item,
+  type ItemType,
+  type JumpSim,
+  type Laser,
+  type Platform,
+  type PlatformType,
+  type Portal,
+} from "@/games/jump/jump-sim";
 
 type GameState = "menu" | "playing" | "paused" | "over";
-type PlatformType = "normal" | "moving" | "vertical" | "break" | "spike" | "spring" | "phase" | "conveyor" | "electric";
-type ItemType = "coin" | "shield" | "magnet" | "jetpack" | "slow" | "multiplier" | "life";
-type HazardType = "drone" | "mine" | "saw" | "hunter";
-
-interface Platform {
-  id: number;
-  x: number;
-  y: number;
-  originY: number;
-  w: number;
-  h: number;
-  type: PlatformType;
-  vx: number;
-  vy: number;
-  broken: boolean;
-  timer: number;
-  phase: number;
-}
-interface Item { id: number; x: number; y: number; type: ItemType; collected: boolean; phase: number }
-interface Hazard { id: number; x: number; y: number; originX: number; r: number; vx: number; range: number; type: HazardType; alive: boolean; phase: number }
-interface Laser { id: number; y: number; gapX: number; gapW: number; phase: number }
-interface Portal { id: number; x: number; y: number; targetX: number; active: boolean; phase: number }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number }
 interface Trail { x: number; y: number; life: number }
-interface Buffs { shield: number; magnet: number; jetpack: number; slow: number; multiplier: number; lives: number }
 
 const C = {
   cyan: "#22d3ee", pink: "#ff3ca6", lime: "#a3e635", yellow: "#fde047",
@@ -49,45 +40,29 @@ const ITEM_COLOR: Record<ItemType, string> = {
   jetpack: C.orange, slow: C.blue, multiplier: C.lime, life: C.pink,
 };
 
-let entityId = 1;
-const nextId = () => entityId++;
+const FX_COLOR = (c: FxColor): string =>
+  c === "cyan" ? C.cyan : c === "pink" ? C.pink : c === "red" ? C.red : c === "yellow" ? C.yellow : c === "purple" ? C.purple : ITEM_COLOR[c];
 
-function makePlatform(y: number, difficulty: number, safe = false): Platform {
-  const roll = Math.random();
-  let type: PlatformType = "normal";
-  if (!safe) {
-    if (difficulty > 0.6 && roll < 0.08) type = "phase";
-    else if (difficulty > 0.45 && roll < 0.16) type = "vertical";
-    else if (difficulty > 0.72 && roll < 0.14) type = "electric";
-    else if (difficulty > 0.52 && roll < 0.22) type = "conveyor";
-    else if (difficulty > 0.16 && roll < 0.32) type = "moving";
-    else if (difficulty > 0.25 && roll < 0.43) type = "break";
-    else if (difficulty > 0.35 && roll < 0.51) type = "spike";
-    else if (roll > 0.91) type = "spring";
-  }
-  const width = type === "spring" ? 58 : 66 + Math.random() * 26;
-  return {
-    id: nextId(), x: 8 + Math.random() * (W - width - 16), y, originY: y, w: width,
-    h: type === "spring" ? 15 : 12, type,
-    vx: type === "moving" || type === "conveyor" ? (Math.random() < 0.5 ? -1 : 1) * (1.1 + difficulty * 1.7) : 0,
-    vy: type === "vertical" ? 0.8 + difficulty : 0, broken: false, timer: 0,
-    phase: Math.random() * Math.PI * 2,
-  };
-}
+type World = JumpSim & {
+  rng: () => number;
+  acc: number;
+  lastDir: number;
+  inputs: number[];
+  sessionId: string | null;
+  particles: Particle[];
+  trails: Trail[];
+  stars: { x: number; y: number; s: number }[];
+};
 
-function freshWorld() {
+function freshWorld(seed = 1, sessionId: string | null = null): World {
+  const rng = createRng(seed);
   return {
-    px: W / 2, py: H - 120, vx: 0, vy: JUMP_V, cameraY: 0,
-    platforms: [] as Platform[], items: [] as Item[], hazards: [] as Hazard[],
-    lasers: [] as Laser[], portals: [] as Portal[], particles: [] as Particle[], trails: [] as Trail[],
+    ...createJumpSim(rng),
+    rng, acc: 0, lastDir: 0, inputs: [], sessionId,
+    particles: [], trails: [],
     stars: Array.from({ length: 72 }, () => ({ x: Math.random() * W, y: Math.random() * H * 2, s: Math.random() * 2 + 0.5 })),
-    score: 0, coins: 0, combo: 1,
-    buffs: { shield: 0, magnet: 0, jetpack: 0, slow: 0, multiplier: 0, lives: 0 } as Buffs,
-    shake: 0, flash: 0, invulnerable: 0, portalCooldown: 0,
   };
 }
-
-type World = ReturnType<typeof freshWorld>;
 
 export default function NeonJump() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,21 +83,28 @@ export default function NeonJump() {
     setGameState(state);
   }, []);
 
-  const seedWorld = useCallback(() => {
-    const w = freshWorld();
-    w.platforms.push({ ...makePlatform(H - 60, 0, true), x: W / 2 - 48, w: 96 });
-    let y = H - 145;
-    let count = 0;
-    while (y > -700) {
-      const platform = makePlatform(y, Math.min(0.18, count / 50), count < 4);
-      w.platforms.push(platform);
-      if (Math.random() < 0.62) w.items.push({ id: nextId(), x: platform.x + platform.w / 2, y: y - 34, type: "coin", collected: false, phase: Math.random() * 6 });
-      y -= 72 + Math.random() * 30;
-      count++;
+  // Seeds come from the server so runs can be verified by replay.
+  const nextSessionRef = useRef<{ sessionId: string; seed: number } | null>(null);
+  const prefetchSession = useCallback(async () => {
+    try {
+      nextSessionRef.current = await startGameRun({ data: { slug: "jump", leagueId: currentLeagueId() } });
+    } catch {
+      nextSessionRef.current = null; // guest: local practice run
     }
+  }, []);
+  useEffect(() => {
+    void prefetchSession();
+  }, [prefetchSession]);
+
+  const seedWorld = useCallback(() => {
+    const session = nextSessionRef.current;
+    nextSessionRef.current = null;
+    const seed = session?.seed ?? Math.floor(Math.random() * 2 ** 31);
+    const w = freshWorld(seed, session?.sessionId ?? null);
     world.current = w;
     setHud({ score: 0, coins: 0, buffs: { ...w.buffs } });
-  }, []);
+    void prefetchSession();
+  }, [prefetchSession]);
 
   const start = useCallback(() => {
     seedWorld();
@@ -169,174 +151,37 @@ export default function NeonJump() {
       }
     };
 
-    const damage = () => {
-      const w = world.current;
-      if (w.invulnerable > 0) return false;
-      playSfx("collision");
-      if (w.buffs.jetpack > 0) { w.invulnerable = 24; w.shake = 5; w.flash = 6; burst(w.px, w.py, C.cyan, 16, 4); return false; }
-      if (w.buffs.shield > 0) {
-        w.buffs.shield = 0; w.invulnerable = 90; w.shake = 10; w.flash = 12;
-        burst(w.px, w.py, C.cyan, 28, 5); return false;
-      }
-      if (w.buffs.lives > 0) {
-        w.buffs.lives -= 1; w.invulnerable = 120; w.vy = SPRING_V * 0.72; w.py -= 34; w.shake = 12; w.flash = 16;
-        burst(w.px, w.py, C.pink, 32, 5); return false;
-      }
-      const final = Math.floor(w.score);
+    const finish = (w: World) => {
+      const final = finalJumpScore(w);
       setBest((current) => { const value = Math.max(current, final); window.localStorage.setItem("neon-jump-best", String(value)); return value; });
+      setHud({ score: final, coins: w.coins, buffs: { ...w.buffs } });
       setState("over");
-      reportScore("jump", final);
-      playSfx("gameover");
-      return true;
-    };
-
-    const addItem = (platform: Platform, difficulty: number) => {
-      const w = world.current;
-      if (platform.type === "spike") return;
-      const roll = Math.random();
-      let type: ItemType = "coin";
-      if (roll > 0.985) type = "life";
-      else if (roll > 0.94) type = "jetpack";
-      else if (roll > 0.90) type = "shield";
-      else if (roll > 0.86) type = "magnet";
-      else if (roll > 0.82) type = "slow";
-      else if (roll > 0.77) type = "multiplier";
-      w.items.push({ id: nextId(), x: platform.x + platform.w / 2, y: platform.y - 34, type, collected: false, phase: Math.random() * 6 });
-    };
-
-    const spawnUpward = (difficulty: number) => {
-      const w = world.current;
-      let topY = Math.min(...w.platforms.map((p) => p.y));
-      while (topY > w.cameraY - 240) {
-        const gap = 70 + Math.random() * (28 + difficulty * 24);
-        topY -= gap;
-        const p = makePlatform(topY, difficulty);
-        w.platforms.push(p);
-        if (Math.random() < 0.68) addItem(p, difficulty);
-        if (difficulty > 0.12 && Math.random() < 0.14 + difficulty * 0.15) {
-          const x = 34 + Math.random() * (W - 68);
-          const hazardRoll = Math.random();
-          const type: HazardType = difficulty > 0.7 && hazardRoll < 0.2 ? "hunter" : difficulty > 0.42 && hazardRoll < 0.46 ? "saw" : hazardRoll < 0.68 ? "mine" : "drone";
-          w.hazards.push({ id: nextId(), x, y: topY - 58, originX: x, r: type === "saw" ? 15 : 13, vx: (Math.random() < 0.5 ? -1 : 1) * (1.1 + difficulty * 1.5), range: 42 + Math.random() * 65, type, alive: true, phase: Math.random() * 6 });
-        }
-        if (difficulty > 0.42 && Math.random() < 0.045 + difficulty * 0.035) {
-          w.lasers.push({ id: nextId(), y: topY - 42, gapX: 75 + Math.random() * 250, gapW: 88, phase: Math.random() * 240 });
-        }
-        if (difficulty > 0.52 && Math.random() < 0.035) {
-          w.portals.push({ id: nextId(), x: 42 + Math.random() * (W - 84), y: topY - 46, targetX: 42 + Math.random() * (W - 84), active: true, phase: Math.random() * 6 });
-        }
-      }
-    };
-
-    const collect = (item: Item) => {
-      const w = world.current;
-      item.collected = true;
-      const multiplier = w.buffs.multiplier > 0 ? 2 : 1;
-      if (item.type === "coin") { w.coins += 1; w.score += 25 * multiplier; playSfx("coin", 0.5); }
-      if (item.type === "shield") { w.buffs.shield = 1; playSfx("powerup"); }
-      if (item.type === "magnet") { w.buffs.magnet = 600; playSfx("powerup"); }
-      if (item.type === "jetpack") { w.buffs.jetpack = 120; w.vy = -16; playSfx("powerup"); }
-      if (item.type === "slow") { w.buffs.slow = 520; playSfx("powerup"); }
-      if (item.type === "multiplier") { w.buffs.multiplier = 600; playSfx("powerup"); }
-      if (item.type === "life") { w.buffs.lives = Math.min(2, w.buffs.lives + 1); playSfx("powerup"); }
-      burst(item.x, item.y, ITEM_COLOR[item.type], item.type === "coin" ? 14 : 25, item.type === "coin" ? 3 : 5);
+      // Only the input log is sent; the server replays it and computes the score.
+      const sessionId = w.sessionId;
+      w.sessionId = null;
+      if (sessionId) void submitGameRun({ data: { slug: "jump", sessionId, inputs: w.inputs } }).catch(() => {});
     };
 
     const update = (dt: number) => {
       const w = world.current;
-      const factor = Math.min(1.7, dt / 16.67);
-      const slowFactor = w.buffs.slow > 0 ? 0.55 : 1;
-      const left = keys.current.left || touch.current.left;
-      const right = keys.current.right || touch.current.right;
-      const target = (right ? MOVE_SPEED : 0) - (left ? MOVE_SPEED : 0);
-      w.vx += (target - w.vx) * 0.22 * factor;
-      if (w.buffs.jetpack > 0) {
-        w.vy = Math.max(-17, w.vy - 0.36 * factor);
-        w.trails.push({ x: w.px + (Math.random() - 0.5) * 10, y: w.py + 18, life: 20 });
-      } else w.vy += GRAVITY * factor;
-      w.py += w.vy * factor; w.px += w.vx * factor;
-      if (w.px < -16) w.px = W + 16;
-      if (w.px > W + 16) w.px = -16;
-      const screenY = w.py - w.cameraY;
-      if (screenY < PLAYER_Y) w.cameraY = w.py - PLAYER_Y;
-      const altitude = Math.max(0, -w.cameraY);
-      const difficulty = Math.min(1, altitude / 10500);
-      w.score = Math.max(w.score, Math.floor(altitude / 9));
-
-      for (const key of ["magnet", "jetpack", "slow", "multiplier"] as const) w.buffs[key] = Math.max(0, w.buffs[key] - factor);
-      w.invulnerable = Math.max(0, w.invulnerable - factor); w.portalCooldown = Math.max(0, w.portalCooldown - factor);
-      w.shake *= 0.88; w.flash = Math.max(0, w.flash - factor);
-
-      for (const p of w.platforms) {
-        if (p.type === "moving") { p.x += p.vx * slowFactor * factor; if (p.x < 4 || p.x + p.w > W - 4) p.vx *= -1; }
-        if (p.type === "vertical") { p.timer += 0.025 * slowFactor * factor; p.y = p.originY + Math.sin(p.timer + p.phase) * 34; }
-        if (p.type === "break" && p.broken) { p.timer += factor; p.y += p.timer * 0.035 * factor; }
-        if (p.type === "phase") p.timer += 0.025 * slowFactor * factor;
-        if (p.type === "electric") p.timer += 0.035 * slowFactor * factor;
+      w.acc += dt;
+      while (w.acc >= TICK_MS) {
+        w.acc -= TICK_MS;
+        const left = keys.current.left || touch.current.left;
+        const right = keys.current.right || touch.current.right;
+        const dir = left === right ? 0 : left ? 1 : 2;
+        const tick = w.tick;
+        if (dir !== w.lastDir) { w.inputs.push(encodeJumpInput(tick, dir)); w.lastDir = dir; }
+        const ev = stepJump(w, w.rng, dir);
+        for (const [name, vol] of ev.sfx) playSfx(name as Parameters<typeof playSfx>[0], vol);
+        for (const [x, y, c, n, f] of ev.bursts) burst(x, y, FX_COLOR(c), n, f);
+        if (ev.jet) w.trails.push({ x: w.px + (Math.random() - 0.5) * 10, y: w.py + 18, life: 20 });
+        for (const particle of w.particles) { particle.x += particle.vx; particle.y += particle.vy; particle.vy += 0.12; particle.life -= 1; }
+        w.particles = w.particles.filter((p) => p.life > 0);
+        for (const trail of w.trails) trail.life -= 1;
+        w.trails = w.trails.filter((t) => t.life > 0);
+        if (ev.died) { finish(w); return false; }
       }
-
-      if (w.vy > 0) {
-        for (const p of w.platforms) {
-          const phaseVisible = p.type !== "phase" || Math.sin(p.timer + p.phase) > -0.18;
-          if (p.broken || !phaseVisible) continue;
-          const previousBottom = w.py - w.vy * factor + 16;
-          const bottom = w.py + 16;
-          if (w.px + 12 > p.x && w.px - 12 < p.x + p.w && previousBottom <= p.y && bottom >= p.y && bottom <= p.y + p.h + 15) {
-            if (p.type === "spike" || (p.type === "electric" && Math.sin(p.timer + p.phase) > -0.15)) { if (damage()) return false; w.vy = JUMP_V; }
-            else if (p.type === "spring") { w.vy = SPRING_V; w.shake = 7; burst(w.px, p.y, C.yellow, 22, 5); playSfx("jump", 1); }
-            else { w.vy = JUMP_V; if (p.type === "conveyor") w.vx += Math.sign(p.vx) * 4.5; burst(w.px, p.y, p.type === "break" ? C.red : C.cyan, 8); if (p.type === "break") p.broken = true; playSfx("land", 0.5); }
-            break;
-          }
-        }
-      }
-
-      for (const item of w.items) {
-        if (item.collected) continue;
-        let dx = w.px - item.x, dy = w.py - item.y;
-        if (w.buffs.magnet > 0 && dx * dx + dy * dy < 145 * 145) { item.x += dx * 0.1 * factor; item.y += dy * 0.1 * factor; dx = w.px - item.x; dy = w.py - item.y; }
-        if (dx * dx + dy * dy < 25 * 25) collect(item);
-      }
-
-      for (const hazard of w.hazards) {
-        if (!hazard.alive) continue;
-        if (hazard.type === "hunter") {
-          hazard.vx += Math.sign(w.px - hazard.x) * 0.025 * slowFactor * factor;
-          hazard.vx = Math.max(-2.8, Math.min(2.8, hazard.vx));
-          hazard.y += Math.sign(w.py - hazard.y) * 0.28 * slowFactor * factor;
-        }
-        hazard.x += hazard.vx * slowFactor * factor;
-        if (Math.abs(hazard.x - hazard.originX) > hazard.range || hazard.x < 20 || hazard.x > W - 20) hazard.vx *= -1;
-        const dx = w.px - hazard.x, dy = w.py - hazard.y;
-        if (dx * dx + dy * dy < (hazard.r + 13) ** 2) {
-          if (w.vy > 0 && dy < -2) { hazard.alive = false; w.vy = JUMP_V; w.score += 75 * (w.buffs.multiplier > 0 ? 2 : 1); burst(hazard.x, hazard.y, C.pink, 24, 5); playSfx("score", 0.6); }
-          else if (damage()) return false;
-        }
-      }
-
-      for (const laser of w.lasers) {
-        const cycle = (performance.now() * slowFactor / 16 + laser.phase) % 240;
-        if (cycle > 105 && cycle < 190 && Math.abs(w.py - laser.y) < 13 && Math.abs(w.px - laser.gapX) > laser.gapW / 2) {
-          if (damage()) return false;
-        }
-      }
-      for (const portal of w.portals) {
-        if (!portal.active || w.portalCooldown > 0) continue;
-        const dx = w.px - portal.x, dy = w.py - portal.y;
-        if (dx * dx + dy * dy < 28 * 28) { burst(w.px, w.py, C.purple, 24, 5); w.px = portal.targetX; w.py -= 75; w.vy = -13; w.portalCooldown = 100; burst(w.px, w.py, C.cyan, 24, 5); playSfx("whoosh", 0.6); }
-      }
-
-      spawnUpward(difficulty);
-      const limit = w.cameraY + H + 160;
-      w.platforms = w.platforms.filter((p) => p.y < limit);
-      w.items = w.items.filter((i) => i.y < limit && !i.collected);
-      w.hazards = w.hazards.filter((h) => h.y < limit && h.alive);
-      w.lasers = w.lasers.filter((l) => l.y < limit);
-      w.portals = w.portals.filter((p) => p.y < limit);
-      for (const particle of w.particles) { particle.x += particle.vx * factor; particle.y += particle.vy * factor; particle.vy += 0.12 * factor; particle.life -= factor; }
-      w.particles = w.particles.filter((p) => p.life > 0);
-      for (const trail of w.trails) trail.life -= factor;
-      w.trails = w.trails.filter((t) => t.life > 0);
-      if (w.py - w.cameraY > H + 48 && damage()) return false;
       setHud({ score: Math.floor(w.score), coins: w.coins, buffs: { ...w.buffs } });
       return true;
     };
@@ -408,9 +253,9 @@ function draw(ctx: CanvasRenderingContext2D, w: World, time: number) {
   ctx.save(); ctx.translate(sx, sy);
   drawBackground(ctx, w, time, zone);
   ctx.save();
-  const scale = 0.88; ctx.setTransform(scale, 0, 0, scale, W * (1 - scale) / 2 + sx, sy);
+  const scale = 0.88 * 0.9; ctx.setTransform(scale, 0, 0, scale, W * (1 - scale) / 2 + sx, H * (1 - scale) / 2 + sy);
   const cam = w.cameraY;
-  for (const laser of w.lasers) drawLaser(ctx, laser, cam, time, w.buffs.slow > 0);
+  for (const laser of w.lasers) drawLaser(ctx, laser, cam, w.clock, w.buffs.slow > 0);
   for (const portal of w.portals) drawPortal(ctx, portal, cam, time);
   for (const p of w.platforms) drawPlatform(ctx, p, cam);
   for (const item of w.items) if (!item.collected) drawItem(ctx, item, cam, time);

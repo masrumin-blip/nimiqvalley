@@ -232,6 +232,12 @@ export class Game {
 
   onHud: (h: Hud) => void = () => {};
   onOver: (score: number) => void = () => {};
+  /** Run summary for server-side plausibility checks. */
+  kills: Record<string, number> = {};
+  private startT = 0;
+  get playSeconds() {
+    return this.t - this.startT;
+  }
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -262,6 +268,8 @@ export class Game {
 
   start() {
     this.score = 0;
+    this.kills = {};
+    this.startT = this.t;
     this.wave = 0;
     this.hp = this.maxHp;
     this.px = W / 2;
@@ -830,6 +838,7 @@ export class Game {
     this.enemies = this.enemies.filter((e) => {
       if (e.hp > 0) return true;
       this.score += SCORES[e.kind];
+      this.kills[e.kind] = (this.kills[e.kind] ?? 0) + 1;
       this.burst(e.x, e.y, e.kind === "brute" ? 28 : 320, e.kind === "brute" ? 40 : 22, 1.4);
       this.rings.push({
         x: e.x,

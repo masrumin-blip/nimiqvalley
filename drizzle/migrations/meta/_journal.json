@@ -148,6 +148,55 @@
       "when": 1790208255228,
       "tag": "0020_letters_usdt_to",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790216439377,
+      "tag": "0021_import_nimiqvalley_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790216552857,
+      "tag": "0022_restrict_credit_spending_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790224119861,
+      "tag": "0023_leagues",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790291148192,
+      "tag": "0024_league_pending_deposits",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790292043739,
+      "tag": "0025_league_deposit_checker_wake",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790294968739,
+      "tag": "0026_confirm_league_deposit_atomically",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790300361250,
+      "tag": "0027_credit_purchases",
+      "breakpoints": true
     }
   ]
 }

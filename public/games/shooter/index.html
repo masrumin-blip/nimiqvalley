@@ -128,6 +128,7 @@ const S = {
 /* ---------- state ---------- */
 let ship, bullets, foes, fbullets, orbs, parts, stars, floats;
 let score, wave, waveTimer, spawnT, shake, alive, best, timeScale, slowT, gameT;
+let kills = {}, maxCombo = 0;
 let combo, comboT, D, bossFlash, bossCount, laserBlock;
 const LASER_DUR = 60 * 3;   // super power laser horizontal: tepat 3 detik
 best = +(localStorage.getItem("cosnimiq.best") || 0);
@@ -207,8 +208,10 @@ function difficulty(){
 }
 
 /* ---------- init ---------- */
-function startGame(){
+function startGame(idle){
   initAudio();
+  kills = {}; maxCombo = 0;
+  if (idle !== true) { try { window.parent.postMessage({ type: "nimiq-start", slug: "shooter" }, window.location.origin); } catch (e) {} }
   ship = {x: W/2, y: H*0.76, r: 15, hp: 3, maxhp: 3, cool: 0, inv: 90,
           pw: 1, pwT: 0, pwMin: 1, shield: 0, sT: 0, tilt: 0, laserT: 0};
   bullets = []; foes = []; fbullets = []; orbs = []; parts = []; floats = [];
@@ -503,7 +506,8 @@ function update(){
         burst(b.x, b.y, 4, f.col, 3, 16);
         if (f.hp > 0) S.hit();
         if (f.hp <= 0){
-          combo++; comboT = 90;
+          combo++; comboT = 90; if (combo > maxCombo) maxCombo = combo;
+          kills[f.t] = (kills[f.t] || 0) + 1;
           const mult = 1 + Math.floor(combo / 5) * 0.5;
           const gain = Math.round(f.sc * mult);
           score += gain;
@@ -575,6 +579,7 @@ function update(){
       if (gameT % 3 === 0) burst(f.x, ly, 2, "#ff3bd0", 3, 14);
       if (f.hp <= 0){
         const gain = Math.round(f.sc);
+        kills[f.t] = (kills[f.t] || 0) + 1;
         score += gain; float(f.x, f.y, "+" + gain, f.col);
         burst(f.x, f.y, f.boss ? 80 : 20, f.col, f.boss ? 10 : 5, f.boss ? 60 : 40);
         shake = Math.max(shake, f.boss ? 30 : 6);
@@ -625,7 +630,7 @@ function gameOver(){
   burst(ship.x, ship.y, 50, "#ff2fd0", 7, 50);
   shake = 30; S.dead();
   const s = Math.floor(score), rec = s > best;
-  try { window.parent.postMessage({ type: "nimiq-score", slug: "shooter", value: s }, window.location.origin); } catch (e) {}
+  try { window.parent.postMessage({ type: "nimiq-run", slug: "shooter", score: s, durationSec: gameT / 60, wave: wave, kills: kills, maxCombo: maxCombo }, window.location.origin); } catch (e) {}
   if (rec){ best = s; localStorage.setItem("cosnimiq.best", best); }
   document.getElementById("overTitle").textContent = rec ? "NEW RECORD!" : "GAME OVER";
   document.getElementById("fScore").textContent = s;
@@ -885,12 +890,12 @@ function loop(now){
 
 /* ---------- boot ---------- */
 document.getElementById("menuBest").textContent = best ? "BEST " + best : "";
-document.getElementById("playBtn").onclick = startGame;
+document.getElementById("playBtn").onclick = () => startGame();
 document.getElementById("againBtn").onclick = () => {
   document.getElementById("menuBest").textContent = "BEST " + best;
   startGame();
 };
-startGame(); alive = false; ship.hp = 0;   // idle background di menu
+startGame(true); alive = false; ship.hp = 0;   // idle background di menu
 document.getElementById("menu").classList.remove("hidden");
 requestAnimationFrame(loop);
 </script>

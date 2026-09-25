@@ -28,6 +28,8 @@ const FIT_SLUGS = new Set([
   "ship",
   "crossing",
   "pet",
+  "rooftop",
+  "race",
 ]);
 
 export function GameFrame({ slug, name, children }: { slug: string; name: string; children: ReactNode }) {
@@ -48,7 +50,7 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
           size="sm"
           variant="secondary"
           aria-label={`Exit ${name} to Game Hub`}
-          className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-[60] h-9 gap-1 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition-colors hover:bg-accent"
+          className="h-9 gap-1 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition-colors hover:bg-accent"
         >
           <LogOut className="size-4" />
           Exit
@@ -69,24 +71,29 @@ export function GameFrame({ slug, name, children }: { slug: string; name: string
     </AlertDialog>
   );
 
+  const toolbar = (
+    <div className="relative z-40 flex h-12 shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 pt-[env(safe-area-inset-top)]">
+      {exitButton}
+      <InGameChat />
+    </div>
+  );
+
   if (fit) {
     return (
-      <div className={`g-${slug} relative h-[100svh] w-full overflow-hidden overscroll-none bg-background`}>
+      <div className={`g-${slug} relative flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none bg-background`}>
         <WalletGate name={name}>
-          {exitButton}
-          <InGameChat />
-          <div className="h-full w-full overflow-hidden">{children}</div>
+          {toolbar}
+          <div className="game-content relative min-h-0 w-full flex-1 overflow-hidden">{children}</div>
         </WalletGate>
       </div>
     );
   }
 
   return (
-    <div className={`g-${slug} relative min-h-screen bg-background`}>
+    <div className={`g-${slug} relative flex min-h-[100svh] w-full flex-col bg-background ${slug === "shooter" ? "h-[100svh] overflow-hidden" : ""}`}>
       <WalletGate name={name}>
-        {exitButton}
-        <InGameChat />
-        {children}
+        {toolbar}
+        <div className={`game-content relative min-h-0 w-full flex-1 ${slug === "shooter" ? "overflow-hidden" : ""}`}>{children}</div>
       </WalletGate>
     </div>
   );

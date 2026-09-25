@@ -1,5 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Mail } from "lucide-react";
+import PostOfficeDialog from "@/components/PostOfficeDialog";
+import LetterPopup from "@/components/LetterPopup";
+import { fetchInbox, fetchLetter, openLetter } from "@/lib/letters.functions";
+import type { Letter } from "@/lib/letters";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
@@ -17,24 +22,92 @@ import type { Neighbor, RestSpot } from "@/lib/village";
 export const Route = createFileRoute("/village")({
   head: () => ({
     meta: [
-      { title: "Nimiq Island — An Island Village with Interactive Scenery" },
+      { title: "Nimiq Island — An Interactive Portfolio Village" },
       {
         name: "description",
-        content:
-          "Explore a pixel-art island village, meet villagers and animals, and unwind at six animated scenic spots.",
-      },
-      { property: "og:title", content: "Nimiq Island — An Island Village with Interactive Scenery" },
-      {
-        property: "og:description",
-        content:
-          "Explore a cozy island and discover six relaxing spots with animated scenery.",
+        content: "An interactive portfolio shaped like a village — explore it and see the views inside.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { letter?: string } => {
+    const l = search["letter"];
+    return typeof l === "string" && /^[0-9a-f-]{36}$/i.test(l) ? { letter: l } : {};
+  },
   component: VillagePage,
 });
+
+function PostOffice({ wallet, near, badgeRef }: { wallet: string | null; near: boolean; badgeRef: React.MutableRefObject<number> }) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { letter: letterId } = Route.useSearch();
+  const inboxFn = useServerFn(fetchInbox);
+  const letterFn = useServerFn(fetchLetter);
+  const openFn = useServerFn(openLetter);
+  const [open, setOpen] = useState(false);
+  const [reading, setReading] = useState<Letter | null>(null);
+
+  const inbox = useQuery({
+    queryKey: ["inbox", wallet],
+    enabled: Boolean(wallet),
+    queryFn: () => inboxFn(),
+    refetchInterval: 60_000,
+  });
+  const letters = inbox.data ?? [];
+  const unread = letters.filter((l) => !l.openedAt).length;
+  useEffect(() => {
+    badgeRef.current = unread;
+  }, [unread, badgeRef]);
+
+  const shared = useQuery({
+    queryKey: ["letter", letterId, wallet],
+    enabled: Boolean(letterId && wallet),
+    queryFn: () => letterFn({ data: { id: letterId as string } }),
+    retry: false,
+  });
+
+  const closeShared = () => navigate({ to: "/village", search: {}, replace: true });
+  const markOpened = (id: string) => {
+    void openFn({ data: { id } }).then(() => qc.invalidateQueries({ queryKey: ["inbox"] }));
+  };
+
+  return (
+    <>
+      {near && (
+        <div className="absolute bottom-24 right-4 z-30">
+          <Button onClick={() => setOpen(true)} className="relative min-h-11 rounded-xl px-5 text-sm font-semibold shadow-lg">
+            <Mail className="size-4" /> Post Office
+            {unread > 0 && (
+              <span className="absolute -right-2 -top-2 grid min-w-5 place-items-center rounded-full bg-destructive px-1 text-[11px] text-destructive-foreground">
+                {unread}
+              </span>
+            )}
+          </Button>
+        </div>
+      )}
+      <PostOfficeDialog open={open} onOpenChange={setOpen} inbox={letters} onRead={(l) => setReading(l)} />
+      {reading && <LetterPopup letter={reading} onOpened={markOpened} onClose={() => setReading(null)} />}
+      {letterId && !wallet && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-background/70 p-4 backdrop-blur-sm">
+          <div className="max-w-sm rounded-2xl border border-border bg-card p-6 text-center shadow-xl">
+            <p className="text-lg font-semibold">You've got a letter!</p>
+            <p className="mt-1 text-sm text-muted-foreground">Connect your Nimiq wallet to open it.</p>
+            <Button onClick={closeShared} variant="outline" className="mt-4 min-h-11 w-full">Close</Button>
+          </div>
+        </div>
+      )}
+      {letterId && wallet && shared.isFetched && (
+        <LetterPopup
+          letter={shared.data?.letter ?? null}
+          notForYou={shared.data ? !shared.data.forYou : false}
+          onOpened={markOpened}
+          onClose={closeShared}
+        />
+      )}
+    </>
+  );
+}
 
 function VillagePage() {
   const { player } = usePlayer();
@@ -51,6 +124,9 @@ function VillagePage() {
   const [demoHouseTier, setDemoHouseTier] = useState(1);
   const [nearbyViewpoint, setNearbyViewpoint] = useState<RestSpot | null>(null);
   const [activeViewpoint, setActiveViewpoint] = useState<RestSpot | null>(null);
+  const [nearPost, setNearPost] = useState(false);
+  const postBadgeRef = useRef(0);
+  const { letter: sharedLetter } = Route.useSearch();
 
   const priceFn = useServerFn(getNimPrice);
   const balanceFn = useServerFn(getNimBalance);
@@ -172,7 +248,7 @@ function VillagePage() {
       <Link
         to="/"
         aria-label="Back to main menu"
-        className="absolute left-3 top-3 z-40 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur transition-colors hover:bg-accent"
+        className="absolute right-3 top-3 z-40 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-semibold text-foreground backdrop-blur transition-colors hover:bg-accent"
       >
         ← Menu
       </Link>
@@ -185,12 +261,15 @@ function VillagePage() {
           onNearbyChange={onNearbyChange}
           onViewpointChange={onViewpointChange}
           paused={Boolean(activeViewpoint)}
+          onPostOfficeChange={setNearPost}
+          postBadgeRef={postBadgeRef}
+          spawnAtPostOffice={Boolean(sharedLetter)}
         />
       </div>
 
 
-      {/* Status panel — original layout, moved to the top-left and scaled to 60% */}
-      <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.6] p-3">
+      {/* Status panel, enlarged by 15% while keeping the menu in its own corner. */}
+      <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.69] p-3">
         <div className="pointer-events-auto w-[430px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -368,6 +447,7 @@ function VillagePage() {
           </div>
         </div>
       )}
+      <PostOffice wallet={player?.wallet ?? null} near={nearPost && !activeViewpoint} badgeRef={postBadgeRef} />
       {activeViewpoint && <SceneryView spot={activeViewpoint} onClose={closeScenery} />}
       </main>
     </GameStage>

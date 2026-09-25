@@ -7,7 +7,7 @@ const BomberGame = lazy(
 
 function Index() {
   return (
-    <main className="h-dvh overflow-hidden bg-arcade-bg bg-arcade-grid px-2 py-1 sm:px-3 sm:py-2">
+    <main className="h-full min-h-0 overflow-hidden bg-arcade-bg bg-arcade-grid px-2 py-1 sm:px-3 sm:py-2">
       <div className="mx-auto flex h-full max-w-[500px] flex-col items-center gap-1">
         <header className="text-center">
           <h1 className="font-display text-sm text-arcade-highlight drop-shadow-[0_2px_0_var(--arcade-frame)] sm:text-xl">

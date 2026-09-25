@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { playSfx } from "@/lib/sfx";
-import { reportScore } from "@/lib/report-score";
 
 /**
  * CROSSING FOR NIMIQ
@@ -9,28 +8,17 @@ import { reportScore } from "@/lib/report-score";
  * Keyboard: WASD / arrows. Touch: swipe or tap directional buttons.
  */
 
-// ---------- Types ----------
-type LaneType = "grass" | "trail" | "river";
-
-interface Obstacle {
-  /** world x in cells (float) */
-  x: number;
-  width: number; // in cells
-  speed: number; // cells per second (sign = direction)
-  kind: "snake" | "log";
-  hue: number;
-}
-
-interface Lane {
-  type: LaneType;
-  obstacles: Obstacle[];
-  /** static tree cells for grass */
-  trees: number[];
-  /** hexagonal coin columns waiting to be collected */
-  coins: number[];
-  index: number;
-}
-
+import {
+  COLS,
+  TICK_DT,
+  createCrossingSim,
+  createRng,
+  encodeCrossingInput,
+  stepCrossing,
+  type CrossingSim,
+} from "@/games/crossing/crossing-sim";
+import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
 
 interface Particle {
   x: number;
@@ -44,95 +32,10 @@ interface Particle {
 }
 
 // ---------- Constants ----------
-const COLS = 11;
-const PLAYER_COL = 5;
-const LANES_AHEAD = 16;
-const LANES_BEHIND = 6;
 const CELL = 64; // px, scaled by dpr & zoom
-const HOP_TIME = 0.12;
-// Minimum center-to-center distance between vehicles so a gap is always passable
-const MIN_ROAD_GAP = 4.6;
-// Player hitbox half-width in cells (tight: a snake must really touch the player)
-const PLAYER_HALF = 0.28;
 
+// Cosmetic-only randomness (particles). Never affects the score.
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const randInt = (a: number, b: number) => Math.floor(rand(a, b + 1));
-
-function makeLane(index: number): Lane {
-  // First lanes always grass for a safe start
-  if (index < 3) {
-    return {
-      type: "grass",
-      obstacles: [],
-      trees: scatterTrees().filter((c) => c !== PLAYER_COL),
-      coins: [],
-      index,
-    };
-  }
-  const prevBias = index < 6 ? 0.35 : 0; // gentle ramp
-  const r = Math.random();
-  let type: LaneType;
-  if (r < 0.4 - prevBias * 0.2) type = "trail";
-  else if (r < 0.65 - prevBias * 0.1) type = "river";
-  else type = "grass";
-
-  const lane: Lane = { type, obstacles: [], trees: [], coins: [], index };
-
-  if (type === "grass") {
-    lane.trees = scatterTrees();
-  } else if (type === "trail") {
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const speed = dir * rand(2.2, 4.6) * (1 + index * 0.004);
-    const baseCount = randInt(2, 4);
-    // Vehicle intensity reduced by 25%
-    const count = Array.from({ length: baseCount }, () => Math.random() < 0.4875).filter(Boolean).length;
-    const spacing = count > 0 ? Math.max(COLS / count + rand(1, 3), MIN_ROAD_GAP) : 0;
-    for (let i = 0; i < count; i++) {
-      lane.obstacles.push({
-        x: i * spacing + rand(-0.6, 0.6),
-        width: Math.random() < 0.25 ? 2.6 : 1.6,
-        speed,
-        kind: "snake",
-        hue: randInt(85, 155),
-      });
-    }
-  } else {
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const speed = dir * rand(1.4, 3.0) * (1 + index * 0.003);
-    const count = randInt(2, 3);
-    const spacing = COLS / count + rand(1.5, 3.5);
-    for (let i = 0; i < count; i++) {
-      lane.obstacles.push({
-        x: i * spacing + rand(-0.5, 0.5),
-        width: rand(2.2, 3.8),
-        speed,
-        kind: "log",
-        hue: 0,
-      });
-    }
-  }
-  // scatter coins on walkable ground (grass without trees, or forest trail)
-  if (index >= 1 && (type === "grass" || type === "trail")) {
-    const n = type === "grass" ? randInt(2, 3) : randInt(1, 2);
-    for (let i = 0; i < n; i++) {
-      const c = randInt(0, COLS - 1);
-      if (!lane.trees.includes(c) && !lane.coins.includes(c)) lane.coins.push(c);
-    }
-  }
-  return lane;
-}
-
-function scatterTrees(): number[] {
-  const trees: number[] = [];
-  // Keep one guaranteed open corridor so a row can never be a dead end
-  const corridor = randInt(0, COLS - 1);
-  for (let c = 0; c < COLS; c++) {
-    if (c === corridor) continue;
-    if (trees.length >= 4) break;
-    if (Math.random() < 0.22) trees.push(c);
-  }
-  return trees;
-}
 
 // ---------- Component ----------
 export default function CrossingGame() {
@@ -154,20 +57,31 @@ export default function CrossingGame() {
   }, [exitConfirm]);
 
   const stateRef = useRef({
-    lanes: [] as Lane[],
-    player: { x: PLAYER_COL, y: 0, px: PLAYER_COL, py: 0, hopT: 1, facing: 1 },
-    score: 0,
-    dead: false,
+    ...createCrossingSim(createRng(1)),
+    rng: createRng(1),
+    acc: 0,
+    pendingDir: null as number | null,
+    inputs: [] as number[],
+    sessionId: null as string | null,
     deadT: 0,
     particles: [] as Particle[],
     cameraY: -3,
     started: false,
     time: 0,
-    onLog: null as Obstacle | null,
-    logOffset: 0,
-
-    deathCause: "" as "" | "snake" | "water",
   });
+
+  // Seeds come from the server so runs can be verified by replay.
+  const nextSessionRef = useRef<{ sessionId: string; seed: number } | null>(null);
+  const prefetchSession = useCallback(async () => {
+    try {
+      nextSessionRef.current = await startGameRun({ data: { slug: "crossing", leagueId: currentLeagueId() } });
+    } catch {
+      nextSessionRef.current = null; // guest / offline: local practice run
+    }
+  }, []);
+  useEffect(() => {
+    void prefetchSession();
+  }, [prefetchSession]);
 
   const spawnBurst = useCallback((x: number, y: number, color: string, n: number) => {
     const s = stateRef.current;
@@ -189,32 +103,36 @@ export default function CrossingGame() {
 
   const reset = useCallback(() => {
     const s = stateRef.current;
-    s.lanes = [];
-    for (let i = -LANES_BEHIND; i < LANES_AHEAD; i++) s.lanes.push(makeLane(i));
-    s.player = { x: PLAYER_COL, y: 0, px: PLAYER_COL, py: 0, hopT: 1, facing: 1 };
-    s.score = 0;
-    s.dead = false;
+    const session = nextSessionRef.current;
+    nextSessionRef.current = null;
+    const seed = session?.seed ?? Math.floor(Math.random() * 2 ** 31);
+    s.sessionId = session?.sessionId ?? null;
+    s.rng = createRng(seed);
+    Object.assign(s, createCrossingSim(s.rng));
+    s.acc = 0;
+    s.pendingDir = null;
+    s.inputs = [];
     s.deadT = 0;
     s.particles = [];
     s.cameraY = -3;
-    s.onLog = null;
-    s.logOffset = 0;
-    s.deathCause = "";
     setScore(0);
     setGameOver(false);
     setExitConfirm(false);
-  }, []);
+    void prefetchSession();
+  }, [prefetchSession]);
 
   const die = useCallback(
     (cause: "snake" | "water") => {
       const s = stateRef.current;
-      if (s.dead) return;
-      s.dead = true;
-      s.deathCause = cause;
       s.deadT = 0;
       spawnBurst(s.player.x, s.player.y, cause === "snake" ? "#b7e35d" : "#4fc3f7", 26);
       playSfx(cause === "snake" ? "collision" : "splash", 0.8);
-      reportScore("crossing", s.score);
+      // Send only the input log; the server replays it and computes the score.
+      const sessionId = s.sessionId;
+      s.sessionId = null;
+      if (sessionId) {
+        void submitGameRun({ data: { slug: "crossing", sessionId, inputs: s.inputs } }).catch(() => {});
+      }
       setBest((b) => {
         const nb = Math.max(b, s.score);
         try {
@@ -227,42 +145,13 @@ export default function CrossingGame() {
     [spawnBurst],
   );
 
-  const move = useCallback(
-    (dx: number, dy: number) => {
-      const s = stateRef.current;
-      if (s.dead || !s.started) return;
-      if (s.player.hopT < 1) return; // one press = one hop
-      // snap back to the grid (riding a log leaves a fractional x)
-      const nx = Math.round(s.player.x + dx);
-      const ny = s.player.y + dy;
-      if (nx < 0 || nx >= COLS) return;
-      // blocked by tree?
-      const lane = s.lanes.find((l) => l.index === ny);
-      if (lane?.type === "grass" && lane.trees.includes(nx)) return;
-      s.player.px = s.player.x;
-      s.player.py = s.player.y;
-      s.player.x = nx;
-      s.player.y = ny;
-      s.player.hopT = 0;
-      s.onLog = null;
-      if (dx !== 0) s.player.facing = dx;
-      spawnBurst(nx - dx * 0.3, ny - dy * 0.3, "rgba(255,255,255,0.7)", 5);
-      playSfx("jump", 0.45);
-
-      // scoring: collect hexagonal coins
-      if (lane) {
-        const ci = lane.coins.indexOf(nx);
-        if (ci >= 0) {
-          lane.coins.splice(ci, 1);
-          s.score += 1;
-          setScore(s.score);
-          spawnBurst(nx, ny, "#f7c531", 12);
-          playSfx("coin", 0.6);
-        }
-      }
-    },
-    [spawnBurst],
-  );
+  /** Queues a hop; the simulation applies it on the next fixed tick. */
+  const move = useCallback((dx: number, dy: number) => {
+    const s = stateRef.current;
+    if (s.dead || !s.started || s.pendingDir !== null) return;
+    if (s.player.hopT < 1) return; // one press = one hop
+    s.pendingDir = dy === 1 ? 0 : dy === -1 ? 1 : dx === -1 ? 2 : 3;
+  }, []);
 
   // ---------- input ----------
   useEffect(() => {
@@ -376,92 +265,25 @@ export default function CrossingGame() {
 
       // --- update ---
       if (s.started && !s.dead && !exitConfirmRef.current) {
-        s.player.hopT = Math.min(1, s.player.hopT + dt / HOP_TIME);
-
-        // extend lanes
-        const maxLane = s.lanes[s.lanes.length - 1]?.index ?? 0;
-        if (s.player.y + LANES_AHEAD > maxLane) {
-          for (let i = maxLane + 1; i <= s.player.y + LANES_AHEAD; i++) {
-            s.lanes.push(makeLane(i));
+        s.acc += dt;
+        while (s.acc >= TICK_DT && !s.dead) {
+          s.acc -= TICK_DT;
+          const dir = s.pendingDir;
+          s.pendingDir = null;
+          const tick = s.tick;
+          const ev = stepCrossing(s, s.rng, dir);
+          if (ev.hop) {
+            s.inputs.push(encodeCrossingInput(tick, dir!));
+            spawnBurst(ev.hop.x - ev.hop.dx * 0.3, ev.hop.y - ev.hop.dy * 0.3, "rgba(255,255,255,0.7)", 5);
+            playSfx("jump", 0.45);
           }
-        }
-        // prune old lanes
-        while (s.lanes.length && s.lanes[0]!.index < s.player.y - LANES_BEHIND - 4) {
-          s.lanes.shift();
-        }
-
-        // move obstacles — wrap instantly at the screen edges
-        for (const lane of s.lanes) {
-          for (const ob of lane.obstacles) {
-            ob.x += ob.speed * dt;
-            const half = ob.width / 2;
-            let shift = 0;
-            if (ob.speed > 0 && ob.x - half > COLS) shift = -(COLS + ob.width);
-            if (ob.speed < 0 && ob.x + half < 0) shift = COLS + ob.width;
-            if (shift !== 0) {
-              ob.x += shift;
-              // carry the rider along so it never looks like a fall
-              if (s.onLog === ob) {
-                s.player.x += shift;
-                s.player.px += shift;
-              }
-            }
+          if (ev.coin) {
+            setScore(s.score);
+            spawnBurst(ev.coin.x, ev.coin.y, "#f7c531", 12);
+            playSfx("coin", 0.6);
           }
+          if (ev.died) die(ev.died);
         }
-
-
-        // player lane interactions
-        const lane = s.lanes.find((l) => l.index === s.player.y);
-        if (lane) {
-          if (lane.type === "trail") {
-            for (const ob of lane.obstacles) {
-              // require real overlap between the snake body and the player body
-              const overlap =
-                Math.min(s.player.x + PLAYER_HALF, ob.x + ob.width / 2) -
-                Math.max(s.player.x - PLAYER_HALF, ob.x - ob.width / 2);
-              if (overlap > 0.06) {
-                die("snake");
-              }
-            }
-            s.onLog = null;
-          } else if (lane.type === "river") {
-            // stay locked to the current log as long as it belongs to this lane
-            let riding: Obstacle | null =
-              s.onLog && lane.obstacles.includes(s.onLog) ? s.onLog : null;
-            if (!riding) {
-              for (const ob of lane.obstacles) {
-                if (
-                  s.player.x > ob.x - ob.width / 2 - 0.3 &&
-                  s.player.x < ob.x + ob.width / 2 + 0.3
-                ) {
-                  riding = ob;
-                  break;
-                }
-              }
-            }
-            if (riding && s.player.hopT >= 1) {
-              if (s.onLog !== riding) {
-                s.onLog = riding;
-                s.logOffset = s.player.x - riding.x;
-              }
-            } else if (s.player.hopT >= 1 && !riding) {
-              die("water");
-            }
-          } else {
-            s.onLog = null;
-          }
-        }
-
-
-        // ride the log — the player is locked to the log, so wrapping is seamless
-        if (s.onLog && !s.dead) {
-          s.player.x = s.onLog.x + s.logOffset;
-          if (s.player.hopT >= 1) s.player.px = s.player.x;
-        }
-
-
-
-        // idle timeout: eagle — skip for simplicity, no pressure
       } else if (s.dead) {
         s.deadT += dt;
       }
@@ -890,7 +712,7 @@ export default function CrossingGame() {
   return (
     <div
       ref={wrapRef}
-      className="relative h-dvh w-full touch-none overflow-hidden bg-background select-none"
+      className="relative h-full min-h-0 w-full touch-none overflow-hidden bg-background select-none"
     >
       <canvas ref={canvasRef} className="block" />
 
@@ -1046,7 +868,7 @@ export default function CrossingGame() {
 
       {/* Mobile d-pad */}
       {started && !gameOver && !exitConfirm && (
-        <div className="absolute inset-x-0 bottom-5 flex justify-center gap-2 sm:hidden">
+        <div className="absolute inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex justify-center gap-2 sm:hidden">
           {[
             { label: "←", dx: -1, dy: 0 },
             { label: "↓", dx: 0, dy: -1 },

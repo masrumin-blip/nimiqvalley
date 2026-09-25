@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Game, H, MAX_AMMO, W, type Hud, type PlayerColor } from "@/games/ship/game/engine";
 import { Joystick } from "@/games/ship/components/Joystick";
 import { Button } from "@/components/ui/button";
-import { reportScore } from "@/lib/report-score";
+import { startGameRun, submitTelemetryRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
 
 
 type Phase = "menu" | "playing" | "paused" | "over";
@@ -23,6 +24,7 @@ function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const sessionRef = useRef<string | null>(null);
   const [phase, setPhase] = useState<Phase>("menu");
   const [hud, setHud] = useState<Hud>({
     hp: 120,
@@ -88,7 +90,20 @@ function Index() {
     game.onHud = setHud;
     game.onOver = (score) => {
       setPhase("over");
-      reportScore("ship", score);
+      const sessionId = sessionRef.current;
+      sessionRef.current = null;
+      if (sessionId) {
+        void submitTelemetryRun({
+          data: {
+            slug: "ship",
+            sessionId,
+            score,
+            durationSec: game.playSeconds,
+            wave: game.wave,
+            kills: game.kills,
+          },
+        }).catch(() => {});
+      }
       setHiscore((prev) => {
         const next = Math.max(prev, score);
         localStorage.setItem(HISCORE_KEY, String(next));
@@ -119,6 +134,13 @@ function Index() {
 
   const startGame = useCallback(() => {
     gameRef.current?.setPlayerColor(playerColor);
+    sessionRef.current = null;
+    // Server ticket for this round; guests (no wallet) just play without saving.
+    void startGameRun({ data: { slug: "ship", leagueId: currentLeagueId() } })
+      .then((r) => {
+        sessionRef.current = r.sessionId;
+      })
+      .catch(() => {});
     gameRef.current?.start();
     setPhase("playing");
   }, [playerColor]);
@@ -169,13 +191,13 @@ function Index() {
   const inGame = phase === "playing" || phase === "paused";
 
   return (
-    <main className="fixed inset-0 flex flex-col overflow-hidden bg-[#04060f] select-none">
+    <main className="relative flex h-full flex-col overflow-hidden bg-[#04060f] select-none">
       <h1 className="sr-only">nimiqspcship — 2D top-down shooter vs CPU</h1>
 
       {/* Play area — controls never sit on top of it */}
       <div
         ref={stageRef}
-        className="relative mx-auto h-[min(100vw,calc(100dvh-136px))] w-[min(100vw,calc(100dvh-136px))] shrink-0"
+        className="relative mx-auto h-[min(100vw,calc(100svh-184px))] w-[min(100vw,calc(100svh-184px))] shrink-0"
       >
         <div
           className="absolute left-1/2 top-1/2 shrink-0 grow-0"

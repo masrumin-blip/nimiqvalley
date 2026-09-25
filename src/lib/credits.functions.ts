@@ -21,23 +21,64 @@ export const fetchCredits = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const redeemPayment = createServerFn({ method: "POST" })
+export const getShopPrices = createServerFn({ method: "GET" }).handler(async () => {
+  const { getNimUsdPrice } = await import("./purchases.server");
+  return { nimUsd: await getNimUsdPrice() };
+});
+
+export const quotePurchase = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
       .object({
-        txHash: z.string().trim().max(400).optional(),
-        kind: z.enum(["chat", "room", "key"]),
+        kind: z.enum(["chat", "key", "room"]),
+        token: z.enum(["nim", "usdt"]),
         packId: z.string().trim().max(32).optional(),
-        rooms: z.number().int().min(1).max(10).optional(),
         keys: z.number().int().min(1).max(10).optional(),
+        rooms: z.number().int().min(1).max(10).optional(),
       })
       .parse(input),
   )
-  .handler(async ({ data }): Promise<CreditState> => {
+  .handler(async ({ data }) => {
     const wallet = await requireWallet();
-    const { redeemPayment: redeem } = await import("./credits.server");
-    return redeem({ wallet, ...data });
+    const { createQuote } = await import("./purchases.server");
+    return createQuote(wallet, data);
   });
+
+const hashSchema = z.string().trim().regex(/^(0x)?[0-9a-fA-F]{64}$/, "Invalid transaction hash.");
+
+export const submitPurchaseTx = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), txHash: hashSchema }).parse(input))
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const { submitTx } = await import("./purchases.server");
+    return submitTx(wallet, data.id, data.txHash);
+  });
+
+export const recheckPurchase = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid(), txHash: hashSchema.optional() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const { recheck } = await import("./purchases.server");
+    return recheck(wallet, data.id, data.txHash);
+  });
+
+export const getPurchaseStatus = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const wallet = await requireWallet();
+    const { purchaseStatus } = await import("./purchases.server");
+    return purchaseStatus(wallet, data.id);
+  });
+
+export const getOpenPurchase = createServerFn({ method: "GET" }).handler(async () => {
+  const { currentWallet } = await import("./session.server");
+  const wallet = await currentWallet();
+  if (!wallet) return null;
+  const { latestOpenPurchase } = await import("./purchases.server");
+  return latestOpenPurchase(wallet);
+});
 
 export const recordDailyVisit = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>

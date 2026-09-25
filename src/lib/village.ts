@@ -12,11 +12,12 @@ export interface BuildingSpot {
   id: string;
   x: number;
   y: number;
-  sheet: "a" | "b";
+  sheet: "a" | "b" | "post" | "barn" | "house-windmill";
   crop: [number, number, number, number];
   width: number;
   height: number;
   collider: [number, number, number, number];
+  extraColliders?: Array<[number, number, number, number]>;
 }
 export type AnimalKind = "cow" | "pig" | "sheep" | "chicken" | "frog" | "butterfly";
 export interface AnimalSpot { id: string; kind: AnimalKind; x: number; y: number; phase: number; range?: number }
@@ -109,13 +110,13 @@ export const BUILDINGS: BuildingSpot[] = [
   { id: "chapel", x: 1820, y: 390, sheet: "a", crop: [485, 80, 180, 225], width: 150, height: 188, collider: [-58, -55, 116, 75] },
   { id: "hall", x: 1280, y: 720, sheet: "a", crop: [330, 330, 240, 255], width: 210, height: 223, collider: [-82, -62, 164, 88] },
   { id: "shop", x: 1980, y: 760, sheet: "a", crop: [610, 335, 230, 245], width: 205, height: 218, collider: [-82, -55, 164, 78] },
-  { id: "barn", x: 410, y: 1400, sheet: "a", crop: [100, 730, 235, 305], width: 205, height: 266, collider: [-82, -62, 164, 90] },
-  { id: "windmill", x: 2240, y: 760, sheet: "a", crop: [620, 650, 175, 280], width: 158, height: 252, collider: [-52, -58, 104, 82] },
+  { id: "barn", x: 410, y: 1400, sheet: "barn", crop: [0, 0, 218, 306], width: 205, height: 288, collider: [-65, -223, 130, 145], extraColliders: [[-89, -195, 9, 206], [86, -193, 9, 118], [-88, 8, 63, 8], [24, 8, 69, 8]] },
+  { id: "windmill", x: 2240, y: 760, sheet: "house-windmill", crop: [0, 0, 210, 350], width: 190, height: 317, collider: [-27, -72, 58, 86], extraColliders: [[-86, -145, 124, 38], [52, -141, 20, 42]] },
   { id: "market", x: 800, y: 770, sheet: "b", crop: [240, 340, 205, 190], width: 180, height: 167, collider: [-72, -45, 144, 65] },
   { id: "clock", x: 740, y: 1160, sheet: "b", crop: [20, 600, 190, 245], width: 175, height: 226, collider: [-70, -55, 140, 80] },
   { id: "forge", x: 1120, y: 1190, sheet: "b", crop: [245, 610, 205, 225], width: 180, height: 198, collider: [-72, -52, 144, 76] },
   { id: "mill", x: 2150, y: 1120, sheet: "b", crop: [470, 600, 185, 245], width: 170, height: 225, collider: [-56, -55, 112, 78] },
-  { id: "shed", x: 330, y: 820, sheet: "b", crop: [660, 355, 150, 180], width: 135, height: 162, collider: [-54, -42, 108, 60] },
+  { id: "post-office", x: 1650, y: 1200, sheet: "post", crop: [0, 0, 411, 506], width: 210, height: 259, collider: [-82, -58, 164, 70] },
 ];
 
 export const ANIMALS: AnimalSpot[] = [
@@ -132,7 +133,7 @@ export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "farmer-market", name: "Lani", x: 820, y: 650, spriteRow: 1, speed: 46, idleMs: 1300, path: [{x:820,y:650},{x:1300,y:960},{x:820,y:1220},{x:520,y:960}] },
   { id: "pastel-stroll", name: "Pipi", x: 1300, y: 270, spriteRow: 2, speed: 42, idleMs: 1600, path: [{x:1300,y:270},{x:1300,y:700},{x:1100,y:960},{x:1300,y:1260},{x:1300,y:1680}] },
   { id: "headphones-loop", name: "Momo", x: 1530, y: 720, spriteRow: 3, speed: 50, idleMs: 1100, path: [{x:1530,y:720},{x:1760,y:960},{x:1530,y:1210},{x:1280,y:960}] },
-  { id: "elder-walk", name: "Elder Nuo", x: 570, y: 520, spriteRow: 4, speed: 34, idleMs: 1900, path: [{x:570,y:520},{x:950,y:730},{x:1300,y:960},{x:840,y:1190},{x:560,y:1380}] },
+  { id: "elder-walk", name: "Elder Nuo", x: 690, y: 650, spriteRow: 4, speed: 34, idleMs: 1900, path: [{x:690,y:650},{x:850,y:650},{x:930,y:650},{x:930,y:750},{x:950,y:760},{x:1300,y:960},{x:840,y:1190},{x:560,y:1380},{x:520,y:900},{x:640,y:900},{x:690,y:890}] },
   { id: "queen-parade", name: "Queen Aya", x: 2070, y: 570, spriteRow: 5, speed: 38, idleMs: 1800, path: [{x:2070,y:570},{x:1740,y:760},{x:1450,y:960},{x:1830,y:1160},{x:2290,y:1020}] },
 ];
 
@@ -165,7 +166,9 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
       h: footprint.height,
     });
   }
-  for(const b of BUILDINGS){const [ox,oy,w,h]=b.collider;rects.push({x:b.x+ox,y:b.y+oy,w,h});}
+  for(const b of BUILDINGS){
+    for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
+  }
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
   for (const tree of trees) {
     const { footprint } = TREE_SPRITES[tree.kind];
@@ -181,5 +184,5 @@ export function circleBlocked(x:number,y:number,radius:number,rects:Rect[]):bool
   const px=(x-POND.x)/POND.rx,py=(y-POND.y)/POND.ry;
   return px*px+py*py<1;
 }
-/** The small shed on the west side serves as the village post office. */
-export const POST_OFFICE = { buildingId: "shed", x: 330, y: 820, door: { x: 330, y: 885 }, radius: 130 };
+/** The post office sits beside the player's home, with its entrance accessible from the south. */
+export const POST_OFFICE = { buildingId: "post-office", x: 1650, y: 1200, door: { x: 1650, y: 1240 }, radius: 130 };

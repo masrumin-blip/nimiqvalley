@@ -5,17 +5,14 @@ import { useState } from "react";
 import {
   claimDailyReward,
   fetchCredits,
+  getPurchaseStatus,
+  quotePurchase,
+  recheckPurchase,
   recordDailyVisit,
-  redeemPayment,
+  submitPurchaseTx,
 } from "@/lib/credits.functions";
-import {
-  KEY_COST_NIM,
-  PAY_TO_ADDRESS,
-  ROOM_COST_NIM,
-  type ChatPack,
-  type CreditState,
-} from "@/lib/credits";
-import { payNim, preferredWallet } from "@/lib/wallet";
+import type { ChatPack, CreditState } from "@/lib/credits";
+import { payNim, preferredWallet, sendUsdtPolygon } from "@/lib/wallet";
 
 export function useCredits() {
   const load = useServerFn(fetchCredits);
@@ -28,69 +25,85 @@ export function useCredits() {
 }
 
 export type PurchasePhase = "idle" | "approving" | "confirming";
+export type PayToken = "nim" | "usdt";
+export type PurchaseResult = { id: string; status: string };
+
+type BuyInput = { kind: "chat" | "key" | "room"; token: PayToken; packId?: string; keys?: number; rooms?: number };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useCreditActions() {
   const queryClient = useQueryClient();
-  const redeem = useServerFn(redeemPayment);
+  const quote = useServerFn(quotePurchase);
+  const submit = useServerFn(submitPurchaseTx);
+  const status = useServerFn(getPurchaseStatus);
+  const recheckFn = useServerFn(recheckPurchase);
   const claim = useServerFn(claimDailyReward);
   const visit = useServerFn(recordDailyVisit);
   const [phase, setPhase] = useState<PurchasePhase>("idle");
+  const [lastId, setLastId] = useState<string | null>(null);
 
-  const settle = (credits: CreditState) => {
-    setPhase("idle");
-    queryClient.setQueryData(["credits"], credits);
-  };
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["credits"] });
 
-  const pay = async (nim: number, note: string) => {
+  const buy = async (input: BuyInput): Promise<PurchaseResult> => {
     setPhase("approving");
     try {
-      const receipt = await payNim(PAY_TO_ADDRESS, nim, note, preferredWallet());
+      const q = await quote({ data: input });
+      setLastId(q.id);
+      const txHash =
+        q.token === "nim"
+          ? await payNim(q.payTo, q.amount, q.memo, preferredWallet())
+          : (await sendUsdtPolygon(q.payTo, q.amount)).hash;
       setPhase("confirming");
-      return receipt;
-    } catch (error) {
+      let r = await submit({ data: { id: q.id, txHash } });
+      for (let i = 0; i < 12 && r.status === "pending"; i++) {
+        await sleep(4_000);
+        r = await status({ data: { id: q.id } });
+      }
+      if (r.status === "failed") throw new Error("The payment did not match this purchase.");
+      return r;
+    } finally {
       setPhase("idle");
-      throw error as Error;
+      void refresh();
     }
   };
 
-  const failed = () => setPhase("idle");
+  const onDone = () => void refresh();
 
   const buyChatPack = useMutation({
-    mutationFn: async (pack: ChatPack) => {
-      const txHash = await pay(pack.nim, `NimiqValley chat ${pack.id}`);
-      return redeem({ data: { txHash, kind: "chat", packId: pack.id } });
+    mutationFn: (arg: ChatPack | { pack: ChatPack; token: PayToken }) => {
+      const { pack, token } = "pack" in arg ? arg : { pack: arg, token: "nim" as PayToken };
+      return buy({ kind: "chat", packId: pack.id, token });
     },
-    onSuccess: settle,
-    onError: failed,
+    onSuccess: onDone,
   });
 
   const buyRooms = useMutation({
-    mutationFn: async (rooms: number) => {
-      const txHash = await pay(rooms * ROOM_COST_NIM, `NimiqValley rooms x${rooms}`);
-      return redeem({ data: { txHash, kind: "room", rooms } });
-    },
-    onSuccess: settle,
-    onError: failed,
+    mutationFn: (rooms: number) => buy({ kind: "room", rooms, token: "nim" }),
+    onSuccess: onDone,
   });
 
   const buyKeys = useMutation({
-    mutationFn: async (keys: number) => {
-      const txHash = await pay(keys * KEY_COST_NIM, `NimiqValley match keys x${keys}`);
-      return redeem({ data: { txHash, kind: "key", keys } });
+    mutationFn: (arg: number | { keys: number; token: PayToken }) => {
+      const { keys, token } = typeof arg === "number" ? { keys: arg, token: "nim" as PayToken } : arg;
+      return buy({ kind: "key", keys, token });
     },
-    onSuccess: settle,
-    onError: failed,
+    onSuccess: onDone,
+  });
+
+  const recheck = useMutation({
+    mutationFn: (arg: { id: string; txHash?: string }) => recheckFn({ data: arg }),
+    onSuccess: onDone,
   });
 
   const claimDaily = useMutation({
     mutationFn: () => claim(),
-    onSuccess: settle,
+    onSuccess: (credits: CreditState) => queryClient.setQueryData(["credits"], credits),
   });
 
-  // The server records the visit; the dialog no longer decides on its own.
   const markVisit = useMutation({
     mutationFn: (linkId: string) => visit({ data: { linkId } }),
   });
 
-  return { buyChatPack, buyRooms, buyKeys, claimDaily, markVisit, phase };
+  return { buyChatPack, buyRooms, buyKeys, recheck, claimDaily, markVisit, phase, lastId };
 }

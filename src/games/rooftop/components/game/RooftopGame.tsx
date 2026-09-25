@@ -116,7 +116,7 @@ export function RooftopGame() {
   const difficulty = Math.min(100, Math.round(((speed - 15) / 20) * 100));
 
   return (
-    <div className="fixed inset-0 select-none overflow-hidden bg-game-sky font-[family-name:var(--font-body)] text-game-ink">
+    <div className="relative h-full min-h-0 w-full select-none overflow-hidden bg-game-sky font-[family-name:var(--font-body)] text-game-ink">
       <Canvas shadows camera={{ position: [0, 14, -26], fov: 58 }} dpr={[1, 2]}>
         <Scene
           playing={phase === "playing"}

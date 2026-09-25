@@ -411,7 +411,7 @@ export default function BomberGame() {
 
 
       {screen === "playing" && !over && !paused && (
-        <div className="flex h-[150px] w-full max-w-[480px] shrink-0 select-none items-center justify-between px-2 md:hidden">
+        <div className="flex h-[calc(164px+env(safe-area-inset-bottom))] w-full max-w-[480px] shrink-0 select-none items-center justify-between px-2 pb-[env(safe-area-inset-bottom)] md:hidden">
           <div className="grid grid-cols-3 grid-rows-3 gap-1 opacity-90">
             <span />
             <PadButton label="▲" onDown={() => press(0, -1)} onUp={release} />

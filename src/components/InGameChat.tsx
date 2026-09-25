@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Copy, MessageCircle, Send, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,7 +92,7 @@ export function InGameChat() {
         variant="secondary"
         aria-label="Open Arena chat"
         onClick={() => setOpen(true)}
-        className="absolute left-[5.5rem] top-[max(0.5rem,env(safe-area-inset-top))] z-[60] h-9 gap-1 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition-colors hover:bg-accent"
+        className="h-9 gap-1 rounded-full border border-border/60 bg-background/80 px-3 text-xs font-semibold text-foreground shadow-lg backdrop-blur transition-colors hover:bg-accent"
       >
         <MessageCircle className="size-4" />
         Chat
@@ -100,8 +101,8 @@ export function InGameChat() {
         ) : null}
       </Button>
 
-      {open ? (
-        <div className="absolute inset-0 z-[70] flex items-end justify-center bg-background/50 backdrop-blur-[2px]">
+      {open ? createPortal(
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-background/50 backdrop-blur-[2px]">
           <div className="flex h-[70%] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border/70 bg-card/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-2">
               <div>
@@ -175,7 +176,7 @@ export function InGameChat() {
               </p>
             ) : null}
           </div>
-        </div>
+        </div>, document.body
       ) : null}
     </>
   );

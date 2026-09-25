@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as ArenaRouteImport } from './routes/arena'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as VillageRouteImport } from './routes/village'
+import { Route as AdminLeaguesRouteImport } from './routes/admin.leagues'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatCharacterIdRouteImport } from './routes/chat.$characterId'
@@ -33,6 +34,10 @@ import { Route as GamesShooterRouteImport } from './routes/games.shooter'
 import { Route as GamesSlideRouteImport } from './routes/games.slide'
 import { Route as GamesSoccerRouteImport } from './routes/games.soccer'
 import { Route as GamesTappyRouteImport } from './routes/games.tappy'
+import { Route as LeaguesIndexRouteImport } from './routes/leagues.index'
+import { Route as LeaguesIdRouteImport } from './routes/leagues.$id'
+import { Route as LeaguesNewRouteImport } from './routes/leagues.new'
+import { Route as ApiPublicCronLeagueDepositsRouteImport } from './routes/api/public/cron/league-deposits'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -57,6 +62,11 @@ const LeaderboardRoute = LeaderboardRouteImport.update({
 const VillageRoute = VillageRouteImport.update({
   id: '/village',
   path: '/village',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLeaguesRoute = AdminLeaguesRouteImport.update({
+  id: '/admin/leagues',
+  path: '/admin/leagues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -154,6 +164,27 @@ const GamesTappyRoute = GamesTappyRouteImport.update({
   path: '/games/tappy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeaguesIndexRoute = LeaguesIndexRouteImport.update({
+  id: '/leagues/',
+  path: '/leagues/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaguesIdRoute = LeaguesIdRouteImport.update({
+  id: '/leagues/$id',
+  path: '/leagues/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaguesNewRoute = LeaguesNewRouteImport.update({
+  id: '/leagues/new',
+  path: '/leagues/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronLeagueDepositsRoute =
+  ApiPublicCronLeagueDepositsRouteImport.update({
+    id: '/api/public/cron/league-deposits',
+    path: '/api/public/cron/league-deposits',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -161,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/arena': typeof ArenaRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -178,8 +210,12 @@ export interface FileRoutesByFullPath {
   '/games/slide': typeof GamesSlideRoute
   '/games/soccer': typeof GamesSoccerRoute
   '/games/tappy': typeof GamesTappyRoute
+  '/leagues/$id': typeof LeaguesIdRoute
+  '/leagues/new': typeof LeaguesNewRoute
   '/chat/': typeof ChatIndexRoute
   '/games/': typeof GamesIndexRoute
+  '/leagues/': typeof LeaguesIndexRoute
+  '/api/public/cron/league-deposits': typeof ApiPublicCronLeagueDepositsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -187,6 +223,7 @@ export interface FileRoutesByTo {
   '/arena': typeof ArenaRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -204,8 +241,12 @@ export interface FileRoutesByTo {
   '/games/slide': typeof GamesSlideRoute
   '/games/soccer': typeof GamesSoccerRoute
   '/games/tappy': typeof GamesTappyRoute
+  '/leagues/$id': typeof LeaguesIdRoute
+  '/leagues/new': typeof LeaguesNewRoute
   '/chat': typeof ChatIndexRoute
   '/games': typeof GamesIndexRoute
+  '/leagues': typeof LeaguesIndexRoute
+  '/api/public/cron/league-deposits': typeof ApiPublicCronLeagueDepositsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -214,6 +255,7 @@ export interface FileRoutesById {
   '/arena': typeof ArenaRoute
   '/leaderboard': typeof LeaderboardRoute
   '/village': typeof VillageRoute
+  '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
   '/games/bomber': typeof GamesBomberRoute
@@ -231,8 +273,12 @@ export interface FileRoutesById {
   '/games/slide': typeof GamesSlideRoute
   '/games/soccer': typeof GamesSoccerRoute
   '/games/tappy': typeof GamesTappyRoute
+  '/leagues/$id': typeof LeaguesIdRoute
+  '/leagues/new': typeof LeaguesNewRoute
   '/chat/': typeof ChatIndexRoute
   '/games/': typeof GamesIndexRoute
+  '/leagues/': typeof LeaguesIndexRoute
+  '/api/public/cron/league-deposits': typeof ApiPublicCronLeagueDepositsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -242,6 +288,7 @@ export interface FileRouteTypes {
     | '/arena'
     | '/leaderboard'
     | '/village'
+    | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -259,8 +306,12 @@ export interface FileRouteTypes {
     | '/games/slide'
     | '/games/soccer'
     | '/games/tappy'
+    | '/leagues/$id'
+    | '/leagues/new'
     | '/chat/'
     | '/games/'
+    | '/leagues/'
+    | '/api/public/cron/league-deposits'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -268,6 +319,7 @@ export interface FileRouteTypes {
     | '/arena'
     | '/leaderboard'
     | '/village'
+    | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -285,8 +337,12 @@ export interface FileRouteTypes {
     | '/games/slide'
     | '/games/soccer'
     | '/games/tappy'
+    | '/leagues/$id'
+    | '/leagues/new'
     | '/chat'
     | '/games'
+    | '/leagues'
+    | '/api/public/cron/league-deposits'
   id:
     | '__root__'
     | '/'
@@ -294,6 +350,7 @@ export interface FileRouteTypes {
     | '/arena'
     | '/leaderboard'
     | '/village'
+    | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
     | '/games/bomber'
@@ -311,8 +368,12 @@ export interface FileRouteTypes {
     | '/games/slide'
     | '/games/soccer'
     | '/games/tappy'
+    | '/leagues/$id'
+    | '/leagues/new'
     | '/chat/'
     | '/games/'
+    | '/leagues/'
+    | '/api/public/cron/league-deposits'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +382,7 @@ export interface RootRouteChildren {
   ArenaRoute: typeof ArenaRoute
   LeaderboardRoute: typeof LeaderboardRoute
   VillageRoute: typeof VillageRoute
+  AdminLeaguesRoute: typeof AdminLeaguesRoute
   ApiChatRoute: typeof ApiChatRoute
   ChatCharacterIdRoute: typeof ChatCharacterIdRoute
   GamesBomberRoute: typeof GamesBomberRoute
@@ -338,8 +400,12 @@ export interface RootRouteChildren {
   GamesSlideRoute: typeof GamesSlideRoute
   GamesSoccerRoute: typeof GamesSoccerRoute
   GamesTappyRoute: typeof GamesTappyRoute
+  LeaguesIdRoute: typeof LeaguesIdRoute
+  LeaguesNewRoute: typeof LeaguesNewRoute
   ChatIndexRoute: typeof ChatIndexRoute
   GamesIndexRoute: typeof GamesIndexRoute
+  LeaguesIndexRoute: typeof LeaguesIndexRoute
+  ApiPublicCronLeagueDepositsRoute: typeof ApiPublicCronLeagueDepositsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -377,6 +443,13 @@ declare module '@tanstack/react-router' {
       path: '/village'
       fullPath: '/village'
       preLoaderRoute: typeof VillageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/leagues': {
+      id: '/admin/leagues'
+      path: '/admin/leagues'
+      fullPath: '/admin/leagues'
+      preLoaderRoute: typeof AdminLeaguesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -512,6 +585,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesTappyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/leagues/': {
+      id: '/leagues/'
+      path: '/leagues'
+      fullPath: '/leagues/'
+      preLoaderRoute: typeof LeaguesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leagues/$id': {
+      id: '/leagues/$id'
+      path: '/leagues/$id'
+      fullPath: '/leagues/$id'
+      preLoaderRoute: typeof LeaguesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leagues/new': {
+      id: '/leagues/new'
+      path: '/leagues/new'
+      fullPath: '/leagues/new'
+      preLoaderRoute: typeof LeaguesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/league-deposits': {
+      id: '/api/public/cron/league-deposits'
+      path: '/api/public/cron/league-deposits'
+      fullPath: '/api/public/cron/league-deposits'
+      preLoaderRoute: typeof ApiPublicCronLeagueDepositsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -521,6 +622,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArenaRoute: ArenaRoute,
   LeaderboardRoute: LeaderboardRoute,
   VillageRoute: VillageRoute,
+  AdminLeaguesRoute: AdminLeaguesRoute,
   ApiChatRoute: ApiChatRoute,
   ChatCharacterIdRoute: ChatCharacterIdRoute,
   GamesBomberRoute: GamesBomberRoute,
@@ -538,8 +640,12 @@ const rootRouteChildren: RootRouteChildren = {
   GamesSlideRoute: GamesSlideRoute,
   GamesSoccerRoute: GamesSoccerRoute,
   GamesTappyRoute: GamesTappyRoute,
+  LeaguesIdRoute: LeaguesIdRoute,
+  LeaguesNewRoute: LeaguesNewRoute,
   ChatIndexRoute: ChatIndexRoute,
   GamesIndexRoute: GamesIndexRoute,
+  LeaguesIndexRoute: LeaguesIndexRoute,
+  ApiPublicCronLeagueDepositsRoute: ApiPublicCronLeagueDepositsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

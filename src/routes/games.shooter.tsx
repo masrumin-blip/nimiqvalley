@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { GameFrame } from "@/components/GameFrame";
-import { reportScore } from "@/lib/report-score";
+import { startGameRun, submitTelemetryRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
 
 const title = "CosNimiq Shooter — Space Arcade Shooter";
 const description =
@@ -23,12 +24,43 @@ export const Route = createFileRoute("/games/shooter")({
 });
 
 function ShooterRoute() {
+  const sessionRef = useRef<string | null>(null);
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      const data = event.data as { type?: string; slug?: string; value?: number };
-      if (data?.type === "nimiq-score" && data.slug === "shooter" && typeof data.value === "number") {
-        reportScore("shooter", data.value);
+      const data = event.data as {
+        type?: string;
+        slug?: string;
+        score?: number;
+        durationSec?: number;
+        wave?: number;
+        kills?: Record<string, number>;
+        maxCombo?: number;
+      };
+      if (data?.slug !== "shooter") return;
+      if (data.type === "nimiq-start") {
+        sessionRef.current = null;
+        void startGameRun({ data: { slug: "shooter", leagueId: currentLeagueId() } })
+          .then((r) => {
+            sessionRef.current = r.sessionId;
+          })
+          .catch(() => {});
+      } else if (data.type === "nimiq-run" && typeof data.score === "number") {
+        const sessionId = sessionRef.current;
+        sessionRef.current = null;
+        if (!sessionId) return;
+        void submitTelemetryRun({
+          data: {
+            slug: "shooter",
+            sessionId,
+            score: data.score,
+            durationSec: Number(data.durationSec) || 0,
+            wave: Math.floor(Number(data.wave) || 0),
+            kills: data.kills ?? {},
+            maxCombo: Math.floor(Number(data.maxCombo) || 0),
+          },
+        }).catch(() => {});
       }
     };
     window.addEventListener("message", onMessage);
@@ -40,7 +72,7 @@ function ShooterRoute() {
       <iframe
         src="/games/shooter/index.html"
         title="CosNimiq Shooter"
-        className="h-[calc(100vh-2.75rem)] w-full border-0"
+        className="h-full w-full border-0"
       />
     </GameFrame>
   );

@@ -1,88 +1,64 @@
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { reportScore } from "@/lib/report-score";
+import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
+import {
+  GROUND,
+  PLAYER_H,
+  PLAYER_W,
+  PLAYER_X,
+  TICK_DT,
+  VIEW,
+  createMininjaSim,
+  createRng,
+  encodeMininjaInput,
+  finalMininjaScore,
+  stepMininja,
+  type Entity,
+  type EntityKind,
+  type MininjaSim,
+} from "@/games/mininja/mininja-sim";
 
 // The canvas is 800px but the camera shows a 1600px world region at 0.5 scale,
 // so the action reads as twice as far away.
 const CANVAS = 800;
-const VIEW = 1600;
 const CAMERA_SCALE = CANVAS / VIEW;
-const GROUND = 1160;
-const PLAYER_X = 210;
-const PLAYER_W = 60;
-const PLAYER_H = 82;
-const GRAVITY = 2200;
-const JUMP_FORCE = -820;
-const START_SPEED = 664;
 
 type Phase = "ready" | "playing" | "paused" | "gameover";
-type EntityKind = "crate" | "barrier" | "laser" | "spikes" | "grunt" | "drone" | "saw" | "tower" | "bat";
-
-type Entity = {
-  id: number;
-  kind: EntityKind;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  dead?: boolean;
-  age: number;
-  attacking?: boolean;
-  baseY?: number;
-};
 
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
 
-type Game = {
+type Game = MininjaSim & {
   phase: Phase;
-  y: number;
-  vy: number;
-  grounded: boolean;
-  slash: number;
-  hurt: number;
-  score: number;
-  kills: number;
-  speed: number;
-  distance: number;
-  activeTime: number;
-  spawnIn: number;
-  entities: Entity[];
   particles: Particle[];
-  nextId: number;
   lastTime: number;
-  cityOffset: number;
+  rng: () => number;
+  acc: number;
+  pendingJump: boolean;
+  pendingSlash: boolean;
+  inputs: number[];
+  sessionId: string | null;
 };
 
-function freshGame(phase: Phase = "ready"): Game {
+function freshGame(phase: Phase = "ready", seed = 1, sessionId: string | null = null): Game {
   return {
+    ...createMininjaSim(),
     phase,
-    y: GROUND - PLAYER_H,
-    vy: 0,
-    grounded: true,
-    slash: 0,
-    hurt: 0,
-    score: 0,
-    kills: 0,
-    speed: START_SPEED,
-    distance: 0,
-    activeTime: 0,
-    spawnIn: 1.35,
-    entities: [],
     particles: [],
-    nextId: 1,
     lastTime: 0,
-    cityOffset: 0,
+    rng: createRng(seed),
+    acc: 0,
+    pendingJump: false,
+    pendingSlash: false,
+    inputs: [],
+    sessionId,
   };
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
-}
-
-function intersects(ax: number, ay: number, aw: number, ah: number, b: Entity) {
-  return ax < b.x + b.w && ax + aw > b.x && ay < b.y + b.h && ay + ah > b.y;
 }
 
 function drawCity(ctx: CanvasRenderingContext2D, offset: number) {
@@ -472,53 +448,6 @@ function IconGlyph({ kind }: { kind: EntityKind }) {
   return <svg className="tut-icon" viewBox="0 0 24 24" aria-hidden="true">{shapes[kind]}</svg>;
 }
 
-function spawn(game: Game) {
-  // Difficulty keeps climbing with survival time: faster, tighter, busier,
-  // and new obstacle varieties unlock the longer the run lasts.
-  const difficulty = Math.min(1, game.activeTime / 90);
-  const roll = Math.random();
-  let kind: EntityKind;
-  // Obstacles are far more common than enemies (about 3 out of 4 spawns).
-  if (roll < 0.2) kind = "crate";
-  else if (roll < 0.34) kind = "barrier";
-  else if (roll < 0.5) kind = "spikes";
-  else if (roll < 0.6) kind = difficulty > 0.08 ? "laser" : "crate";
-  else if (roll < 0.68) kind = difficulty > 0.08 ? "tower" : "barrier";
-  else if (roll < 0.72) kind = difficulty > 0.14 ? "saw" : "spikes";
-  else if (roll < 0.8) kind = difficulty > 0.1 ? "bat" : "spikes";
-  else if (roll < 0.9) kind = "grunt";
-  else kind = "drone";
-
-  const specs: Record<EntityKind, [number, number, number]> = {
-    crate: [60, 116, GROUND - 116], barrier: [45, 108, GROUND - 108],
-    spikes: [76, 36, GROUND - 36],
-    laser: [88, 28, GROUND - 28], grunt: [62, 72, GROUND - 72],
-    drone: [72, 48, GROUND - 155],
-    tower: [60, 120, GROUND - 120],
-    saw: [56, 56, GROUND - 150],
-    // Bat hovers just above a standing ninja's head: only a jump connects.
-    bat: [52, 44, GROUND - 135],
-  };
-  const [w, h, y] = specs[kind];
-  game.entities.push({ id: game.nextId++, kind, x: VIEW + 25, y, w, h, age: 0, baseY: y });
-  // Spacing is distance-based, so increasing speed can never create an
-  // impossible pair of obstacles. A physics guard guarantees the ninja can
-  // always land from one jump and take off again before the next obstacle:
-  // tall obstacles (barrier/tower) demand extra runway because the ninja is
-  // still rising when the next one arrives.
-  const tall = kind === "barrier" || kind === "tower" || kind === "crate";
-  const airtime = (2 * -JUMP_FORCE) / GRAVITY; // full jump flight time (~0.75s)
-  const guaranteed = Math.max(
-    game.speed * 0.3,
-    game.speed * (airtime + (tall ? 0.18 : 0.03)) - w + 30,
-  );
-  const desired = game.speed * (0.44 + (1 - difficulty) * 0.1);
-  const recoveryDistance = Math.max(guaranteed, desired);
-  const clearDistance = w + recoveryDistance + 12;
-  const variationDistance = (10 + Math.random() * 58) * (1 - difficulty * 0.8);
-  game.spawnIn = (clearDistance + variationDistance) / game.speed;
-}
-
 function synth(type: "jump" | "slash" | "hit" | "kill", muted: boolean) {
   if (muted || typeof window === "undefined") return;
   const AudioCtx = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -552,29 +481,44 @@ export function MininjaGame() {
   const [score, setScore] = useState(0);
   const [muted, setMuted] = useState(false);
 
+  // Seeds come from the server so runs can be verified by replay.
+  const nextSessionRef = useRef<{ sessionId: string; seed: number } | null>(null);
+  const prefetchSession = useCallback(async () => {
+    try {
+      nextSessionRef.current = await startGameRun({ data: { slug: "mininja", leagueId: currentLeagueId() } });
+    } catch {
+      nextSessionRef.current = null; // guest: local practice run
+    }
+  }, []);
+  useEffect(() => {
+    void prefetchSession();
+  }, [prefetchSession]);
+
   const start = useCallback(() => {
     if (typeof window !== "undefined") {
       bestRef.current = Number(window.localStorage.getItem("neon-ninja-best") ?? 0);
     }
-    gameRef.current = freshGame("playing");
+    const session = nextSessionRef.current;
+    nextSessionRef.current = null;
+    const seed = session?.seed ?? Math.floor(Math.random() * 2 ** 31);
+    gameRef.current = freshGame("playing", seed, session?.sessionId ?? null);
     setScore(0);
     setPhase("playing");
-  }, []);
+    void prefetchSession();
+  }, [prefetchSession]);
 
   const jump = useCallback(() => {
     const g = gameRef.current;
     if (g.phase === "ready" || g.phase === "gameover") { start(); return; }
     if (g.phase !== "playing" || !g.grounded) return;
-    g.vy = JUMP_FORCE; g.grounded = false;
-    synth("jump", mutedRef.current);
+    g.pendingJump = true;
   }, [start]);
 
   const slash = useCallback(() => {
     const g = gameRef.current;
     if (g.phase === "ready" || g.phase === "gameover") { start(); return; }
     if (g.phase !== "playing" || g.slash > 0.05) return;
-    g.slash = 0.28;
-    synth("slash", mutedRef.current);
+    g.pendingSlash = true;
   }, [start]);
 
   const exitToMenu = useCallback(() => {
@@ -631,64 +575,37 @@ export function MininjaGame() {
       const dt = g.lastTime ? Math.min((time - g.lastTime) / 1000, 0.035) : 0;
       g.lastTime = time;
       if (g.phase === "playing") {
-        g.activeTime += dt;
-        // Speed ramps up continuously the longer the run lasts.
-        g.speed = START_SPEED * Math.min(2.8, 1 + Math.floor(g.activeTime / 2.4) * 0.3);
-        g.distance += g.speed * dt;
-        g.cityOffset += g.speed * dt;
-        g.score += dt * (12 + g.speed / 40);
-        g.spawnIn -= dt;
-        if (g.spawnIn <= 0) spawn(g);
-        if (!g.grounded) {
-          g.vy += GRAVITY * dt;
-          g.y += g.vy * dt;
-          if (g.y >= GROUND - PLAYER_H) { g.y = GROUND - PLAYER_H; g.vy = 0; g.grounded = true; }
-        }
-        g.slash = Math.max(0, g.slash - dt);
-        g.hurt = Math.max(0, g.hurt - dt);
-        g.entities.forEach((e) => {
-          e.x -= g.speed * dt;
-          e.age += dt;
-          if (e.kind === "saw" && e.baseY !== undefined) {
-            // The saw bobs up and down, forcing tighter jump timing.
-            e.y = e.baseY + Math.sin(e.age * 3.1) * 42;
-            e.x -= 40 * dt;
+        g.acc += dt;
+        while (g.acc >= TICK_DT && g.phase === "playing") {
+          g.acc -= TICK_DT;
+          const tick = g.tick;
+          const wantJump = g.pendingJump;
+          const wantSlash = g.pendingSlash;
+          g.pendingJump = false;
+          g.pendingSlash = false;
+          const ev = stepMininja(g, g.rng, wantJump, wantSlash);
+          if (ev.jumped) { g.inputs.push(encodeMininjaInput(tick, 0)); synth("jump", mutedRef.current); }
+          if (ev.slashed) { g.inputs.push(encodeMininjaInput(tick, 1)); synth("slash", mutedRef.current); }
+          for (const k of ev.kills) {
+            synth("kill", mutedRef.current);
+            for (let i = 0; i < 13; i++) g.particles.push({ x: k.x, y: k.y, vx: -120 + Math.random() * 250, vy: -180 + Math.random() * 260, life: 0.45, color: i % 2 ? "#ff43c7" : "#34edff", size: 3 + Math.random() * 5 });
           }
-          if (e.kind === "bat" && e.baseY !== undefined) {
-            // Gentle glide with small bobs, always staying above head height
-            // so running under it is safe and jumping is not.
-            e.y = e.baseY + Math.sin(e.age * 4.2) * 14;
-            e.x -= 30 * dt;
-          }
-          if (e.kind === "grunt" || e.kind === "drone") {
-            const closingIn = e.x < 510 && e.x > PLAYER_X + 45;
-            e.attacking = e.x < 330;
-            if (closingIn) e.x -= (e.kind === "grunt" ? 105 : 78) * dt;
-            if (e.kind === "drone") {
-              const targetY = e.attacking ? g.y + 12 : GROUND - 155;
-              e.y += (targetY - e.y) * Math.min(1, dt * 3.4);
-            }
-          }
-          if ((e.kind === "grunt" || e.kind === "drone") && g.slash > 0 && !e.dead) {
-            const blade = { x: PLAYER_X + 35, y: g.y - 10, w: 115, h: PLAYER_H + 28 };
-            if (intersects(blade.x, blade.y, blade.w, blade.h, e)) {
-              e.dead = true; g.kills += 1; g.score += 75; synth("kill", mutedRef.current);
-              for (let i = 0; i < 13; i++) g.particles.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, vx: -120 + Math.random() * 250, vy: -180 + Math.random() * 260, life: 0.45, color: i % 2 ? "#ff43c7" : "#34edff", size: 3 + Math.random() * 5 });
-            }
-          }
-          const hitSolid = intersects(PLAYER_X + 9, g.y + 8, PLAYER_W - 18, PLAYER_H - 8, e);
-          if (!e.dead && hitSolid) {
-            g.phase = "gameover"; g.hurt = 0.6; synth("hit", mutedRef.current);
-            const finalScore = Math.floor(g.score);
+          if (ev.died) {
+            g.phase = "gameover"; synth("hit", mutedRef.current);
+            const finalScore = finalMininjaScore(g);
             const savedBest = Number(window.localStorage.getItem("neon-ninja-best") ?? 0);
             const nextBest = Math.max(savedBest, finalScore);
             window.localStorage.setItem("neon-ninja-best", String(nextBest));
             bestRef.current = nextBest;
             setScore(finalScore); setPhase("gameover");
-            reportScore("mininja", finalScore);
+            // Only the input log is sent; the server replays it to compute the score.
+            const sessionId = g.sessionId;
+            g.sessionId = null;
+            if (sessionId) {
+              void submitGameRun({ data: { slug: "mininja", sessionId, inputs: g.inputs } }).catch(() => {});
+            }
           }
-        });
-        g.entities = g.entities.filter((e) => e.x + e.w > -30 && !e.dead);
+        }
         g.particles.forEach((p) => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt; });
         g.particles = g.particles.filter((p) => p.life > 0).slice(-60);
         hudTick += dt;
@@ -745,7 +662,7 @@ export function MininjaGame() {
               <li><IconGlyph kind="spikes" /><span className="tag pink">SPIKES</span> Low jagged mine. How to beat: a quick short jump.</li>
               <li><IconGlyph kind="laser" /><span className="tag pink">LASER</span> Thin beam on the floor. How to beat: jump over the beam.</li>
               <li><IconGlyph kind="tower" /><span className="tag pink">TOWER</span> High crate stack. How to beat: jump at the last moment for full height.</li>
-              <li><IconGlyph kind="saw" /><span className="tag pink">SAW</span> Flying saw bobbing up and down. How to beat: time your jump when it rises — or simply stay on the ground and it passes safely.</li>
+              <li><IconGlyph kind="saw" /><span className="tag pink">SAW</span> Flying saw bobbing up and down. How to beat: time your jump when it rises.</li>
             </ul>
           </div>
           <div className="tutorial-block">

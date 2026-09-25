@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MessagesSquare, Trophy } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { MessagesSquare, ShieldCheck, Trophy } from "lucide-react";
 import { useState } from "react";
 import { KeyShopDialog } from "@/components/KeyShopDialog";
 import { PlayerBadge } from "@/components/PlayerBadge";
 import { Button } from "@/components/ui/button";
+import { getAdminStatus } from "@/lib/admin.functions";
 import { GAMES } from "@/lib/games";
 
 const title = "Game Hub — 15 NimiqValley Games";
@@ -27,6 +30,8 @@ export const Route = createFileRoute("/games/")({
 function GameHub() {
   const [category, setCategory] = useState<"all" | "multiplayer" | "just-for-fun">("all");
   const visibleGames = category === "all" ? GAMES : GAMES.filter((game) => game.category === category);
+  const adminStatus = useServerFn(getAdminStatus);
+  const admin = useQuery({ queryKey: ["admin-status"], queryFn: () => adminStatus(), staleTime: 60_000 });
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">
@@ -44,9 +49,6 @@ function GameHub() {
           <h1 className="mt-2 text-4xl font-black tracking-tight text-foreground sm:text-5xl">
             Game Hub
           </h1>
-          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-            Fifteen games are ready to play. Choose one to open it full screen.
-          </p>
         </header>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-3">
@@ -65,7 +67,23 @@ function GameHub() {
               <MessagesSquare className="size-4" aria-hidden="true" />
               Arena Chat
             </Link>
+            <Link
+              to="/leagues"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-black uppercase tracking-wide text-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Trophy className="size-4" aria-hidden="true" />
+              Leagues
+            </Link>
             <KeyShopDialog />
+            {admin.data?.isAdmin === true && (
+              <Link
+                to="/admin/leagues"
+                className="inline-flex items-center gap-2 rounded-full border border-primary bg-primary/10 px-4 py-2 text-xs font-black uppercase tracking-wide text-primary transition-transform hover:-translate-y-0.5"
+              >
+                <ShieldCheck className="size-4" aria-hidden="true" />
+                Admin Panel
+              </Link>
+            )}
           </div>
           <PlayerBadge />
         </div>
