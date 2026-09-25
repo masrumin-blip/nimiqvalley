@@ -197,60 +197,6 @@ export type Database = {
         }
         Relationships: []
       }
-      credit_purchases: {
-        Row: {
-          amount: number
-          attempts: number
-          chats: number
-          created_at: string
-          id: string
-          keys: number
-          kind: string
-          memo: string
-          pack_id: string | null
-          rooms: number
-          status: string
-          token: string
-          tx_hash: string | null
-          updated_at: string
-          wallet: string
-        }
-        Insert: {
-          amount: number
-          attempts?: number
-          chats?: number
-          created_at?: string
-          id?: string
-          keys?: number
-          kind: string
-          memo: string
-          pack_id?: string | null
-          rooms?: number
-          status?: string
-          token: string
-          tx_hash?: string | null
-          updated_at?: string
-          wallet: string
-        }
-        Update: {
-          amount?: number
-          attempts?: number
-          chats?: number
-          created_at?: string
-          id?: string
-          keys?: number
-          kind?: string
-          memo?: string
-          pack_id?: string | null
-          rooms?: number
-          status?: string
-          token?: string
-          tx_hash?: string | null
-          updated_at?: string
-          wallet?: string
-        }
-        Relationships: []
-      }
       daily_claims: {
         Row: {
           claim_date: string
@@ -303,7 +249,6 @@ export type Database = {
           expires_at: string
           game_slug: string
           id: string
-          league_id: string | null
           seed: number
           wallet: string
         }
@@ -313,7 +258,6 @@ export type Database = {
           expires_at: string
           game_slug: string
           id?: string
-          league_id?: string | null
           seed: number
           wallet: string
         }
@@ -323,209 +267,8 @@ export type Database = {
           expires_at?: string
           game_slug?: string
           id?: string
-          league_id?: string | null
           seed?: number
           wallet?: string
-        }
-        Relationships: []
-      }
-      league_deposits: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          league_id: string
-          tx_hash: string
-          wallet: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          league_id: string
-          tx_hash: string
-          wallet: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          league_id?: string
-          tx_hash?: string
-          wallet?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_deposits_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      league_payouts: {
-        Row: {
-          amount: number
-          claimed_at: string
-          id: string
-          league_id: string
-          ranks: number[]
-          status: string
-          to_address: string
-          tx_hash: string | null
-          wallet: string
-        }
-        Insert: {
-          amount: number
-          claimed_at?: string
-          id?: string
-          league_id: string
-          ranks?: number[]
-          status?: string
-          to_address: string
-          tx_hash?: string | null
-          wallet: string
-        }
-        Update: {
-          amount?: number
-          claimed_at?: string
-          id?: string
-          league_id?: string
-          ranks?: number[]
-          status?: string
-          to_address?: string
-          tx_hash?: string | null
-          wallet?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_payouts_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      league_pending_deposits: {
-        Row: {
-          amount: number
-          attempts: number
-          created_at: string
-          id: string
-          league_id: string
-          status: string
-          token: string
-          tx_hash: string
-          updated_at: string
-          wallet: string
-        }
-        Insert: {
-          amount: number
-          attempts?: number
-          created_at?: string
-          id?: string
-          league_id: string
-          status?: string
-          token?: string
-          tx_hash: string
-          updated_at?: string
-          wallet: string
-        }
-        Update: {
-          amount?: number
-          attempts?: number
-          created_at?: string
-          id?: string
-          league_id?: string
-          status?: string
-          token?: string
-          tx_hash?: string
-          updated_at?: string
-          wallet?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_pending_deposits_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      league_scores: {
-        Row: {
-          best: number
-          id: string
-          league_id: string
-          updated_at: string
-          wallet: string
-        }
-        Insert: {
-          best: number
-          id?: string
-          league_id: string
-          updated_at?: string
-          wallet: string
-        }
-        Update: {
-          best?: number
-          id?: string
-          league_id?: string
-          updated_at?: string
-          wallet?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "league_scores_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      leagues: {
-        Row: {
-          created_at: string
-          creator_wallet: string
-          ends_at: string
-          game_slug: string
-          id: string
-          payout: string
-          pool: number
-          starts_at: string
-          status: string
-          title: string
-          token: string
-        }
-        Insert: {
-          created_at?: string
-          creator_wallet: string
-          ends_at: string
-          game_slug: string
-          id?: string
-          payout?: string
-          pool?: number
-          starts_at: string
-          status?: string
-          title: string
-          token?: string
-        }
-        Update: {
-          created_at?: string
-          creator_wallet?: string
-          ends_at?: string
-          game_slug?: string
-          id?: string
-          payout?: string
-          pool?: number
-          starts_at?: string
-          status?: string
-          title?: string
-          token?: string
         }
         Relationships: []
       }
@@ -574,6 +317,7 @@ export type Database = {
           id: string
           joined_at: string
           max_players: number
+          mode: string
           rank_hint: number
           room_id: string | null
           settings: Json
@@ -585,6 +329,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -596,6 +341,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -658,6 +404,8 @@ export type Database = {
           kind: string
           max_players: number
           settings: Json
+          settled_at: string | null
+          stake: number
           started_at: string | null
           status: string
           turn_no: number
@@ -676,6 +424,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -694,6 +444,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -701,6 +453,36 @@ export type Database = {
           turn_wallet?: string | null
           updated_at?: string
           winner_wallet?: string | null
+        }
+        Relationships: []
+      }
+      mp_tickets: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          reason: string
+          room_id: string | null
+          unit: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          reason: string
+          room_id?: string | null
+          unit?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          reason?: string
+          room_id?: string | null
+          unit?: string
+          wallet?: string
         }
         Relationships: []
       }
@@ -1008,6 +790,7 @@ export type Database = {
           free_chats_used: number
           free_keys_date: string | null
           match_keys: number
+          nim_balance: number
           room_credits: number
           updated_at: string
           wallet: string
@@ -1018,6 +801,7 @@ export type Database = {
           free_chats_used?: number
           free_keys_date?: string | null
           match_keys?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet: string
@@ -1028,6 +812,7 @@ export type Database = {
           free_chats_used?: number
           free_keys_date?: string | null
           match_keys?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet?: string
@@ -1066,18 +851,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_league_deposit: {
+      grant_credits: {
         Args: {
-          p_amount: number
-          p_league: string
-          p_tx: string
+          p_chat?: number
+          p_key?: number
+          p_room?: number
           p_wallet: string
         }
-        Returns: number
+        Returns: undefined
       }
-      confirm_credit_purchase: { Args: { p_id: string }; Returns: string }
-      confirm_league_deposit: { Args: { p_pending: string }; Returns: number }
-      disarm_league_deposit_checker: { Args: never; Returns: undefined }
       moderate_chat_submission: {
         Args: {
           _is_profane: boolean
@@ -1086,8 +868,37 @@ export type Database = {
         }
         Returns: Json
       }
+      redeem_nim_payment: {
+        Args: {
+          p_chat?: number
+          p_key?: number
+          p_kind: string
+          p_nim: number
+          p_room?: number
+          p_tx_hash: string
+          p_wallet: string
+        }
+        Returns: boolean
+      }
+      refund_chat_credit: {
+        Args: { p_source: string; p_wallet: string }
+        Returns: undefined
+      }
+      spend_chat_credit: {
+        Args: { p_free_limit: number; p_wallet: string }
+        Returns: {
+          chat_credits: number
+          free_chats_date: string
+          free_chats_used: number
+          match_keys: number
+          room_credits: number
+          source: string
+          wallet: string
+        }[]
+      }
       spend_match_key: { Args: { p_wallet: string }; Returns: boolean }
       spend_room_credit: { Args: { p_wallet: string }; Returns: boolean }
+      spend_room_entry: { Args: { p_wallet: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
