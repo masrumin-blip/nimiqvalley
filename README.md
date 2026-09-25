@@ -1,29 +1,34 @@
-# Welcome to your Lovable project
+# 🌾 NimiqValley
 
-This project was built with [Lovable](https://lovable.dev).
+An interactive Web3 portfolio village and arcade hub powered by **Nimiq** 
 
-## Build with Lovable
+## ✨ Highlights
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+- **Interactive Village:** Explore the 2.5D village, talk with AI villagers, and visit the on-chain Post Office.
+- **15 Retro Games:** Arcade mini-games featuring server-side anti-cheat and verified leaderboards.
+- **Crypto Leagues:** Community tournaments with automated prize pools paid in **NIM** and **USDT**.
+- **Shop & Economy:** Key shop and AI passes with real-time NIM/USDT pricing.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+## 🛠 Tech Stack
 
-## Development
+- **Frontend & Fullstack:** TanStack Start v1 (React 19), Tailwind CSS v4
+- **Database:** PostgreSQL (Lovable Cloud / Supabase) with Row-Level Security
+- **Web3:** Nimiq RPC 2.0 (Albatross) & Polygon (USDT ERC-20 via Viem)
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## 🔐 Required Secrets
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+Set these in your server environment / secrets settings:
 
-## Built with
+- `ADMIN_WALLETS` – Admin Nimiq wallet addresses (`NQ...`).
+- `LEAGUE_TREASURY_NIM` – Treasury address for NIM deposits.
+- `LEAGUE_TREASURY_POLYGON` – Treasury address for USDT on Polygon (`0x...`).
+- `LEAGUE_TREASURY_POLYGON_KEY` – Private key for USDT automated payouts.
+- `SESSION_SECRET` – Random 32+ char string for session encryption.
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## 🚀 Quick Start
+
+```bash
+git clone https://github.com/masrumin-blip/nimiqvalley.git
+cd nimiqvalley
+bun install    # or npm install
+bun dev        # or npm run dev
