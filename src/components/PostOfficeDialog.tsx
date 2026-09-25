@@ -17,6 +17,18 @@ interface Props {
   onRead: (letter: Letter) => void;
 }
 
+function friendlyError(raw: string): string {
+  const text = raw.trim();
+  if (!text.startsWith("[") && !text.startsWith("{")) return text;
+  try {
+    const parsed = JSON.parse(text) as Array<{ message?: string }>;
+    const first = Array.isArray(parsed) ? parsed[0]?.message : undefined;
+    return first && first !== "Invalid" ? first : "Something in the form is not valid. Please check and try again.";
+  } catch {
+    return "Something went wrong. Please try again.";
+  }
+}
+
 export default function PostOfficeDialog({ open, onOpenChange, inbox, onRead }: Props) {
   const qc = useQueryClient();
   const send = useServerFn(sendLetter);
@@ -37,7 +49,7 @@ export default function PostOfficeDialog({ open, onOpenChange, inbox, onRead }: 
       let txHash: string | undefined;
       if (token === "nim") {
         setStep("Approve the NIM payment in your wallet…");
-        await payNim(address, amt, "Nimiq Village letter");
+        txHash = await payNim(address.replace(/\s+/g, ""), amt, "Nimiq Village letter");
       } else if (token === "usdt") {
         if (!/^0x[0-9a-fA-F]{40}$/.test(usdtTo.trim())) throw new Error("Enter the recipient's Polygon address.");
         setStep("Approve the USDT transfer in your wallet…");
@@ -51,6 +63,7 @@ export default function PostOfficeDialog({ open, onOpenChange, inbox, onRead }: 
           token,
           amount: token === "none" ? 0 : amt,
           txHash,
+          memo: token === "nim" ? "Nimiq Village letter" : undefined,
           usdtTo: token === "usdt" ? usdtTo.trim() : undefined,
         },
       });
@@ -153,7 +166,9 @@ export default function PostOfficeDialog({ open, onOpenChange, inbox, onRead }: 
                     <input value={usdtTo} onChange={(e) => setUsdtTo(e.target.value)} placeholder="0x…" className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground" />
                   </label>
                 )}
-                {mutation.error && <p className="text-xs text-destructive">{mutation.error.message}</p>}
+                {mutation.error && (
+                  <p className="text-xs text-destructive">{friendlyError(mutation.error.message)}</p>
+                )}
                 {step && <p className="text-xs text-muted-foreground">{step}</p>}
                 <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !message.trim() || !to.trim()} className="min-h-11 w-full">
                   {mutation.isPending ? "Sending…" : "Send letter"}

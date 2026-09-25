@@ -76,7 +76,22 @@ type RawTx = {
   data?: string;
   recipientData?: string;
   senderData?: string;
+  /** Present on Nimiq Pay payments: the tx settles via an HTLC/contract, real parties listed here. */
+  relatedAddresses?: string[];
+  toType?: number;
+  executionResult?: boolean;
 };
+
+/** Nimiq Pay sends via an HTLC contract, so `to` is the contract and the real recipient is in relatedAddresses. */
+function isContractTx(tx: RawTx): boolean {
+  return tx.toType === 2 || (Array.isArray(tx.relatedAddresses) && tx.relatedAddresses.length > 0);
+}
+
+function recipientMatches(tx: RawTx, recipient: string): boolean {
+  const want = norm(recipient);
+  if (norm(tx.to ?? tx.recipient ?? "") === want) return true;
+  return (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === want);
+}
 
 function hexToText(hex: string): string {
   try {
@@ -119,11 +134,15 @@ export async function findNimTransfer(
         const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
         const ts = typeof tx.timestamp === "number" ? (tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp) : Date.now();
         const senderOk = byRecipient ? true : norm(tx.from ?? tx.sender ?? "") === norm(sender);
-        const memoOk = byRecipient ? txMemo(tx).toLowerCase().includes(memoNeedle) : true;
+        // Contract txs (Nimiq Pay) carry no plain memo; matching the recipient in relatedAddresses is enough.
+        const memoOk = byRecipient
+          ? txMemo(tx).toLowerCase().includes(memoNeedle) ||
+            (isContractTx(tx) && (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === norm(recipient)))
+          : true;
         if (
           hash.length >= 8 &&
           senderOk &&
-          norm(tx.to ?? tx.recipient ?? "") === norm(recipient) &&
+          recipientMatches(tx, recipient) &&
           Math.abs(value - nim) < 0.00001 &&
           memoOk &&
           Date.now() - ts < maxAge &&
@@ -150,10 +169,16 @@ export async function verifyNimTx(
 ): Promise<"ok" | "bad" | "unknown"> {
   const tx = await nimRpc<RawTx>("getTransactionByHash", [hash.replace(/^0x/, "")]);
   if (!tx || typeof tx !== "object" || !(tx.to ?? tx.recipient)) return "unknown";
+  if (tx.executionResult === false) return "bad";
   const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
   const senderOk = norm(tx.from ?? tx.sender ?? "") === norm(sender);
-  const memoOk = memo ? txMemo(tx).toLowerCase().includes(memo.toLowerCase()) : false;
-  const ok = (senderOk || memoOk) && norm(tx.to ?? tx.recipient ?? "") === norm(recipient) && Math.abs(value - nim) < 0.00001;
+  const contract = isContractTx(tx);
+  // Nimiq Pay contract txs have no plain-text memo; the recipient in relatedAddresses proves intent.
+  const memoOk = memo
+    ? txMemo(tx).toLowerCase().includes(memo.toLowerCase()) ||
+      (contract && (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === norm(recipient)))
+    : false;
+  const ok = (senderOk || memoOk) && recipientMatches(tx, recipient) && Math.abs(value - nim) < 0.00001;
   return ok ? "ok" : "bad";
 }
 
@@ -221,8 +246,25 @@ export async function sendLetter(wallet: string, input: SendLetterInput): Promis
 
   let txHash: string | null = null;
   if (input.token === "nim") {
-    txHash = await findNimTransfer(wallet, to, input.amount);
-    if (!txHash) throw new Error("We could not find your NIM payment yet. Please try again in a minute.");
+    const memo = input.memo?.trim() || "Nimiq Village letter";
+    if (input.txHash) {
+      txHash = input.txHash.replace(/^0x/, "").toLowerCase();
+      if (await hashUsed(txHash)) throw new Error("This payment was already used.");
+      const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+      for (;;) {
+        const result = await verifyNimTx(txHash, wallet, to, input.amount, memo);
+        if (result === "ok") break;
+        if (result === "bad") throw new Error("The NIM payment did not match this letter.");
+        if (Date.now() >= deadline)
+          throw new Error("We could not confirm the NIM payment yet. Please try again in a minute.");
+        await sleep(2_500);
+      }
+    } else {
+      // Fallback: search the recipient's incoming transactions for the exact amount + memo.
+      // (Nimiq Pay sends via an HTLC intermediary, so matching by sender address fails.)
+      txHash = await findNimTransfer(wallet, to, input.amount, hashUsed, { memo });
+      if (!txHash) throw new Error("We could not find your NIM payment yet. Please try again in a minute.");
+    }
   } else if (input.token === "usdt") {
     if (!input.txHash || !input.usdtTo) throw new Error("USDT payment is missing.");
     txHash = input.txHash.toLowerCase();

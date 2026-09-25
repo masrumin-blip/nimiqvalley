@@ -18,7 +18,12 @@ export const sendLetter = createServerFn({ method: "POST" })
         message: z.string().trim().min(1).max(280),
         token: z.enum(["none", "nim", "usdt"]),
         amount: z.number().min(0).max(1_000_000),
-        txHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+        txHash: z
+          .string()
+          .trim()
+          .regex(/^(0x)?[0-9a-fA-F]{64}$/, "Invalid transaction hash.")
+          .optional(),
+        memo: z.string().trim().max(64).optional(),
         usdtTo: z.string().trim().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
       })
       .refine((d) => d.token === "none" || d.amount > 0, "Enter an amount.")
