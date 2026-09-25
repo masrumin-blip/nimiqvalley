@@ -197,6 +197,60 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_purchases: {
+        Row: {
+          amount: number
+          attempts: number
+          chats: number
+          created_at: string
+          id: string
+          keys: number
+          kind: string
+          memo: string
+          pack_id: string | null
+          rooms: number
+          status: string
+          token: string
+          tx_hash: string | null
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          amount: number
+          attempts?: number
+          chats?: number
+          created_at?: string
+          id?: string
+          keys?: number
+          kind: string
+          memo: string
+          pack_id?: string | null
+          rooms?: number
+          status?: string
+          token: string
+          tx_hash?: string | null
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          amount?: number
+          attempts?: number
+          chats?: number
+          created_at?: string
+          id?: string
+          keys?: number
+          kind?: string
+          memo?: string
+          pack_id?: string | null
+          rooms?: number
+          status?: string
+          token?: string
+          tx_hash?: string | null
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
       daily_claims: {
         Row: {
           claim_date: string
@@ -249,6 +303,7 @@ export type Database = {
           expires_at: string
           game_slug: string
           id: string
+          league_id: string | null
           seed: number
           wallet: string
         }
@@ -258,6 +313,7 @@ export type Database = {
           expires_at: string
           game_slug: string
           id?: string
+          league_id?: string | null
           seed: number
           wallet: string
         }
@@ -267,8 +323,209 @@ export type Database = {
           expires_at?: string
           game_slug?: string
           id?: string
+          league_id?: string | null
           seed?: number
           wallet?: string
+        }
+        Relationships: []
+      }
+      league_deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          league_id: string
+          tx_hash: string
+          wallet: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          league_id: string
+          tx_hash: string
+          wallet: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          league_id?: string
+          tx_hash?: string
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_deposits_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_payouts: {
+        Row: {
+          amount: number
+          claimed_at: string
+          id: string
+          league_id: string
+          ranks: number[]
+          status: string
+          to_address: string
+          tx_hash: string | null
+          wallet: string
+        }
+        Insert: {
+          amount: number
+          claimed_at?: string
+          id?: string
+          league_id: string
+          ranks?: number[]
+          status?: string
+          to_address: string
+          tx_hash?: string | null
+          wallet: string
+        }
+        Update: {
+          amount?: number
+          claimed_at?: string
+          id?: string
+          league_id?: string
+          ranks?: number[]
+          status?: string
+          to_address?: string
+          tx_hash?: string | null
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_payouts_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_pending_deposits: {
+        Row: {
+          amount: number
+          attempts: number
+          created_at: string
+          id: string
+          league_id: string
+          status: string
+          token: string
+          tx_hash: string
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          amount: number
+          attempts?: number
+          created_at?: string
+          id?: string
+          league_id: string
+          status?: string
+          token?: string
+          tx_hash: string
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          amount?: number
+          attempts?: number
+          created_at?: string
+          id?: string
+          league_id?: string
+          status?: string
+          token?: string
+          tx_hash?: string
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_pending_deposits_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      league_scores: {
+        Row: {
+          best: number
+          id: string
+          league_id: string
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          best: number
+          id?: string
+          league_id: string
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          best?: number
+          id?: string
+          league_id?: string
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leagues: {
+        Row: {
+          created_at: string
+          creator_wallet: string
+          ends_at: string
+          game_slug: string
+          id: string
+          payout: string
+          pool: number
+          starts_at: string
+          status: string
+          title: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          creator_wallet: string
+          ends_at: string
+          game_slug: string
+          id?: string
+          payout?: string
+          pool?: number
+          starts_at: string
+          status?: string
+          title: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          creator_wallet?: string
+          ends_at?: string
+          game_slug?: string
+          id?: string
+          payout?: string
+          pool?: number
+          starts_at?: string
+          status?: string
+          title?: string
+          token?: string
         }
         Relationships: []
       }
@@ -851,6 +1108,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_league_deposit: {
+        Args: {
+          p_amount: number
+          p_league: string
+          p_tx: string
+          p_wallet: string
+        }
+        Returns: number
+      }
+      confirm_credit_purchase: { Args: { p_id: string }; Returns: string }
+      confirm_league_deposit: { Args: { p_pending: string }; Returns: number }
+      disarm_league_deposit_checker: { Args: never; Returns: undefined }
       grant_credits: {
         Args: {
           p_chat?: number
