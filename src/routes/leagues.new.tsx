@@ -67,7 +67,13 @@ function NewLeague() {
   };
 
   const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-xs font-bold ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"}`;
+    `min-h-11 rounded-full border-2 px-4 text-xs font-black uppercase tracking-wide transition-colors ${on ? "border-primary bg-primary text-primary-foreground shadow-[0_0_16px_-4px_var(--primary)]" : "border-border bg-background text-muted-foreground hover:border-primary/50"}`;
+  const step = (n: string, label: string) => (
+    <h2 className="mb-3 flex items-center gap-2">
+      <span className="rounded-md bg-primary px-1.5 py-0.5 font-mono text-[11px] font-black text-primary-foreground">{n}</span>
+      <span className="arcade-label">{label}</span>
+    </h2>
+  );
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -78,13 +84,16 @@ function NewLeague() {
           </Link>
           <PlayerBadge />
         </div>
-        <h1 className="mt-4 text-3xl font-black tracking-tight text-foreground">Create a league</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Once the prize pool is funded, the game, schedule, and prize split are locked and can't be changed by anyone.
-        </p>
+        <div className="mt-5 text-center">
+          <div className="arcade-label">Setup console</div>
+          <h1 className="mt-1 font-display text-3xl font-black uppercase tracking-tight text-foreground sm:text-4xl">Create a league</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Once the prize pool is funded, the game, schedule, and prize split are locked and can't be changed by anyone.
+          </p>
+        </div>
 
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-bold text-foreground">1. Game</h2>
+        <section className="arcade-panel mt-6 p-4">
+          {step("01", "Game")}
           <div className="grid gap-2 sm:grid-cols-2">
             {LEAGUE_GAMES.map((g) => (
               <div
@@ -93,10 +102,10 @@ function NewLeague() {
                 tabIndex={0}
                 onClick={() => setSlug(g.slug)}
                 onKeyDown={(e) => e.key === "Enter" && setSlug(g.slug)}
-                className={`flex items-center justify-between gap-2 rounded-xl border p-3 text-left ${slug === g.slug ? "border-primary bg-primary/10" : "border-border bg-card"}`}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border-2 p-3 text-left transition-colors ${slug === g.slug ? "border-primary bg-primary/10 shadow-[0_0_18px_-6px_var(--primary)]" : "border-border bg-background hover:border-primary/40"}`}
               >
                 <div>
-                  <div className="text-sm font-bold text-foreground">{g.name}</div>
+                  <div className="text-sm font-bold text-foreground">{slug === g.slug && <span className="text-primary">✓ </span>}{g.name}</div>
                   <div className="text-xs text-muted-foreground">{VERIFY_METHODS[g.method].name}</div>
                 </div>
                 <VerifyInfoButton method={g.method} gameName={g.name} />
@@ -105,27 +114,27 @@ function NewLeague() {
           </div>
         </section>
 
-        <section className="mt-6 grid gap-3">
-          <h2 className="text-sm font-bold text-foreground">2. Details</h2>
+        <section className="arcade-panel mt-4 grid gap-3 p-4">
+          {step("02", "Details")}
           <label className="text-xs font-semibold text-muted-foreground">
             League name
-            <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground" />
+            <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none" />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-muted-foreground">
               Starts
-              <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground" />
+              <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 font-mono text-sm text-foreground" />
             </label>
             <label className="text-xs font-semibold text-muted-foreground">
               Ends
-              <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground" />
+              <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-background px-3 font-mono text-sm text-foreground" />
             </label>
           </div>
           <p className="text-xs text-muted-foreground">Between 1 hour and 30 days.</p>
         </section>
 
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-bold text-foreground">3. Prize split</h2>
+        <section className="arcade-panel mt-4 p-4">
+          {step("03", "Prize split")}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={chip(payout === "winner")} onClick={() => setPayout("winner")}>Winner takes all</button>
             <button type="button" className={chip(payout === "top3")} onClick={() => setPayout("top3")}>Top 3: 50 / 30 / 20</button>
@@ -133,8 +142,8 @@ function NewLeague() {
           <p className="mt-2 text-xs text-muted-foreground">Places with no player go back to you.</p>
         </section>
 
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-bold text-foreground">4. Prize currency</h2>
+        <section className="arcade-panel mt-4 p-4">
+          {step("04", "Prize currency")}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={chip(token === "nim")} onClick={() => setToken("nim")}>NIM</button>
             <button type="button" className={chip(token === "usdt")} onClick={() => setToken("usdt")}>USDT (Polygon)</button>
@@ -147,7 +156,7 @@ function NewLeague() {
           type="button"
           disabled={busy || !player || name.trim().length < 3}
           onClick={submit}
-          className="mt-6 min-h-11 w-full rounded-full bg-primary px-4 text-sm font-black uppercase text-primary-foreground disabled:opacity-50"
+          className="arcade-btn mt-6 min-h-12 w-full px-4 text-sm"
         >
           {!player ? "Connect your wallet first" : busy ? "Creating…" : "Create and fund"}
         </button>
