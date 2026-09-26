@@ -19,7 +19,6 @@ export interface SendLetterInput {
   amount: number;
   txHash?: string | undefined;
   usdtTo?: string | undefined;
-  memo?: string | undefined;
 }
 
 export const LETTER_MAX = 280;
