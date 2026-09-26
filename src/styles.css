@@ -1885,7 +1885,8 @@ canvas{
   gap: 0.5rem;
   border-radius: 9999px;
   background: linear-gradient(180deg, var(--neon-yellow), var(--primary));
-  color: var(--primary-foreground);
+  color: oklch(0.16 0.03 262);
+  text-shadow: 0 1px 0 color-mix(in oklab, white 45%, transparent);
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
