@@ -1867,3 +1867,44 @@ canvas{
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Leagues — retro arcade arena */
+@utility arcade-panel {
+  position: relative;
+  border: 2px solid color-mix(in oklab, var(--primary) 35%, var(--border));
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--primary) 8%, transparent), transparent 60%),
+    var(--card);
+  box-shadow: 0 4px 0 0 color-mix(in oklab, var(--primary) 25%, transparent), 0 12px 30px -16px color-mix(in oklab, var(--primary) 60%, transparent);
+}
+@utility arcade-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, var(--neon-yellow), var(--primary));
+  color: var(--primary-foreground);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 0 0 color-mix(in oklab, var(--primary) 55%, black), 0 0 18px -4px var(--primary);
+  transition: transform 80ms, box-shadow 80ms;
+  &:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 0 color-mix(in oklab, var(--primary) 55%, black);
+  }
+  &:disabled { opacity: 0.5; }
+}
+@utility arcade-glow {
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--primary) 70%, transparent));
+}
+@utility arcade-label {
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--primary);
+}
