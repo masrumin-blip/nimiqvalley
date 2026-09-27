@@ -98,6 +98,24 @@ const PALETTE = {
   wall: "#f6ecd8",
 };
 
+/** Ambient colour tint + lantern strength for the player's local time of day. */
+function skyAmbience(hour: number): { color: string; alpha: number; lamp: number } {
+  const lerp = (a: number, b: number, k: number) => a + (b - a) * Math.min(1, Math.max(0, k));
+  if (hour >= 6 && hour < 10) return { color: "#ffd9a0", alpha: lerp(0.16, 0, (hour - 6) / 4), lamp: 0 };
+  if (hour >= 10 && hour < 16) return { color: "#ffffff", alpha: 0, lamp: 0 };
+  if (hour >= 16 && hour < 19) {
+    const k = (hour - 16) / 3;
+    return { color: "#ff9d4d", alpha: lerp(0.05, 0.3, k), lamp: lerp(0, 0.8, k) };
+  }
+  if (hour >= 19 && hour < 21) {
+    const k = (hour - 19) / 2;
+    return { color: "#1c2b62", alpha: lerp(0.3, 0.5, k), lamp: lerp(0.8, 1, k) };
+  }
+  if (hour >= 21 || hour < 5) return { color: "#152052", alpha: 0.52, lamp: 1 };
+  const k = (hour - 5) / 1; // 05:00-06:00 dawn
+  return { color: "#3b4a8a", alpha: lerp(0.5, 0.18, k), lamp: lerp(1, 0.2, k) };
+}
+
 function islandPath(ctx: CanvasRenderingContext2D, inset: number) {
   const cx = WORLD_W / 2;
   const cy = WORLD_H / 2;
