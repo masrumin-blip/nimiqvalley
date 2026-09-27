@@ -832,6 +832,53 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       });
       drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw());
 
+      // ---- day / night ambience (visual only) ----
+      {
+        const now = new Date();
+        const hour = now.getHours() + now.getMinutes() / 60;
+        const sky = skyAmbience(hour);
+        if (sky.alpha > 0.001) {
+          ctx.save();
+          ctx.globalAlpha = sky.alpha;
+          ctx.fillStyle = sky.color;
+          ctx.fillRect(camX, camY, viewW, viewH);
+          ctx.restore();
+        }
+        if (sky.lamp > 0.02) {
+          // warm lantern pools
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          for (const l of LANTERNS) {
+            if (l.x < camX - 200 || l.x > camX + viewW + 200) continue;
+            if (l.y < camY - 200 || l.y > camY + viewH + 200) continue;
+            const flicker = 0.85 + Math.sin(t / 380 + l.x) * 0.15;
+            const r = 120 * sky.lamp * flicker;
+            const g = ctx.createRadialGradient(l.x, l.y - 54, 0, l.x, l.y - 54, r);
+            g.addColorStop(0, "rgba(255,214,120,0.55)");
+            g.addColorStop(1, "rgba(255,190,90,0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(l.x, l.y - 54, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // fireflies
+          if (sky.lamp > 0.5) {
+            ctx.fillStyle = "rgba(210,255,170,0.75)";
+            for (let i = 0; i < 18; i++) {
+              const fx = camX + ((i * 197 + Math.sin(t / 1600 + i) * 90 + viewW) % viewW);
+              const fy = camY + ((i * 311 + Math.cos(t / 1900 + i * 1.7) * 70 + viewH) % viewH);
+              const a = 0.35 + Math.sin(t / 300 + i * 2.1) * 0.35;
+              ctx.globalAlpha = Math.max(0, a) * sky.lamp;
+              ctx.beginPath();
+              ctx.arc(fx, fy, 3, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+          ctx.restore();
+        }
+      }
+
       // The building image already carries its own POST OFFICE sign; only float the unread mail badge.
       {
         const px = POST_OFFICE.x;
