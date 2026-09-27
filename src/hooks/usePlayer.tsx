@@ -23,6 +23,11 @@ export function usePlayerActions() {
   const signOut = useServerFn(signOutPlayer);
   const rename = useServerFn(setDisplayName);
 
+  const onSignedIn = (player: { wallet: string; displayName: string | null } | null) => {
+    queryClient.setQueryData(["player"], player ? { wallet: player.wallet, displayName: player.displayName } : null);
+    queryClient.invalidateQueries({ queryKey: ["credits"] });
+  };
+
   const connect = useMutation({
     mutationFn: async (kind: WalletKind = preferredWallet()) => {
       const address = await connectWallet(kind);
@@ -32,10 +37,24 @@ export function usePlayerActions() {
       writePlayerToken(result?.token ?? null);
       return result;
     },
-    onSuccess: (player) => {
-      queryClient.setQueryData(["player"], player ? { wallet: player.wallet, displayName: player.displayName } : null);
-      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    onSuccess: onSignedIn,
+  });
+
+  /** Step 1: only opens the address picker, triggered straight from the tap. */
+  const chooseAddress = useMutation({
+    mutationFn: async (kind: WalletKind = preferredWallet()) => connectWallet(kind),
+  });
+
+  /** Step 2: the signature popup opens from its own tap, so browsers never block it. */
+  const signInAs = useMutation({
+    mutationFn: async ({ kind, address }: { kind: WalletKind; address: string }) => {
+      const { challenge, message } = await createChallenge({ data: { address } });
+      const signed = await signLoginMessage(kind, message, address);
+      const result = await signIn({ data: { address, challenge, ...signed } });
+      writePlayerToken(result?.token ?? null);
+      return result;
     },
+    onSuccess: onSignedIn,
   });
 
   const disconnect = useMutation({
@@ -59,5 +78,5 @@ export function usePlayerActions() {
     },
   });
 
-  return { connect, disconnect, changeName };
+  return { connect, chooseAddress, signInAs, disconnect, changeName };
 }

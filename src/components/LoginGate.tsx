@@ -8,7 +8,8 @@ import { connectPolygon, isInsideNimiqPay } from "@/lib/wallet";
 /** Asks for a wallet sign-in before anything else in the app is shown. */
 export function LoginGate({ children }: { children: ReactNode }) {
   const { player, isLoading } = usePlayer();
-  const { connect } = usePlayerActions();
+  const { connect, chooseAddress, signInAs } = usePlayerActions();
+  const [hubAddress, setHubAddress] = useState<string | null>(null);
   const [evm, setEvm] = useState<string | null>(null);
   const [evmError, setEvmError] = useState<string | null>(null);
 
@@ -46,15 +47,40 @@ export function LoginGate({ children }: { children: ReactNode }) {
             <LogIn className="size-4" />
             {insidePay ? "Continue with Nimiq Pay" : "Nimiq Pay"}
           </Button>
-          <Button
-            variant="outline"
-            className="w-full rounded-full font-bold"
-            onClick={() => connect.mutate("hub")}
-            disabled={connect.isPending}
-          >
-            <Wallet className="size-4" />
-            Nimiq browser wallet
-          </Button>
+          {hubAddress ? (
+            <Button
+              variant="outline"
+              className="w-full rounded-full font-bold"
+              onClick={() => signInAs.mutate({ kind: "hub", address: hubAddress })}
+              disabled={signInAs.isPending}
+            >
+              <Wallet className="size-4" />
+              {signInAs.isPending
+                ? "Waiting for your signature…"
+                : `Sign in as ${hubAddress.slice(0, 9)}…`}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full rounded-full font-bold"
+              onClick={() =>
+                chooseAddress.mutate("hub", { onSuccess: (address) => setHubAddress(address) })
+              }
+              disabled={chooseAddress.isPending || connect.isPending}
+            >
+              <Wallet className="size-4" />
+              {chooseAddress.isPending ? "Opening your wallet…" : "Nimiq browser wallet"}
+            </Button>
+          )}
+          {hubAddress && (
+            <button
+              type="button"
+              className="w-full text-[11px] font-bold uppercase tracking-wide text-muted-foreground underline"
+              onClick={() => setHubAddress(null)}
+            >
+              Use another address
+            </button>
+          )}
           <Button
             variant="ghost"
             className="w-full rounded-full text-xs font-bold"
@@ -73,12 +99,18 @@ export function LoginGate({ children }: { children: ReactNode }) {
         </div>
         {evmError && <p className="mt-3 text-xs text-destructive">{evmError}</p>}
 
+        {hubAddress && !signInAs.isPending && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Address connected. Tap the button above to approve the sign-in.
+          </p>
+        )}
         {connect.isPending && (
           <p className="mt-3 text-xs text-muted-foreground">Waiting for your wallet…</p>
         )}
-        {connect.isError && (
+        {(connect.isError || chooseAddress.isError || signInAs.isError) && (
           <p className="mt-3 text-xs text-destructive">
-            {(connect.error as Error)?.message ?? "Could not connect the wallet."}
+            {((connect.error ?? chooseAddress.error ?? signInAs.error) as Error)?.message ??
+              "Could not connect the wallet."}
           </p>
         )}
       </div>
