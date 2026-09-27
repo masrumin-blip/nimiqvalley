@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { GlobalClickSfx } from "../components/GlobalClickSfx";
 import { AppPreloader } from "../components/AppPreloader";
 import { LoginGate } from "../components/LoginGate";
+import { BottomDock } from "../components/BottomDock";
 
 function NotFoundComponent() {
   return (
@@ -132,6 +133,7 @@ function RootComponent() {
         <LoginGate>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
+          <BottomDock />
         </LoginGate>
       </AppPreloader>
     </QueryClientProvider>
