@@ -50,25 +50,25 @@ export const HOUSE_SPRITES: Record<TierId, HouseSpriteSpec> = {
     crop: [70, 405, 285, 305],
     width: 128,
     height: 138,
-    footprint: { width: 89, height: 42, bottom: 12 },
+    footprint: { width: 104, height: 62, bottom: 12 },
   },
   normal: {
     crop: [390, 360, 360, 370],
     width: 164,
     height: 168,
-    footprint: { width: 149, height: 48, bottom: 12 },
+    footprint: { width: 138, height: 78, bottom: 12 },
   },
   cool: {
     crop: [65, 805, 525, 610],
     width: 235,
     height: 273,
-    footprint: { width: 211, height: 58, bottom: 12 },
+    footprint: { width: 200, height: 126, bottom: 12 },
   },
   sultan: {
     crop: [620, 775, 550, 675],
     width: 246,
     height: 302,
-    footprint: { width: 227, height: 64, bottom: 12 },
+    footprint: { width: 212, height: 140, bottom: 12 },
   },
 };
 
@@ -128,6 +128,14 @@ export const ANIMALS: AnimalSpot[] = [
   { id: "butterfly-1", kind: "butterfly", x: 2250, y: 320, phase: 180, range: 150 }, { id: "butterfly-2", kind: "butterfly", x: 2350, y: 520, phase: 820, range: 165 }, { id: "butterfly-3", kind: "butterfly", x: 1750, y: 980, phase: 1490, range: 145 },
 ];
 
+/** Solid ground footprint for the farm animals. Frogs and butterflies stay walk-through. */
+export const ANIMAL_FOOTPRINTS: Partial<Record<AnimalKind, { width: number; height: number }>> = {
+  cow: { width: 66, height: 26 },
+  pig: { width: 56, height: 22 },
+  sheep: { width: 55, height: 24 },
+  chicken: { width: 36, height: 18 },
+};
+
 export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "blue-runner", name: "Kai", x: 300, y: 960, spriteRow: 0, speed: 58, idleMs: 900, path: [{x:300,y:960},{x:900,y:960},{x:1300,y:800},{x:1780,y:960},{x:2320,y:960}] },
   { id: "farmer-market", name: "Lani", x: 820, y: 650, spriteRow: 1, speed: 46, idleMs: 1300, path: [{x:820,y:650},{x:1300,y:960},{x:820,y:1220},{x:520,y:960}] },
@@ -170,6 +178,11 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
+  for(const animal of ANIMALS){
+    const size = ANIMAL_FOOTPRINTS[animal.kind];
+    if(!size) continue;
+    rects.push({ x: animal.x - size.width / 2, y: animal.y - size.height, w: size.width, h: size.height });
+  }
   for (const tree of trees) {
     const { footprint } = TREE_SPRITES[tree.kind];
     const width = footprint.width * tree.scale;
