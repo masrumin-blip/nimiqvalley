@@ -128,6 +128,14 @@ export const ANIMALS: AnimalSpot[] = [
   { id: "butterfly-1", kind: "butterfly", x: 2250, y: 320, phase: 180, range: 150 }, { id: "butterfly-2", kind: "butterfly", x: 2350, y: 520, phase: 820, range: 165 }, { id: "butterfly-3", kind: "butterfly", x: 1750, y: 980, phase: 1490, range: 145 },
 ];
 
+/** Solid ground footprint for the farm animals. Frogs and butterflies stay walk-through. */
+export const ANIMAL_FOOTPRINTS: Partial<Record<AnimalKind, { width: number; height: number }>> = {
+  cow: { width: 66, height: 26 },
+  pig: { width: 56, height: 22 },
+  sheep: { width: 55, height: 24 },
+  chicken: { width: 36, height: 18 },
+};
+
 export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "blue-runner", name: "Kai", x: 300, y: 960, spriteRow: 0, speed: 58, idleMs: 900, path: [{x:300,y:960},{x:900,y:960},{x:1300,y:800},{x:1780,y:960},{x:2320,y:960}] },
   { id: "farmer-market", name: "Lani", x: 820, y: 650, spriteRow: 1, speed: 46, idleMs: 1300, path: [{x:820,y:650},{x:1300,y:960},{x:820,y:1220},{x:520,y:960}] },
