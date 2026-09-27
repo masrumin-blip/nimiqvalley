@@ -132,7 +132,6 @@ function RootComponent() {
         <LoginGate>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
-          <BottomDock />
         </LoginGate>
       </AppPreloader>
     </QueryClientProvider>
