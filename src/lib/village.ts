@@ -50,25 +50,25 @@ export const HOUSE_SPRITES: Record<TierId, HouseSpriteSpec> = {
     crop: [70, 405, 285, 305],
     width: 128,
     height: 138,
-    footprint: { width: 89, height: 42, bottom: 12 },
+    footprint: { width: 104, height: 62, bottom: 12 },
   },
   normal: {
     crop: [390, 360, 360, 370],
     width: 164,
     height: 168,
-    footprint: { width: 149, height: 48, bottom: 12 },
+    footprint: { width: 138, height: 78, bottom: 12 },
   },
   cool: {
     crop: [65, 805, 525, 610],
     width: 235,
     height: 273,
-    footprint: { width: 211, height: 58, bottom: 12 },
+    footprint: { width: 200, height: 126, bottom: 12 },
   },
   sultan: {
     crop: [620, 775, 550, 675],
     width: 246,
     height: 302,
-    footprint: { width: 227, height: 64, bottom: 12 },
+    footprint: { width: 212, height: 140, bottom: 12 },
   },
 };
 
