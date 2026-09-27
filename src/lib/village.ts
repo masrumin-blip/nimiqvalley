@@ -170,6 +170,11 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
+  for(const animal of ANIMALS){
+    const size = ANIMAL_FOOTPRINTS[animal.kind];
+    if(!size) continue;
+    rects.push({ x: animal.x - size.width / 2, y: animal.y - size.height, w: size.width, h: size.height });
+  }
   for (const tree of trees) {
     const { footprint } = TREE_SPRITES[tree.kind];
     const width = footprint.width * tree.scale;
