@@ -341,7 +341,20 @@ function directionFromDelta(dx: number, dy: number, fallback: Direction): Direct
   return dy < 0 ? "up" : "down";
 }
 
-function updateNpcState(npc: NpcState, t: number, dt: number, colliders: ReturnType<typeof buildColliders>) {
+/** Small foot-level body radius so villagers and the player can stand close without overlapping. */
+const BODY_RADIUS = 12;
+
+function bodyBlocked(x: number, y: number, bx: number, by: number) {
+  return Math.hypot(x - bx, y - by) < BODY_RADIUS * 2;
+}
+
+function updateNpcState(
+  npc: NpcState,
+  t: number,
+  dt: number,
+  colliders: ReturnType<typeof buildColliders>,
+  player: { x: number; y: number },
+) {
   if (t < npc.waitUntil) {
     npc.walking = false;
     return;
@@ -373,13 +386,21 @@ function updateNpcState(npc: NpcState, t: number, dt: number, colliders: ReturnT
   const ny = npc.y + (dy / Math.max(dist, 1)) * step;
   let moved = false;
 
-  if (!circleBlocked(nx, npc.y, 14, colliders)) {
+  if (!circleBlocked(nx, npc.y, 14, colliders) && !bodyBlocked(nx, npc.y, player.x, player.y)) {
     npc.x = nx;
     moved = true;
   }
-  if (!circleBlocked(npc.x, ny, 14, colliders)) {
+  if (!circleBlocked(npc.x, ny, 14, colliders) && !bodyBlocked(npc.x, ny, player.x, player.y)) {
     npc.y = ny;
     moved = true;
+  }
+
+  // Standing face to face with the player: pause politely instead of pushing through.
+  if (!moved && bodyBlocked(npc.x, npc.y, player.x, player.y)) {
+    npc.waitUntil = t + 600;
+    npc.stuckMs = 0;
+    npc.walking = false;
+    return;
   }
 
   const remaining = Math.hypot(target.x - npc.x, target.y - npc.y);
@@ -635,11 +656,12 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         const speed = 3.4;
         const nx = s.x + (dx / Math.max(len, 1)) * speed;
         const ny = s.y + (dy / Math.max(len, 1)) * speed;
-        if (!circleBlocked(nx, s.y, 18, colliders)) s.x = nx;
-        if (!circleBlocked(s.x, ny, 18, colliders)) s.y = ny;
+        const hitsNpc = (px: number, py: number) => npcStates.some((n) => bodyBlocked(px, py, n.x, n.y));
+        if (!circleBlocked(nx, s.y, 18, colliders) && !hitsNpc(nx, s.y)) s.x = nx;
+        if (!circleBlocked(s.x, ny, 18, colliders) && !hitsNpc(s.x, ny)) s.y = ny;
       }
 
-      for (const npc of npcStates) updateNpcState(npc, t, dt, colliders);
+      for (const npc of npcStates) updateNpcState(npc, t, dt, colliders, s);
 
       const found = NEIGHBORS.find((n) => Math.hypot(n.x - s.x, n.y - s.y) < 110) ?? null;
       if (found?.name !== nearby?.name) {
