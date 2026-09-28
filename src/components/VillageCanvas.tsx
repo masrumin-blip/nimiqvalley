@@ -341,7 +341,20 @@ function directionFromDelta(dx: number, dy: number, fallback: Direction): Direct
   return dy < 0 ? "up" : "down";
 }
 
-function updateNpcState(npc: NpcState, t: number, dt: number, colliders: ReturnType<typeof buildColliders>) {
+/** Small foot-level body radius so villagers and the player can stand close without overlapping. */
+const BODY_RADIUS = 12;
+
+function bodyBlocked(x: number, y: number, bx: number, by: number) {
+  return Math.hypot(x - bx, y - by) < BODY_RADIUS * 2;
+}
+
+function updateNpcState(
+  npc: NpcState,
+  t: number,
+  dt: number,
+  colliders: ReturnType<typeof buildColliders>,
+  player: { x: number; y: number },
+) {
   if (t < npc.waitUntil) {
     npc.walking = false;
     return;
