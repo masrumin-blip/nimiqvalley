@@ -827,7 +827,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         ctx.lineTo(1300, 960);
         ctx.moveTo(2020, 430);
         ctx.lineTo(1300, 960);
-        ctx.moveTo(410, 1400);
+        ctx.moveTo(560, 1325);
         ctx.lineTo(1300, 960);
         ctx.moveTo(2050, 1370);
         ctx.lineTo(1300, 960);

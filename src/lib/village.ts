@@ -110,7 +110,8 @@ export const BUILDINGS: BuildingSpot[] = [
   { id: "chapel", x: 1820, y: 390, sheet: "a", crop: [485, 80, 180, 225], width: 150, height: 188, collider: [-58, -55, 116, 75] },
   { id: "hall", x: 1280, y: 720, sheet: "a", crop: [330, 330, 240, 255], width: 210, height: 223, collider: [-82, -62, 164, 88] },
   { id: "shop", x: 1980, y: 760, sheet: "a", crop: [610, 335, 230, 245], width: 205, height: 218, collider: [-82, -55, 164, 78] },
-  { id: "barn", x: 410, y: 1400, sheet: "barn", crop: [0, 0, 218, 306], width: 205, height: 288, collider: [-65, -223, 130, 145], extraColliders: [[-89, -195, 9, 206], [86, -193, 9, 118], [-88, 8, 63, 8], [24, 8, 69, 8]] },
+  // The farm is fully fenced in, so the whole paddock is solid ground for the player.
+  { id: "barn", x: 410, y: 1400, sheet: "barn", crop: [0, 0, 218, 306], width: 205, height: 288, collider: [-100, -250, 200, 266] },
   { id: "windmill", x: 2240, y: 760, sheet: "house-windmill", crop: [0, 0, 210, 350], width: 190, height: 317, collider: [-27, -72, 58, 86], extraColliders: [[-86, -145, 124, 38], [52, -141, 20, 42]] },
   { id: "market", x: 800, y: 770, sheet: "b", crop: [240, 340, 205, 190], width: 180, height: 167, collider: [-72, -45, 144, 65] },
   { id: "clock", x: 740, y: 1160, sheet: "b", crop: [20, 600, 190, 245], width: 175, height: 226, collider: [-70, -55, 140, 80] },
