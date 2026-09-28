@@ -354,6 +354,7 @@ function DmRoom({
                 )}
               >
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                <p className="mt-1 text-right text-[10px] opacity-60">{formatChatTime(m.createdAt)}</p>
               </div>
             </div>
           );
