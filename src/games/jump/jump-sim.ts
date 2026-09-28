@@ -140,7 +140,18 @@ export function stepJump(w: JumpSim, rng: Rng, dir: number): JumpEvents {
       topY -= 70 + rng() * (28 + difficulty * 24);
       const p = makePlatform(w, rng, topY, difficulty);
       w.platforms.push(p);
-      if (rng() < 0.68) addItem(p);
+      // A spike/electric floor must never be the only option on its row: always
+      // pair it with a plain platform on the opposite side so a fair route exists.
+      let safeMate: Platform | null = null;
+      if (p.type === "spike" || p.type === "electric") {
+        const mate = makePlatform(w, rng, topY, difficulty, true);
+        const leftSide = p.x + p.w / 2 > W / 2;
+        mate.x = leftSide ? 8 + rng() * Math.max(6, p.x - mate.w - 24) : Math.min(W - mate.w - 8, p.x + p.w + 24 + rng() * 40);
+        mate.x = Math.max(8, Math.min(W - mate.w - 8, mate.x));
+        w.platforms.push(mate);
+        safeMate = mate;
+      }
+      if (rng() < 0.68) addItem(safeMate ?? p);
       if (difficulty > 0.12 && rng() < 0.14 + difficulty * 0.15) {
         const x = 34 + rng() * (W - 68);
         const hr = rng();
@@ -150,8 +161,12 @@ export function stepJump(w: JumpSim, rng: Rng, dir: number): JumpEvents {
         w.hazards.push({ id: w.nextId++, x, y: topY - 58, originX: x, r: type === "saw" ? 15 : 13, vx, range, type, alive: true, phase: rng() * 6 });
       }
       if (difficulty > 0.42 && rng() < 0.045 + difficulty * 0.035) {
-        const gapX = 75 + rng() * 250;
-        w.lasers.push({ id: w.nextId++, y: topY - 42, gapX, gapW: 88, phase: rng() * 240 });
+        // Align the safe gap with the platform right below it: the player bounces
+        // vertically, so an unaligned gap would be impossible to reach in time.
+        const anchor = safeMate ?? p;
+        const gapW = 118;
+        const gapX = Math.max(gapW / 2 + 6, Math.min(W - gapW / 2 - 6, anchor.x + anchor.w / 2 + (rng() - 0.5) * 30));
+        w.lasers.push({ id: w.nextId++, y: topY - 42, gapX, gapW, phase: rng() * 240 });
       }
       if (difficulty > 0.52 && rng() < 0.035) {
         const x = 42 + rng() * (W - 84);
