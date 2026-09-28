@@ -106,6 +106,7 @@ function Arena() {
       )}
       {tab === "me" && <ProfileEditor />}
       <PlayerProfileDialog
+        key={profileWallet ?? "none"}
         wallet={profileWallet}
         onOpenChange={(open) => !open && setProfileWallet(null)}
         onMessage={(p) => {
@@ -717,8 +718,15 @@ function PlayerProfileDialog({
     },
   });
 
+  // Never carry a previous player's "sent" state over to the next profile opened.
+  const addReset = add.reset;
+  useEffect(() => {
+    addReset();
+  }, [wallet, addReset]);
+
   const view = profile.data;
   const relation = view?.relation ?? "none";
+
 
   return (
     <Dialog open={Boolean(wallet)} onOpenChange={onOpenChange}>
