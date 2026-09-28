@@ -386,13 +386,21 @@ function updateNpcState(
   const ny = npc.y + (dy / Math.max(dist, 1)) * step;
   let moved = false;
 
-  if (!circleBlocked(nx, npc.y, 14, colliders)) {
+  if (!circleBlocked(nx, npc.y, 14, colliders) && !bodyBlocked(nx, npc.y, player.x, player.y)) {
     npc.x = nx;
     moved = true;
   }
-  if (!circleBlocked(npc.x, ny, 14, colliders)) {
+  if (!circleBlocked(npc.x, ny, 14, colliders) && !bodyBlocked(npc.x, ny, player.x, player.y)) {
     npc.y = ny;
     moved = true;
+  }
+
+  // Standing face to face with the player: pause politely instead of pushing through.
+  if (!moved && bodyBlocked(npc.x, npc.y, player.x, player.y)) {
+    npc.waitUntil = t + 600;
+    npc.stuckMs = 0;
+    npc.walking = false;
+    return;
   }
 
   const remaining = Math.hypot(target.x - npc.x, target.y - npc.y);
