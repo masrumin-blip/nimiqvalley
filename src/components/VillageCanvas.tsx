@@ -656,11 +656,12 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         const speed = 3.4;
         const nx = s.x + (dx / Math.max(len, 1)) * speed;
         const ny = s.y + (dy / Math.max(len, 1)) * speed;
-        if (!circleBlocked(nx, s.y, 18, colliders)) s.x = nx;
-        if (!circleBlocked(s.x, ny, 18, colliders)) s.y = ny;
+        const hitsNpc = (px: number, py: number) => npcStates.some((n) => bodyBlocked(px, py, n.x, n.y));
+        if (!circleBlocked(nx, s.y, 18, colliders) && !hitsNpc(nx, s.y)) s.x = nx;
+        if (!circleBlocked(s.x, ny, 18, colliders) && !hitsNpc(s.x, ny)) s.y = ny;
       }
 
-      for (const npc of npcStates) updateNpcState(npc, t, dt, colliders);
+      for (const npc of npcStates) updateNpcState(npc, t, dt, colliders, s);
 
       const found = NEIGHBORS.find((n) => Math.hypot(n.x - s.x, n.y - s.y) < 110) ?? null;
       if (found?.name !== nearby?.name) {
