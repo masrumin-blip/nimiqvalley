@@ -6,6 +6,7 @@ import {
   CHAT_LIMITS,
   type ChatSnapshot,
   type DirectMessage,
+  type Player,
   type ProfileView,
   type SocialSnapshot,
 } from "./chat/types";
@@ -109,13 +110,29 @@ export const viewProfile = createServerFn({ method: "GET" })
     };
   });
 
+/** Search players by display name or wallet. Names can repeat, so every match is returned. */
+export const searchPlayers = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => z.object({ query: z.string().trim().min(1).max(60) }).parse(input))
+  .handler(async ({ data }): Promise<Player[]> => {
+    const wallet = await requireWallet();
+    const cloud = await import("./chat/cloud.server");
+    const matches = await cloud.findPlayers(data.query, 10);
+    return matches.filter((m) => m.wallet !== wallet);
+  });
+
 export const addFriend = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ target: walletSchema }).parse(input))
   .handler(async ({ data }) => {
     const wallet = await requireWallet();
     const cloud = await import("./chat/cloud.server");
-    const found = (await cloud.findPlayer(data.target)) ?? null;
-    if (!found) throw new Error("No player found with that name or wallet.");
+    const matches = await cloud.findPlayers(data.target, 10);
+    if (matches.length === 0) throw new Error("No player found with that name or wallet.");
+    if (matches.length > 1) {
+      throw new Error(
+        `${matches.length} players use that name. Pick the right one from the list below.`,
+      );
+    }
+    const found = matches[0]!;
     if (found.wallet === wallet) throw new Error("You cannot add yourself.");
     await cloud.requestFriend(wallet, found.wallet);
     return { ok: true, name: found.name };

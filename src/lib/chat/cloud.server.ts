@@ -236,17 +236,42 @@ export async function listThreads(wallet: string): Promise<DmThread[]> {
   return [...seen.values()].map((t) => ({ ...t, name: names.get(t.wallet) ?? t.name }));
 }
 
-/** Find a player by display name or wallet, for friend requests. */
-export async function findPlayer(query: string): Promise<Player | null> {
-  const trimmed = query.trim();
-  if (!trimmed) return null;
-  const byWallet = trimmed.toUpperCase();
+const compactWallet = (value: string) => value.replace(/\s+/g, "").toUpperCase();
+const looksLikeWallet = (value: string) => /^NQ[0-9A-Z]{30,40}$/.test(compactWallet(value));
+
+/** Exact wallet lookup — always unambiguous, tolerant of the spaces wallets add when copying. */
+export async function findByWallet(wallet: string): Promise<Player | null> {
+  const compact = compactWallet(wallet);
+  if (!compact) return null;
+  // Wallets are stored with the spaces Nimiq shows, so match character by
+  // character with wildcards between them and confirm the exact value after.
+  const pattern = `${compact.split("").join("%")}%`;
   const { data } = await supabaseAdmin
     .from("profiles")
     .select("wallet, display_name")
-    .or(`wallet.eq.${byWallet},display_name.ilike.${trimmed}`)
-    .limit(1);
-  const row = data?.[0];
+    .ilike("wallet", pattern)
+    .limit(20);
+  const row = (data ?? []).find((r) => compactWallet(r.wallet) === compact);
   if (!row) return null;
   return { wallet: row.wallet, name: row.display_name || fallbackName(row.wallet) };
+}
+
+/** Find every player matching a display name or wallet. Display names are not unique, so this can return many. */
+export async function findPlayers(query: string, limit = 10): Promise<Player[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  if (looksLikeWallet(trimmed)) {
+    const exact = await findByWallet(trimmed);
+    return exact ? [exact] : [];
+  }
+  const escaped = trimmed.replace(/[%_,()]/g, " ");
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("wallet, display_name")
+    .ilike("display_name", escaped)
+    .limit(limit);
+  return (data ?? []).map((row) => ({
+    wallet: row.wallet,
+    name: row.display_name || fallbackName(row.wallet),
+  }));
 }

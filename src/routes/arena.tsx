@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Award, Check, Crown, Gamepad2, Globe, Lock, Medal, MessageSquare, Send, Shield, Trophy, User, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, Award, Check, Clock, Crown, Gamepad2, Globe, Lock, Medal, MessageSquare, Search, Send, Shield, Trophy, User, UserCheck, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { PlayerBadge } from "@/components/PlayerBadge";
@@ -18,12 +18,14 @@ import {
   fetchSocial,
   respondFriend,
   saveProfile,
+  searchPlayers,
   sendChat,
   sendDm,
   viewProfile,
 } from "@/lib/chat.functions";
 import { CHAT_LIMITS, POLL_INTERVAL_MS, type ProfileView, type Socials } from "@/lib/chat/types";
 import { formatChatTime } from "@/lib/chat-time";
+import { shortWallet } from "@/lib/leaderboard";
 import { cn } from "@/lib/utils";
 
 const title = "Arena Chat — NimiqValley";
@@ -103,7 +105,14 @@ function Arena() {
         />
       )}
       {tab === "me" && <ProfileEditor />}
-      <PlayerProfileDialog wallet={profileWallet} onOpenChange={(open) => !open && setProfileWallet(null)} />
+      <PlayerProfileDialog
+        wallet={profileWallet}
+        onOpenChange={(open) => !open && setProfileWallet(null)}
+        onMessage={(p) => {
+          setDmWith(p);
+          setTab("dm");
+        }}
+      />
     </main>
   );
 }
@@ -386,14 +395,23 @@ function Friends({ onMessage, onProfile }: { onMessage: (p: { wallet: string; na
   const social = useSocial();
   const addFn = useServerFn(addFriend);
   const respondFn = useServerFn(respondFriend);
+  const searchFn = useServerFn(searchPlayers);
   const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["arena-social"] });
 
+  const results = useQuery({
+    queryKey: ["arena-search", submitted],
+    queryFn: () => searchFn({ data: { query: submitted } }),
+    enabled: submitted.length > 0,
+  });
+
   const add = useMutation({
-    mutationFn: (value: string) => addFn({ data: { target: value } }),
+    mutationFn: (wallet: string) => addFn({ data: { target: wallet } }),
     onSuccess: () => {
       setQuery("");
+      setSubmitted("");
       refresh();
     },
   });
@@ -409,7 +427,7 @@ function Friends({ onMessage, onProfile }: { onMessage: (p: { wallet: string; na
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (query.trim()) add.mutate(query.trim());
+            setSubmitted(query.trim());
           }}
           className="flex gap-2"
         >
@@ -420,13 +438,41 @@ function Friends({ onMessage, onProfile }: { onMessage: (p: { wallet: string; na
             aria-label="Find a player"
             className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
-          <Button type="submit" className="rounded-xl" disabled={add.isPending || !query.trim()}>
-            <UserPlus className="size-4" /> Add
+          <Button type="submit" className="rounded-xl" disabled={results.isFetching || !query.trim()}>
+            <Search className="size-4" /> Find
           </Button>
         </form>
         {add.isError && <p className="text-xs text-destructive">{(add.error as Error).message}</p>}
         {add.isSuccess && (
           <p className="text-xs text-muted-foreground">Friend request sent.</p>
+        )}
+        {submitted && !results.isFetching && (results.data ?? []).length === 0 && (
+          <p className="text-xs text-muted-foreground">No player found with that name or wallet.</p>
+        )}
+        {(results.data ?? []).length > 0 && (
+          <div>
+            <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Search results
+            </h2>
+            {(results.data ?? []).length > 1 && (
+              <p className="mb-2 text-[11px] text-muted-foreground">
+                Several players share this name — check the wallet address before adding.
+              </p>
+            )}
+            <ul className="space-y-1">
+              {(results.data ?? []).map((p) => (
+                <li key={p.wallet} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-accent">
+                  <button type="button" onClick={() => onProfile(p.wallet)} className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-semibold text-foreground">{p.name}</span>
+                    <span className="block truncate font-mono text-[10px] text-muted-foreground">{shortWallet(p.wallet)}</span>
+                  </button>
+                  <Button size="sm" variant="secondary" className="rounded-full" disabled={add.isPending} onClick={() => add.mutate(p.wallet)}>
+                    <UserPlus className="size-3.5" /> Add
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div>
@@ -639,9 +685,19 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   return <div className="rounded-lg bg-muted px-2 py-2"><strong className="block text-lg leading-none text-foreground">{value}</strong><span className="mt-1 block text-[10px] text-muted-foreground">{label}</span></div>;
 }
 
-function PlayerProfileDialog({ wallet, onOpenChange }: { wallet: string | null; onOpenChange: (open: boolean) => void }) {
+function PlayerProfileDialog({
+  wallet,
+  onOpenChange,
+  onMessage,
+}: {
+  wallet: string | null;
+  onOpenChange: (open: boolean) => void;
+  onMessage: (p: { wallet: string; name: string }) => void;
+}) {
+  const qc = useQueryClient();
   const profileFn = useServerFn(viewProfile);
   const achievementFn = useServerFn(fetchAchievements);
+  const addFn = useServerFn(addFriend);
   const profile = useQuery<ProfileView>({
     queryKey: ["arena-profile", wallet],
     queryFn: () => profileFn({ data: { target: wallet ?? "" } }),
@@ -652,19 +708,72 @@ function PlayerProfileDialog({ wallet, onOpenChange }: { wallet: string | null; 
     queryFn: () => achievementFn({ data: { target: wallet ?? undefined } }),
     enabled: Boolean(wallet),
   });
+
+  const add = useMutation({
+    mutationFn: () => addFn({ data: { target: wallet ?? "" } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["arena-social"] });
+      qc.invalidateQueries({ queryKey: ["arena-profile", wallet] });
+    },
+  });
+
+  const view = profile.data;
+  const relation = view?.relation ?? "none";
+
   return (
     <Dialog open={Boolean(wallet)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85svh] max-w-md overflow-y-auto rounded-lg">
         <DialogHeader>
-          <DialogTitle>{profile.data?.name ?? "Player profile"}</DialogTitle>
-          <DialogDescription>{profile.data?.hidden ? "Private profile · achievements are public" : profile.data?.bio || "NimiqValley player"}</DialogDescription>
+          <DialogTitle>{view?.name ?? "Player profile"}</DialogTitle>
+          <DialogDescription>{view?.hidden ? "Private profile · achievements are public" : view?.bio || "NimiqValley player"}</DialogDescription>
         </DialogHeader>
+
+        {wallet && (
+          <p className="-mt-2 font-mono text-[11px] text-muted-foreground" title={wallet}>
+            {shortWallet(wallet)}
+          </p>
+        )}
+
+        {view && relation !== "self" && (
+          <div className="flex flex-wrap gap-2">
+            {relation === "friend" ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-foreground">
+                <UserCheck className="size-3.5" /> Friends
+              </span>
+            ) : relation === "pending" || add.isSuccess ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                <Clock className="size-3.5" /> Request pending
+              </span>
+            ) : (
+              <Button size="sm" className="rounded-full" disabled={add.isPending} onClick={() => add.mutate()}>
+                <UserPlus className="size-3.5" /> {add.isPending ? "Sending…" : "Add friend"}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-full"
+              disabled={!view.canDm}
+              onClick={() => {
+                onMessage({ wallet: view.wallet, name: view.name });
+                onOpenChange(false);
+              }}
+            >
+              <MessageSquare className="size-3.5" /> Message
+            </Button>
+          </div>
+        )}
+        {view && relation !== "self" && !view.canDm && (
+          <p className="text-[11px] text-muted-foreground">{view.name} only accepts messages from friends.</p>
+        )}
+        {add.isError && <p className="text-xs text-destructive">{(add.error as Error).message}</p>}
+
         <AchievementCollection summary={achievements.data} loading={achievements.isLoading} />
-        {!profile.data?.hidden && profile.data?.socials && (
+        {!view?.hidden && view?.socials && (
           <div className="space-y-1 text-xs text-muted-foreground">
-            {profile.data.socials.twitter && <p>X: {profile.data.socials.twitter}</p>}
-            {profile.data.socials.instagram && <p>Instagram: {profile.data.socials.instagram}</p>}
-            {profile.data.socials.discord && <p>Discord: {profile.data.socials.discord}</p>}
+            {view.socials.twitter && <p>X: {view.socials.twitter}</p>}
+            {view.socials.instagram && <p>Instagram: {view.socials.instagram}</p>}
+            {view.socials.discord && <p>Discord: {view.socials.discord}</p>}
           </div>
         )}
       </DialogContent>
