@@ -23,6 +23,7 @@ import {
   viewProfile,
 } from "@/lib/chat.functions";
 import { CHAT_LIMITS, POLL_INTERVAL_MS, type ProfileView, type Socials } from "@/lib/chat/types";
+import { formatChatTime } from "@/lib/chat-time";
 import { cn } from "@/lib/utils";
 
 const title = "Arena Chat — NimiqValley";
