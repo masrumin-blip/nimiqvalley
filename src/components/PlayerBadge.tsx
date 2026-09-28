@@ -47,16 +47,20 @@ export function PlayerBadge({ className = "" }: { className?: string }) {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant="secondary"
-          className={`h-9 rounded-full px-4 text-xs font-bold ${className}`}
-        >
-          <User className="size-4" />
-          {player.displayName || shortWallet(player.wallet)}
-        </Button>
-      </PopoverTrigger>
+      <div className={className}>
+        <PopoverTrigger asChild>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-9 rounded-full px-4 text-xs font-bold"
+          >
+            <User className="size-4" />
+            {player.displayName || shortWallet(player.wallet)}
+          </Button>
+        </PopoverTrigger>
+        <p className="mt-1 pl-1 text-[10px] text-muted-foreground">* edit display name</p>
+      </div>
+
       <PopoverContent align="end" className="w-64 space-y-3">
         <div>
           <p className="text-xs font-semibold text-muted-foreground">Signed in as</p>
