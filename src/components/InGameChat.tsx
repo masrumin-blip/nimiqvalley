@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { fetchChat, sendChat } from "@/lib/chat.functions";
 import { CHAT_LIMITS, type ChatMessage } from "@/lib/chat/types";
 import { getActiveRoom, subscribeActiveRoom } from "@/lib/active-room";
+import { formatChatTime } from "@/lib/chat-time";
 
 function useActiveRoomCode() {
   return useSyncExternalStore(
@@ -144,7 +145,8 @@ export function InGameChat() {
                 messages.map((m) => (
                   <div key={m.id} className="text-sm">
                     <span className="font-semibold text-primary">{m.name}</span>{" "}
-                    <span className="break-words text-foreground">{m.text}</span>
+                    <span className="break-words text-foreground">{m.text}</span>{" "}
+                    <span className="text-[10px] text-muted-foreground">{formatChatTime(m.createdAt)}</span>
                   </div>
                 ))
               )}

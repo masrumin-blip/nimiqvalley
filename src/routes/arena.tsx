@@ -23,6 +23,7 @@ import {
   viewProfile,
 } from "@/lib/chat.functions";
 import { CHAT_LIMITS, POLL_INTERVAL_MS, type ProfileView, type Socials } from "@/lib/chat/types";
+import { formatChatTime } from "@/lib/chat-time";
 import { cn } from "@/lib/utils";
 
 const title = "Arena Chat — NimiqValley";
@@ -209,6 +210,7 @@ function GlobalChat({ onProfile }: { onProfile: (wallet: string) => void }) {
                   </button>
                 )}
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                <p className="mt-1 text-right text-[10px] opacity-60">{formatChatTime(m.createdAt)}</p>
               </div>
             </div>
           );
@@ -353,6 +355,7 @@ function DmRoom({
                 )}
               >
                 <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                <p className="mt-1 text-right text-[10px] opacity-60">{formatChatTime(m.createdAt)}</p>
               </div>
             </div>
           );
