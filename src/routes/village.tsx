@@ -22,10 +22,15 @@ import type { Neighbor, RestSpot } from "@/lib/village";
 export const Route = createFileRoute("/village")({
   head: () => ({
     meta: [
-      { title: "Nimiq Island — An Interactive Portfolio Village" },
+      { title: "NimiqValley — An Interactive Web3 Village" },
       {
         name: "description",
-        content: "An interactive portfolio shaped like a village — explore it and see the views inside.",
+        content: "Explore NimiqValley: an interactive Web3 village with retro arcade games, a post office and scenic views.",
+      },
+      { property: "og:title", content: "NimiqValley — An Interactive Web3 Village" },
+      {
+        property: "og:description",
+        content: "Explore NimiqValley: an interactive Web3 village with retro arcade games, a post office and scenic views.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -243,7 +248,7 @@ function VillagePage() {
   return (
     <GameStage>
       <main className="relative h-full w-full overflow-hidden bg-background">
-      <h1 className="sr-only">Nimiq Island — an island village with six interactive scenic views</h1>
+      <h1 className="sr-only">NimiqValley — an interactive village with six scenic views</h1>
 
       <Link
         to="/"

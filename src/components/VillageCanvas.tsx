@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { TierId } from "@/lib/tiers";
 import playerPoor from "@/assets/player-poor.png";
 import playerNormal from "@/assets/player-normal.png";
@@ -52,6 +52,22 @@ const CHARACTER_SPRITES: Record<TierId, string> = {
   sultan: playerSultan,
 };
 const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen];
+/** Every bitmap the village draws; preloaded before the map is shown. */
+const VILLAGE_ASSET_SOURCES = [
+  playerPoor,
+  playerNormal,
+  playerCool,
+  playerSultan,
+  ...NPC_SPRITES,
+  animalSprites,
+  buildingSpritesA,
+  buildingSpritesB,
+  postOfficeSprite,
+  barnSprite,
+  houseWindmillSprite,
+  objectSprites,
+  houseTierSprites,
+];
 const SPRITE_CELL_W = 144;
 const SPRITE_CELL_H = 224;
 const CHARACTER_HEIGHT = 66;
@@ -101,19 +117,35 @@ const PALETTE = {
 /** Ambient colour tint + lantern strength for the player's local time of day. */
 function skyAmbience(hour: number): { color: string; alpha: number; lamp: number } {
   const lerp = (a: number, b: number, k: number) => a + (b - a) * Math.min(1, Math.max(0, k));
+  // 05:00-06:00 dawn
+  if (hour >= 5 && hour < 6) {
+    const k = hour - 5;
+    return { color: "#3b4a8a", alpha: lerp(0.55, 0.18, k), lamp: lerp(1, 0.2, k) };
+  }
   if (hour >= 6 && hour < 10) return { color: "#ffd9a0", alpha: lerp(0.16, 0, (hour - 6) / 4), lamp: 0 };
   if (hour >= 10 && hour < 16) return { color: "#ffffff", alpha: 0, lamp: 0 };
-  if (hour >= 16 && hour < 19) {
-    const k = (hour - 16) / 3;
-    return { color: "#ff9d4d", alpha: lerp(0.05, 0.3, k), lamp: lerp(0, 0.8, k) };
+  // 16:00-17:30 afternoon warming up
+  if (hour >= 16 && hour < 17.5) {
+    const k = (hour - 16) / 1.5;
+    return { color: "#ffc178", alpha: lerp(0.04, 0.16, k), lamp: lerp(0, 0.25, k) };
   }
-  if (hour >= 19 && hour < 21) {
-    const k = (hour - 19) / 2;
-    return { color: "#1c2b62", alpha: lerp(0.3, 0.5, k), lamp: lerp(0.8, 1, k) };
+  // 17:30-18:15 golden sunset
+  if (hour >= 17.5 && hour < 18.25) {
+    const k = (hour - 17.5) / 0.75;
+    return { color: "#ff8a3d", alpha: lerp(0.16, 0.34, k), lamp: lerp(0.25, 0.7, k) };
   }
-  if (hour >= 21 || hour < 5) return { color: "#152052", alpha: 0.52, lamp: 1 };
-  const k = (hour - 5) / 1; // 05:00-06:00 dawn
-  return { color: "#3b4a8a", alpha: lerp(0.5, 0.18, k), lamp: lerp(1, 0.2, k) };
+  // 18:15-18:45 dusk, fast slide into the blue hour
+  if (hour >= 18.25 && hour < 18.75) {
+    const k = (hour - 18.25) / 0.5;
+    return { color: "#182a5e", alpha: lerp(0.34, 0.62, k), lamp: lerp(0.7, 1, k) };
+  }
+  // 18:45-20:00 settling into full night
+  if (hour >= 18.75 && hour < 20) {
+    const k = (hour - 18.75) / 1.25;
+    return { color: "#080e26", alpha: lerp(0.62, 0.7, k), lamp: 1 };
+  }
+  // deep midnight
+  return { color: "#080e26", alpha: 0.7, lamp: 1 };
 }
 
 function islandPath(ctx: CanvasRenderingContext2D, inset: number) {
@@ -540,6 +572,44 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
   }
   const tiersRef = useRef({ characterTier, houseTier });
   tiersRef.current = { characterTier, houseTier };
+
+  // Decode every village sprite up front so nothing pops in a few seconds late.
+  const [assetsReady, setAssetsReady] = useState(false);
+  const [loadPct, setLoadPct] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    let done = 0;
+    const total = VILLAGE_ASSET_SOURCES.length;
+    const load = (src: string) =>
+      new Promise<void>((resolve) => {
+        const image = new Image();
+        image.src = src;
+        const finish = () => {
+          if (cancelled) return;
+          done += 1;
+          setLoadPct(Math.round((done / total) * 100));
+          resolve();
+        };
+        if (typeof image.decode === "function") {
+          image.decode().then(finish, finish);
+        } else {
+          image.onload = finish;
+          image.onerror = finish;
+        }
+      });
+    void Promise.all(VILLAGE_ASSET_SOURCES.map(load)).then(() => {
+      if (!cancelled) setAssetsReady(true);
+    });
+    // Never trap the player behind a stalled download.
+    const failsafe = window.setTimeout(() => {
+      if (!cancelled) setAssetsReady(true);
+    }, 12_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(failsafe);
+    };
+  }, []);
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -982,5 +1052,33 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     };
   }, [moveRef, onNearbyChange, onViewpointChange, paused, onPostOfficeChange, postBadgeRef]);
 
-  return <canvas ref={canvasRef} className="h-full w-full touch-none" aria-label="Village map" />;
+  return (
+    <div className="relative h-full w-full">
+      <canvas
+        ref={canvasRef}
+        className={`h-full w-full touch-none transition-opacity duration-500 ${assetsReady ? "opacity-100" : "opacity-0"}`}
+        aria-label="Village map"
+      />
+      {!assetsReady && (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-[#0f172a] text-center">
+          <div className="flex w-64 max-w-[80%] flex-col items-center gap-4">
+            <img
+              src="/icon-192.png"
+              alt="NimiqValley"
+              className="size-20 animate-pulse rounded-2xl"
+              style={{ imageRendering: "pixelated" }}
+            />
+            <p className="text-base font-semibold tracking-wide text-[#e7a93a]">Entering NimiqValley...</p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[#e7a93a] transition-[width] duration-200"
+                style={{ width: `${Math.max(6, loadPct)}%` }}
+              />
+            </div>
+            <p className="text-xs text-white/60">Preparing village assets... {loadPct}%</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
