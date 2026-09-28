@@ -631,6 +631,25 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       if (colliderTier !== tiersRef.current.houseTier) {
         colliderTier = tiersRef.current.houseTier;
         colliders = buildColliders(colliderTier, trees);
+        // A bigger house grows its footprint; if the player ends up inside the new
+        // walls, eject them to the nearest free spot (preferring the door side).
+        if (circleBlocked(s.x, s.y, 18, colliders)) {
+          const door = { x: PLAYER_HOUSE.x, y: PLAYER_HOUSE.y + 60 };
+          let placed = false;
+          for (let r = 20; r <= 300 && !placed; r += 20) {
+            for (let i = 0; i < 24; i++) {
+              const a = (i / 24) * Math.PI * 2;
+              const cx = door.x + Math.cos(a) * r;
+              const cy = door.y + Math.sin(a) * r;
+              if (!circleBlocked(cx, cy, 18, colliders)) {
+                s.x = cx;
+                s.y = cy;
+                placed = true;
+                break;
+              }
+            }
+          }
+        }
       }
       const dt = lastTime === 0 ? 16 : Math.min(t - lastTime, 50);
       lastTime = t;
