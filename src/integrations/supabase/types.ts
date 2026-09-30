@@ -197,39 +197,6 @@ export type Database = {
         }
         Relationships: []
       }
-      coin_redemptions: {
-        Row: {
-          coins: number
-          created_at: string
-          id: string
-          nim_amount: number
-          paid_at: string | null
-          status: string
-          tx_hash: string | null
-          wallet: string
-        }
-        Insert: {
-          coins: number
-          created_at?: string
-          id?: string
-          nim_amount: number
-          paid_at?: string | null
-          status?: string
-          tx_hash?: string | null
-          wallet: string
-        }
-        Update: {
-          coins?: number
-          created_at?: string
-          id?: string
-          nim_amount?: number
-          paid_at?: string | null
-          status?: string
-          tx_hash?: string | null
-          wallet?: string
-        }
-        Relationships: []
-      }
       credit_purchases: {
         Row: {
           amount: number
@@ -607,6 +574,7 @@ export type Database = {
           id: string
           joined_at: string
           max_players: number
+          mode: string
           rank_hint: number
           room_id: string | null
           settings: Json
@@ -618,6 +586,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -629,6 +598,7 @@ export type Database = {
           id?: string
           joined_at?: string
           max_players?: number
+          mode?: string
           rank_hint?: number
           room_id?: string | null
           settings?: Json
@@ -691,6 +661,8 @@ export type Database = {
           kind: string
           max_players: number
           settings: Json
+          settled_at: string | null
+          stake: number
           started_at: string | null
           status: string
           turn_no: number
@@ -709,6 +681,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -727,6 +701,8 @@ export type Database = {
           kind?: string
           max_players?: number
           settings?: Json
+          settled_at?: string | null
+          stake?: number
           started_at?: string | null
           status?: string
           turn_no?: number
@@ -734,6 +710,36 @@ export type Database = {
           turn_wallet?: string | null
           updated_at?: string
           winner_wallet?: string | null
+        }
+        Relationships: []
+      }
+      mp_tickets: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          reason: string
+          room_id: string | null
+          unit: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          reason: string
+          room_id?: string | null
+          unit?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          reason?: string
+          room_id?: string | null
+          unit?: string
+          wallet?: string
         }
         Relationships: []
       }
@@ -1037,39 +1043,33 @@ export type Database = {
       wallet_credits: {
         Row: {
           chat_credits: number
-          coins: number
-          coins_date: string | null
-          coins_today: number
           free_chats_date: string | null
           free_chats_used: number
           free_keys_date: string | null
           match_keys: number
+          nim_balance: number
           room_credits: number
           updated_at: string
           wallet: string
         }
         Insert: {
           chat_credits?: number
-          coins?: number
-          coins_date?: string | null
-          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
           match_keys?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet: string
         }
         Update: {
           chat_credits?: number
-          coins?: number
-          coins_date?: string | null
-          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
           match_keys?: number
+          nim_balance?: number
           room_credits?: number
           updated_at?: string
           wallet?: string
@@ -1117,13 +1117,18 @@ export type Database = {
         }
         Returns: number
       }
-      add_player_coins: {
-        Args: { p_coins: number; p_daily_cap: number; p_wallet: string }
-        Returns: number
-      }
       confirm_credit_purchase: { Args: { p_id: string }; Returns: string }
       confirm_league_deposit: { Args: { p_pending: string }; Returns: number }
       disarm_league_deposit_checker: { Args: never; Returns: undefined }
+      grant_credits: {
+        Args: {
+          p_chat?: number
+          p_key?: number
+          p_room?: number
+          p_wallet: string
+        }
+        Returns: undefined
+      }
       moderate_chat_submission: {
         Args: {
           _is_profane: boolean
@@ -1132,12 +1137,37 @@ export type Database = {
         }
         Returns: Json
       }
-      redeem_player_coins: {
-        Args: { p_coins: number; p_rate: number; p_wallet: string }
-        Returns: string
+      redeem_nim_payment: {
+        Args: {
+          p_chat?: number
+          p_key?: number
+          p_kind: string
+          p_nim: number
+          p_room?: number
+          p_tx_hash: string
+          p_wallet: string
+        }
+        Returns: boolean
+      }
+      refund_chat_credit: {
+        Args: { p_source: string; p_wallet: string }
+        Returns: undefined
+      }
+      spend_chat_credit: {
+        Args: { p_free_limit: number; p_wallet: string }
+        Returns: {
+          chat_credits: number
+          free_chats_date: string
+          free_chats_used: number
+          match_keys: number
+          room_credits: number
+          source: string
+          wallet: string
+        }[]
       }
       spend_match_key: { Args: { p_wallet: string }; Returns: boolean }
       spend_room_credit: { Args: { p_wallet: string }; Returns: boolean }
+      spend_room_entry: { Args: { p_wallet: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
