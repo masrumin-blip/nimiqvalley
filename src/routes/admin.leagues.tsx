@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 
 import { WalletGate } from "@/components/WalletGate";
-import { adminOverview, getAdminStatus, markNimPayoutPaid, retryUsdtPayout, type AdminPayout } from "@/lib/admin.functions";
+import { adminOverview, getAdminStatus, markNimPayoutPaid, retryUsdtPayout, markCoinRedemptionPaid, type AdminPayout, type AdminRedemption } from "@/lib/admin.functions";
 import { payNim } from "@/lib/wallet";
 
 export const Route = createFileRoute("/admin/leagues")({
@@ -36,6 +36,7 @@ function AdminPage() {
   const overview = useServerFn(adminOverview);
   const markPaid = useServerFn(markNimPayoutPaid);
   const retry = useServerFn(retryUsdtPayout);
+  const markCoin = useServerFn(markCoinRedemptionPaid);
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -76,6 +77,24 @@ function AdminPage() {
     setBusy(p.id);
     try {
       await markPaid({ data: { id: p.id } });
+      setMsg("Paid.");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setBusy(null);
+      qc.invalidateQueries({ queryKey: ["admin-overview"] });
+    }
+  };
+
+  const coinRun = async (r: AdminRedemption, send: boolean) => {
+    setBusy(r.id);
+    setMsg(null);
+    try {
+      if (send) {
+        await payNim(r.wallet, r.nim, "Coin redemption".slice(0, 60));
+        setMsg("Sent. Checking the blockchain…");
+      }
+      await markCoin({ data: { id: r.id } });
       setMsg("Paid.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed.");
@@ -138,6 +157,36 @@ function AdminPage() {
             <p className="font-bold">{p.leagueTitle} · {p.amount} {p.token.toUpperCase()}</p>
             {p.txHash && (
               <a href={txLink(p.token, p.txHash)} target="_blank" rel="noreferrer" className="break-all text-xs underline text-muted-foreground">{p.txHash}</a>
+            )}
+          </div>
+        ))}
+      </div>
+      <h2 className="mt-8 text-sm font-bold uppercase">Coin redemptions waiting</h2>
+      <div className="mt-2 space-y-2">
+        {d?.coinPending.length === 0 && <p className="text-sm text-muted-foreground">Nothing to pay.</p>}
+        {d?.coinPending.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-border bg-card p-3 text-sm">
+            <p className="font-bold">{r.coins} coins → {r.nim} NIM</p>
+            <p className="break-all text-muted-foreground">{r.wallet}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" disabled={busy !== null} onClick={() => coinRun(r, true)} className="min-h-10 rounded-full bg-primary px-4 font-bold text-primary-foreground disabled:opacity-50">
+                {busy === r.id ? "Working…" : "Pay"}
+              </button>
+              <button type="button" disabled={busy !== null} onClick={() => coinRun(r, false)} className="min-h-10 rounded-full border border-border px-4 disabled:opacity-50">
+                Already sent? Check
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="mt-6 text-sm font-bold uppercase">Coin redemptions paid</h2>
+      <div className="mt-2 space-y-2">
+        {d?.coinPaid.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-border bg-card p-3 text-sm">
+            <p className="font-bold">{r.nim} NIM · {r.coins} coins</p>
+            {r.txHash && (
+              <a href={txLink("nim", r.txHash)} target="_blank" rel="noreferrer" className="break-all text-xs underline text-muted-foreground">{r.txHash}</a>
             )}
           </div>
         ))}

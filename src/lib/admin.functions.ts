@@ -154,3 +154,36 @@ export const retryUsdtPayout = createServerFn({ method: "POST" })
     if (!hash) throw new Error(usdtPayoutErrorMessage(failure));
     return { txHash: hash };
   });
+
+/** Marks a coin redemption paid only after finding the treasury NIM transfer on-chain. */
+export const markCoinRedemptionPaid = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { requireAdmin, treasuryNim } = await import("./admin.server");
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r } = await supabaseAdmin.from("coin_redemptions").select("*").eq("id", data.id).maybeSingle();
+    if (!r || r.status !== "pending") throw new Error("This redemption is not waiting for payment.");
+    const treasury = treasuryNim();
+    if (!treasury) throw new Error("Treasury wallet is not set.");
+    const used = async (h: string) => {
+      const checks = await Promise.all([
+        supabaseAdmin.from("coin_redemptions").select("id").eq("tx_hash", h).maybeSingle(),
+        supabaseAdmin.from("league_payouts").select("id").eq("tx_hash", h).maybeSingle(),
+        supabaseAdmin.from("league_deposits").select("id").eq("tx_hash", h).maybeSingle(),
+        supabaseAdmin.from("village_letters").select("id").eq("tx_hash", h).maybeSingle(),
+      ]);
+      return checks.some((c) => Boolean(c.data));
+    };
+    const { findNimTransfer } = await import("./letters.server");
+    const hash = await findNimTransfer(treasury, r.wallet, Number(r.nim_amount), used);
+    if (!hash) throw new Error("Payment not found on-chain yet. Send it from the treasury wallet, then try again.");
+    const { data: upd } = await supabaseAdmin
+      .from("coin_redemptions")
+      .update({ status: "paid", tx_hash: hash, paid_at: new Date().toISOString() })
+      .eq("id", r.id)
+      .eq("status", "pending")
+      .select("id");
+    if (!upd?.length) throw new Error("Already marked paid.");
+    return { txHash: hash };
+  });
