@@ -111,7 +111,8 @@ export const markNimPayoutPaid = createServerFn({ method: "POST" })
       return checks.some((c) => Boolean(c.data));
     };
     const { findNimTransfer } = await import("./letters.server");
-    const hash = await findNimTransfer(treasury, p.to_address, Number(p.amount), used);
+    // Wider age window: admins may confirm a prize paid hours earlier.
+    const hash = await findNimTransfer(treasury, p.to_address, Number(p.amount), used, { maxAgeMs: 24 * 3600_000 });
     if (!hash) throw new Error("Payment not found on-chain yet. Make sure it was sent from the treasury wallet, then try again.");
     const { data: upd } = await supabaseAdmin
       .from("league_payouts")
@@ -176,7 +177,12 @@ export const markCoinRedemptionPaid = createServerFn({ method: "POST" })
       return checks.some((c) => Boolean(c.data));
     };
     const { findNimTransfer } = await import("./letters.server");
-    const hash = await findNimTransfer(treasury, r.wallet, Number(r.nim_amount), used);
+    // Nimiq Pay settles via an HTLC contract, so the on-chain sender is not the treasury.
+    // Searching the recipient's incoming txs by the "Coin redemption" memo finds it regardless.
+    const hash = await findNimTransfer(treasury, r.wallet, Number(r.nim_amount), used, {
+      memo: "Coin redemption",
+      maxAgeMs: 24 * 3600_000,
+    });
     if (!hash) throw new Error("Payment not found on-chain yet. Send it from the treasury wallet, then try again.");
     const { data: upd } = await supabaseAdmin
       .from("coin_redemptions")
