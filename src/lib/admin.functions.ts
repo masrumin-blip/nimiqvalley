@@ -115,6 +115,7 @@ export const markNimPayoutPaid = createServerFn({ method: "POST" })
     // (HTLC relayer) payments are found too; wide age window for late admin checks.
     const hash = await findNimTransfer(treasury, p.to_address, Number(p.amount), used, {
       memo: "League prize",
+      since: p.claimed_at,
       maxAgeMs: 7 * 24 * 3600_000,
     });
     if (!hash) throw new Error("Payment not found on-chain yet. Make sure it was sent from the treasury wallet, then try again.");
@@ -185,6 +186,7 @@ export const markCoinRedemptionPaid = createServerFn({ method: "POST" })
     // Searching the recipient's incoming txs by the "Coin redemption" memo finds it regardless.
     const hash = await findNimTransfer(treasury, r.wallet, Number(r.nim_amount), used, {
       memo: "Coin redemption",
+      since: r.created_at,
       maxAgeMs: 24 * 3600_000,
     });
     if (!hash) throw new Error("Payment not found on-chain yet. Send it from the treasury wallet, then try again.");

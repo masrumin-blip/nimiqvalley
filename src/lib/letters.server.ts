@@ -120,12 +120,13 @@ export async function findNimTransfer(
   recipient: string,
   nim: number,
   isUsed: (hash: string) => Promise<boolean> = hashUsed,
-  opts: { maxAgeMs?: number; timeoutMs?: number; memo?: string } = {},
+  opts: { maxAgeMs?: number; timeoutMs?: number; memo?: string; since?: string } = {},
 ): Promise<string | null> {
   const deadline = Date.now() + (opts.timeoutMs ?? CONFIRM_TIMEOUT_MS);
   const maxAge = opts.maxAgeMs ?? 15 * 60_000;
   const byRecipient = Boolean(opts.memo);
   const memoNeedle = (opts.memo ?? "").toLowerCase();
+  const sinceMs = opts.since ? new Date(opts.since).getTime() - 60_000 : 0;
   for (;;) {
     const raw = await nimRpc<RawTx[]>("getTransactionsByAddress", [norm(byRecipient ? recipient : sender), 50, null]);
     if (Array.isArray(raw)) {
@@ -146,6 +147,7 @@ export async function findNimTransfer(
           Math.abs(value - nim) < 0.00001 &&
           memoOk &&
           Date.now() - ts < maxAge &&
+          ts >= sinceMs &&
           !(await isUsed(hash))
         )
           return hash;
