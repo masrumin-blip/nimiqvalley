@@ -299,5 +299,5 @@ export function simulateJumpRun(seed: number, inputs: ReadonlyArray<number>, max
     if (next !== undefined) dir = next;
     stepJump(w, rng, dir);
   }
-  return { score: finalJumpScore(w), ticks: w.tick, died: w.over };
+  return { score: finalJumpScore(w), ticks: w.tick, died: w.over, coins: Math.floor(w.coins) };
 }
