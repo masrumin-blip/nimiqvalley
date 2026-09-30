@@ -1043,6 +1043,9 @@ export type Database = {
       wallet_credits: {
         Row: {
           chat_credits: number
+          coins: number
+          coins_date: string | null
+          coins_today: number
           free_chats_date: string | null
           free_chats_used: number
           free_keys_date: string | null
@@ -1054,6 +1057,9 @@ export type Database = {
         }
         Insert: {
           chat_credits?: number
+          coins?: number
+          coins_date?: string | null
+          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
@@ -1065,6 +1071,9 @@ export type Database = {
         }
         Update: {
           chat_credits?: number
+          coins?: number
+          coins_date?: string | null
+          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
@@ -1115,6 +1124,10 @@ export type Database = {
           p_tx: string
           p_wallet: string
         }
+        Returns: number
+      }
+      add_player_coins: {
+        Args: { p_coins: number; p_daily_cap: number; p_wallet: string }
         Returns: number
       }
       confirm_credit_purchase: { Args: { p_id: string }; Returns: string }
