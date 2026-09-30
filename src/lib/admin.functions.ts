@@ -15,6 +15,16 @@ export type AdminPayout = {
   claimedAt: string;
 };
 
+export type AdminRedemption = {
+  id: string;
+  wallet: string;
+  coins: number;
+  nim: number;
+  status: string;
+  txHash: string | null;
+  createdAt: string;
+};
+
 export const getAdminStatus = createServerFn({ method: "GET" }).handler(async () => {
   const { adminWallet } = await import("./admin.server");
   return { isAdmin: Boolean(await adminWallet()) };
