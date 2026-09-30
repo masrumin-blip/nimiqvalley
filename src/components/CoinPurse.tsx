@@ -41,8 +41,8 @@ export function CoinPurse({ enabled = true }: { enabled?: boolean }) {
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        Collect the yellow coins in Mininja, Spaceship and CosNimiq Shooter. Coins never change your score, they
-        only fill this purse.
+        Collect the yellow coins in Mininja, Neon Jump, Crossing, Rooftop, Spaceship, Slide and CosNimiq Shooter.
+        Coins never change your score, they only fill this purse.
       </p>
 
       <Button
