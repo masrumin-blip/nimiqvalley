@@ -261,5 +261,6 @@ export function simulateCrossingRun(seed: number, inputs: ReadonlyArray<number>,
   }
   const s = createCrossingSim(rng);
   for (let t = 0; t < maxTicks && !s.dead; t++) stepCrossing(s, rng, byTick.get(t) ?? null);
-  return { score: s.score, ticks: s.tick, died: s.dead };
+  // Every point in Crossing comes from a collected coin, so score == coins.
+  return { score: s.score, ticks: s.tick, died: s.dead, coins: s.score };
 }

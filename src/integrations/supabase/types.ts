@@ -197,6 +197,39 @@ export type Database = {
         }
         Relationships: []
       }
+      coin_redemptions: {
+        Row: {
+          coins: number
+          created_at: string
+          id: string
+          nim_amount: number
+          paid_at: string | null
+          status: string
+          tx_hash: string | null
+          wallet: string
+        }
+        Insert: {
+          coins: number
+          created_at?: string
+          id?: string
+          nim_amount: number
+          paid_at?: string | null
+          status?: string
+          tx_hash?: string | null
+          wallet: string
+        }
+        Update: {
+          coins?: number
+          created_at?: string
+          id?: string
+          nim_amount?: number
+          paid_at?: string | null
+          status?: string
+          tx_hash?: string | null
+          wallet?: string
+        }
+        Relationships: []
+      }
       credit_purchases: {
         Row: {
           amount: number
@@ -1043,6 +1076,9 @@ export type Database = {
       wallet_credits: {
         Row: {
           chat_credits: number
+          coins: number
+          coins_date: string | null
+          coins_today: number
           free_chats_date: string | null
           free_chats_used: number
           free_keys_date: string | null
@@ -1054,6 +1090,9 @@ export type Database = {
         }
         Insert: {
           chat_credits?: number
+          coins?: number
+          coins_date?: string | null
+          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
@@ -1065,6 +1104,9 @@ export type Database = {
         }
         Update: {
           chat_credits?: number
+          coins?: number
+          coins_date?: string | null
+          coins_today?: number
           free_chats_date?: string | null
           free_chats_used?: number
           free_keys_date?: string | null
@@ -1117,6 +1159,10 @@ export type Database = {
         }
         Returns: number
       }
+      add_player_coins: {
+        Args: { p_coins: number; p_daily_cap: number; p_wallet: string }
+        Returns: number
+      }
       confirm_credit_purchase: { Args: { p_id: string }; Returns: string }
       confirm_league_deposit: { Args: { p_pending: string }; Returns: number }
       disarm_league_deposit_checker: { Args: never; Returns: undefined }
@@ -1148,6 +1194,10 @@ export type Database = {
           p_wallet: string
         }
         Returns: boolean
+      }
+      redeem_player_coins: {
+        Args: { p_coins: number; p_rate: number; p_wallet: string }
+        Returns: string
       }
       refund_chat_credit: {
         Args: { p_source: string; p_wallet: string }
