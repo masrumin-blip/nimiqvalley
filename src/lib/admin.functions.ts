@@ -111,8 +111,12 @@ export const markNimPayoutPaid = createServerFn({ method: "POST" })
       return checks.some((c) => Boolean(c.data));
     };
     const { findNimTransfer } = await import("./letters.server");
-    // Wider age window: admins may confirm a prize paid hours earlier.
-    const hash = await findNimTransfer(treasury, p.to_address, Number(p.amount), used, { maxAgeMs: 24 * 3600_000 });
+    // Search the recipient's incoming txs by the "League prize" memo so Nimiq Pay
+    // (HTLC relayer) payments are found too; wide age window for late admin checks.
+    const hash = await findNimTransfer(treasury, p.to_address, Number(p.amount), used, {
+      memo: "League prize",
+      maxAgeMs: 7 * 24 * 3600_000,
+    });
     if (!hash) throw new Error("Payment not found on-chain yet. Make sure it was sent from the treasury wallet, then try again.");
     const { data: upd } = await supabaseAdmin
       .from("league_payouts")
