@@ -211,6 +211,13 @@
       "when": 1790749163090,
       "tag": "0029_add_player_coins",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790749185940,
+      "tag": "0030_coin_redemptions",
+      "breakpoints": true
     }
   ]
 }
