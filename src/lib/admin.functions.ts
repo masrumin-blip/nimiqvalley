@@ -15,6 +15,16 @@ export type AdminPayout = {
   claimedAt: string;
 };
 
+export type AdminRedemption = {
+  id: string;
+  wallet: string;
+  coins: number;
+  nim: number;
+  status: string;
+  txHash: string | null;
+  createdAt: string;
+};
+
 export const getAdminStatus = createServerFn({ method: "GET" }).handler(async () => {
   const { adminWallet } = await import("./admin.server");
   return { isAdmin: Boolean(await adminWallet()) };
@@ -24,9 +34,14 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(async () 
   const { requireAdmin, treasuryNim } = await import("./admin.server");
   await requireAdmin();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: leagues }, { data: payouts }] = await Promise.all([
+  const [{ data: leagues }, { data: payouts }, { data: redemptions }] = await Promise.all([
     supabaseAdmin.from("leagues").select("id, title, token, pool, status, ends_at"),
     supabaseAdmin.from("league_payouts").select("*").order("claimed_at", { ascending: false }).limit(300),
+    supabaseAdmin
+      .from("coin_redemptions")
+      .select("id, wallet, coins, nim_amount, status, tx_hash, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
   const byId = new Map((leagues ?? []).map((l) => [l.id, l]));
   const now = Date.now();
@@ -48,12 +63,23 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(async () 
       claimedAt: p.claimed_at,
     };
   });
+  const coinRows: AdminRedemption[] = (redemptions ?? []).map((r) => ({
+    id: r.id,
+    wallet: r.wallet,
+    coins: Number(r.coins),
+    nim: Number(r.nim_amount),
+    status: r.status,
+    txHash: r.tx_hash,
+    createdAt: r.created_at,
+  }));
   return {
     activeLeagues: active.length,
     poolNim: sum("nim"),
     poolUsdt: sum("usdt"),
     pending: rows.filter((r) => r.status === "pending"),
     paid: rows.filter((r) => r.status === "paid"),
+    coinPending: coinRows.filter((r) => r.status === "pending"),
+    coinPaid: coinRows.filter((r) => r.status === "paid"),
     treasuryNim: treasuryNim(),
   };
 });
