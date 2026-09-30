@@ -4,7 +4,7 @@
  * combination that the game's own scoring rules could not have produced.
  */
 
-export const TELEMETRY_GAMES = ["ship", "shooter", "rooftop"] as const;
+export const TELEMETRY_GAMES = ["ship", "shooter", "rooftop", "slide"] as const;
 export type TelemetrySlug = (typeof TELEMETRY_GAMES)[number];
 
 export interface TelemetryRun {
@@ -18,6 +18,8 @@ export interface TelemetryRun {
   maxCombo?: number | undefined;
   /** Jumps performed (rooftop only). */
   jumps?: number | undefined;
+  /** Coins picked up during the run. */
+  coins?: number | undefined;
 }
 
 /**
@@ -27,6 +29,15 @@ export interface TelemetryRun {
 const ROOFTOP_MAX_SPEED = 35 * 1.7;
 /** A jump hangs ~0.84s in the air, so jumps can never outpace that cadence. */
 const ROOFTOP_MIN_JUMP_GAP = 0.3;
+
+/** Nimiq Slide — top slope speed is 560px/s and the boost multiplies it by 1.5. */
+const SLIDE_MAX_SPEED = 560 * 1.5;
+/** Coins sit at least this far apart along the slope. */
+const SLIDE_COIN_GAP = 440;
+/** Coins already lying on the first stretch when a run starts. */
+const SLIDE_HEAD_START_COINS = 20;
+/** Each coin is worth exactly 25 points and nothing else scores. */
+const SLIDE_COIN_SCORE = 25;
 
 
 /** Nimiq Spaceship — mirrors SCORES in src/games/ship/game/engine.ts. */
@@ -57,6 +68,18 @@ export function checkTelemetry(slug: TelemetrySlug, run: TelemetryRun, serverEla
     if (Object.keys(kills).length > 0) return "unknown-enemy";
     const jumps = run.jumps ?? 0;
     if (jumps > durationSec / ROOFTOP_MIN_JUMP_GAP + 2) return "jump-rate";
+    return null;
+  }
+
+  if (slug === "slide") {
+    // Only coins score, 25 each, so the score must be an exact multiple.
+    if (Object.keys(kills).length > 0) return "unknown-enemy";
+    if (score % SLIDE_COIN_SCORE !== 0) return "score-mismatch";
+    const coins = score / SLIDE_COIN_SCORE;
+    if (run.coins !== undefined && Math.round(run.coins) !== coins) return "score-mismatch";
+    // Coins are spaced along the slope, so speed caps how many can be passed.
+    const maxCoins = (durationSec * SLIDE_MAX_SPEED) / SLIDE_COIN_GAP + SLIDE_HEAD_START_COINS;
+    if (coins > maxCoins) return "coin-rate";
     return null;
   }
 

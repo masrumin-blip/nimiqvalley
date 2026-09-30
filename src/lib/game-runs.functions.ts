@@ -292,10 +292,12 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
     const totalKills = Object.values(data.kills).reduce((sum, n) => sum + n, 0);
     const { maxPlausibleCoins } = await import("./coins");
     const { awardCoins } = await import("./coins.server");
-    const coinsEarned = await awardCoins(
-      wallet,
-      Math.min(data.coins ?? 0, maxPlausibleCoins(totalKills, data.durationSec)),
-    );
+    // Slide has no kills: its coins are paced by slope speed, not by enemies.
+    const coinCeiling =
+      data.slug === "slide"
+        ? Math.ceil(data.durationSec * 2 + 20)
+        : maxPlausibleCoins(totalKills, data.durationSec);
+    const coinsEarned = await awardCoins(wallet, Math.min(data.coins ?? 0, coinCeiling));
 
     const score = Math.floor(data.score);
     if (session.league_id) {

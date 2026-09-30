@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { playSfx } from "@/lib/sfx";
-import { reportScore } from "@/lib/report-score";
+import { drawHexCoin } from "@/lib/coin-art";
+import { startGameRun, submitTelemetryRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
 
 // ---------- Palette (dusk pastel) ----------
 const SKY_STOPS: [string, string, string][] = [
@@ -44,6 +46,8 @@ type Effects = { shield: number; magnet: number; boost: number };
 
 const ZOOM = 0.32; // kamera 50% lebih jauh
 const POWERUP_SCALE = 0.7;
+/** Spacing between coins; doubled from 220 so the trail holds half as many. */
+export const COIN_GAP = 440;
 
 function pointToSegmentDistance(
   px: number,
@@ -67,12 +71,16 @@ export default function SlideGame() {
     score: 0,
     dist: 0,
     best: 0,
+    coins: 0,
     effects: { shield: 0, magnet: 0, boost: 0 } as Effects,
   });
   const [state, setState] = useState<"ready" | "run" | "over">("ready");
   const stateRef = useRef(state);
   stateRef.current = state;
   const restartRef = useRef<() => void>(() => {});
+  // Server-issued round tickets: a run only counts when it carries one.
+  const nextSessionRef = useRef<string | null>(null);
+  const sessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -121,6 +129,24 @@ export default function SlideGame() {
     let px = 120; // posisi x pemain (dunia), dihitung ulang di fit
     const p = { y: 0, vy: 0, rot: 0, grounded: true, airTime: 0, crouch: 0 };
     let hudTick = 0;
+    let coinsGot = 0;
+
+    // Ask the server for a fresh round ticket, ready for the next run.
+    const prefetchSession = () => {
+      void startGameRun({ data: { slug: "slide", leagueId: currentLeagueId() } })
+        .then((s) => {
+          nextSessionRef.current = s.sessionId;
+        })
+        .catch(() => {
+          nextSessionRef.current = null; // guest: local practice run
+        });
+    };
+    prefetchSession();
+    const beginRun = () => {
+      sessionRef.current = nextSessionRef.current;
+      nextSessionRef.current = null;
+      prefetchSession();
+    };
 
     const chasmAt = (wx: number) =>
       obstacles.find((o): o is Chasm => o.kind === "chasm" && wx > o.x0 && wx < o.x1);
@@ -156,6 +182,7 @@ export default function SlideGame() {
       scroll = 0;
       speed = 300;
       score = 0;
+      coinsGot = 0;
       coins = [];
       parts = [];
       obstacles = [];
@@ -172,8 +199,9 @@ export default function SlideGame() {
       p.crouch = 0;
       p.y = terrainY(px);
       nextObsX = px + 600;
-      for (let i = 0; i < 40; i++) {
-        const x = 400 + i * 220 + Math.random() * 140;
+      // Half as many coins as before: same stretch, double the spacing.
+      for (let i = 0; i < 20; i++) {
+        const x = 400 + i * COIN_GAP + Math.random() * 140;
         coins.push({ x, y: terrainY(x) - 46 - Math.random() * 30, taken: false });
       }
       for (let i = 0; i < 5; i++) {
@@ -182,7 +210,7 @@ export default function SlideGame() {
         powerUps.push({ kind: kinds[i % kinds.length]!, x, y: terrainY(x) - 72, taken: false });
       }
       nextPowerX = 1100 + 5 * 2300;
-      setHud({ score: 0, dist: 0, best, effects: { shield: 0, magnet: 0, boost: 0 } });
+      setHud({ score: 0, dist: 0, best, coins: 0, effects: { shield: 0, magnet: 0, boost: 0 } });
     };
 
     const computePx = () => {
@@ -193,6 +221,7 @@ export default function SlideGame() {
     restartRef.current = () => {
       computePx();
       reset();
+      beginRun();
       setState("run");
       playSfx("start");
     };
@@ -228,9 +257,24 @@ export default function SlideGame() {
         best = Math.floor(score);
         localStorage.setItem("meluncur-best", String(best));
       }
-      setHud({ score: Math.floor(score), dist: Math.floor(scroll / 10), best, effects: { shield: 0, magnet: 0, boost: 0 } });
+      setHud({ score: Math.floor(score), dist: Math.floor(scroll / 10), best, coins: coinsGot, effects: { shield: 0, magnet: 0, boost: 0 } });
       setState("over");
-      reportScore("slide", Math.floor(score));
+      // The score only counts when the run carries a one-time server ticket.
+      const sessionId = sessionRef.current;
+      sessionRef.current = null;
+      if (sessionId) {
+        void submitTelemetryRun({
+          data: {
+            slug: "slide",
+            sessionId,
+            score: Math.floor(score),
+            durationSec: runTime,
+            wave: 0,
+            kills: {},
+            coins: coinsGot,
+          },
+        }).catch(() => {});
+      }
     };
 
     const isProtected = () => runTime < shieldUntil || runTime < boostUntil || runTime < protectedGraceUntil;
@@ -245,7 +289,7 @@ export default function SlideGame() {
 
     const down = (e: Event) => {
       e.preventDefault();
-      if (stateRef.current === "ready") { setState("run"); playSfx("start"); }
+      if (stateRef.current === "ready") { beginRun(); setState("run"); playSfx("start"); }
       else if (stateRef.current === "over") restartRef.current();
       else jump();
     };
@@ -379,14 +423,15 @@ export default function SlideGame() {
           ) {
             c.taken = true;
             score += 25;
+            coinsGot += 1;
             burst(c.x, c.y, 8);
             playSfx("coin", 0.5);
           }
         }
         const lastCoin = coins[coins.length - 1];
         if (lastCoin && lastCoin.x < scroll + W / ZOOM + 400) {
-          for (let i = 0; i < 12; i++) {
-            const x = lastCoin.x + 200 + i * 220 + Math.random() * 140;
+          for (let i = 0; i < 6; i++) {
+            const x = lastCoin.x + 200 + i * COIN_GAP + Math.random() * 140;
             coins.push({ x, y: terrainY(x) - 46 - Math.random() * 30, taken: false });
           }
         }
@@ -420,6 +465,7 @@ export default function SlideGame() {
             score: Math.floor(score),
             dist: Math.floor(scroll / 10),
             best,
+            coins: coinsGot,
             effects: {
               shield: Math.max(0, shieldUntil - runTime),
               magnet: Math.max(0, magnetUntil - runTime),
@@ -644,44 +690,13 @@ export default function SlideGame() {
         ctx.restore();
       }
 
-      // koin hexagonal top-flat kuning dengan garis sisi neon kuning
+      // koin: heksagon kuning polos bersisi atas datar, sama di semua game
       for (const c of coins) {
         if (c.taken) continue;
         const sx = toSX(c.x);
         if (sx < -20 || sx > W + 20) continue;
         const bob = Math.sin(now / 300 + c.x) * 4;
-        const cy = toSY(c.y) + bob;
-        const coinRadius = 10;
-
-        ctx.save();
-        ctx.beginPath();
-        for (let side = 0; side < 6; side++) {
-          // sudut mulai 0 rad -> sisi atas & bawah mendatar (top flatted)
-          const angle = (side * Math.PI) / 3;
-          const hx = sx + Math.cos(angle) * coinRadius;
-          const hy = cy + Math.sin(angle) * coinRadius;
-          if (side === 0) ctx.moveTo(hx, hy);
-          else ctx.lineTo(hx, hy);
-        }
-        ctx.closePath();
-
-        // isi kuning
-        ctx.fillStyle = "#ffd43a";
-        ctx.shadowColor = "#ffe94a";
-        ctx.shadowBlur = 16;
-        ctx.fill();
-
-        // garis sisi kuning neon
-        ctx.lineJoin = "round";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(255,240,90,0.55)";
-        ctx.shadowBlur = 18;
-        ctx.stroke();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "#fffbaa";
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-        ctx.restore();
+        drawHexCoin(ctx, sx, toSY(c.y) + bob, 10, 0);
       }
 
       // partikel
@@ -819,6 +834,7 @@ export default function SlideGame() {
           </div>
           <div className="text-right">
             <div className="text-xl font-semibold drop-shadow-sm">{hud.dist} m</div>
+            <div className="text-sm font-semibold text-[#c79a13] drop-shadow-sm">🟡 {hud.coins}</div>
             <div className="text-xs opacity-70">best: {hud.best}</div>
           </div>
         </div>
@@ -860,7 +876,7 @@ export default function SlideGame() {
             </h2>
             <p className="mt-1 font-display text-xl font-semibold text-[#fdf6ec] drop-shadow-lg">Wiped out!</p>
             <p className="mt-2 font-display text-lg text-[#fdf6ec]/90">
-              Score {hud.score} · {hud.dist} m
+              Score {hud.score} · {hud.dist} m · 🟡 {hud.coins}
             </p>
             <button
               onClick={() => restartRef.current()}

@@ -33,6 +33,8 @@ export const LEAGUE_GAMES = [
   { slug: "ship", name: "Nimiq Spaceship", path: "/games/ship", method: "telemetry" },
   { slug: "shooter", name: "CosNimiq Shooter", path: "/games/shooter", method: "telemetry" },
   { slug: "rooftop", name: "Nimiq Rooftop", path: "/games/rooftop", method: "telemetry" },
+  { slug: "slide", name: "Nimiq Slide", path: "/games/slide", method: "telemetry" },
+
 
 ] as const satisfies ReadonlyArray<{ slug: string; name: string; path: string; method: VerifyMethod }>;
 
