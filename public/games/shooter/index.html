@@ -128,7 +128,7 @@ const S = {
 /* ---------- state ---------- */
 let ship, bullets, foes, fbullets, orbs, parts, stars, floats;
 let score, wave, waveTimer, spawnT, shake, alive, best, timeScale, slowT, gameT;
-let kills = {}, maxCombo = 0;
+let kills = {}, maxCombo = 0, coinsGot = 0;
 let combo, comboT, D, bossFlash, bossCount, laserBlock;
 const LASER_DUR = 60 * 3;   // super power laser horizontal: tepat 3 detik
 best = +(localStorage.getItem("cosnimiq.best") || 0);
@@ -174,6 +174,38 @@ function burst(x, y, n, col, spd = 4, life = 34){
 }
 function float(x, y, txt, col){ floats.push({x, y, t: txt, c: col, l: 46}); }
 
+/* Reward coins: never add score, they only fill the player's coin purse
+   (100 coins = 1 NIM). Dropped by destroyed enemies. */
+function dropCoins(x, y, n){
+  for (let i = 0; i < n; i++)
+    orbs.push({x: x + rnd(-26, 26), y: y + rnd(-14, 14), vy: rnd(1.2, 2.2), r: 11, k: "C", ph: rnd(0, TAU)});
+}
+
+/* Flat-topped yellow hexagon coin. */
+function drawCoin(x, y, r, ph){
+  const sq = .55 + .45 * Math.abs(Math.cos(ph * 2.2));
+  ctx.save(); ctx.translate(x, y); ctx.scale(sq, 1);
+  const g = ctx.createLinearGradient(0, -r, 0, r);
+  g.addColorStop(0, "#fff3a8"); g.addColorStop(.45, "#ffe066"); g.addColorStop(1, "#f5a300");
+  ctx.shadowColor = "#ffd400"; ctx.shadowBlur = 16;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++){
+    const a = Math.PI/3 * i + Math.PI/6;
+    const px = Math.cos(a)*r, py = Math.sin(a)*r;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+  ctx.shadowBlur = 0; ctx.lineWidth = Math.max(1.2, r*.12); ctx.strokeStyle = "#9a6a00"; ctx.stroke();
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++){
+    const a = Math.PI/3 * i + Math.PI/6;
+    const px = Math.cos(a)*r*.48, py = Math.sin(a)*r*.48;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath(); ctx.strokeStyle = "rgba(154,106,0,.85)"; ctx.lineWidth = Math.max(1, r*.1); ctx.stroke();
+  ctx.restore();
+}
+
 /* ---- item super: LASER horizontal, hanya 1x tiap 3 wave ---- */
 function spawnLaserOrb(){
   const block = Math.floor((wave - 1) / 3);
@@ -210,7 +242,7 @@ function difficulty(){
 /* ---------- init ---------- */
 function startGame(idle){
   initAudio();
-  kills = {}; maxCombo = 0;
+  kills = {}; maxCombo = 0; coinsGot = 0;
   if (idle !== true) { try { window.parent.postMessage({ type: "nimiq-start", slug: "shooter" }, window.location.origin); } catch (e) {} }
   ship = {x: W/2, y: H*0.76, r: 15, hp: 3, maxhp: 3, cool: 0, inv: 90,
           pw: 1, pwT: 0, pwMin: 1, shield: 0, sT: 0, tilt: 0, laserT: 0};
@@ -521,7 +553,9 @@ function update(){
             for (const k of ["P","H","S"])
               orbs.push({x:f.x + rnd(-30,30), y:f.y, vy:1.9, r:11, k, ph:0});
             float(f.x, f.y-46, "BOSS DOWN!", "#ffe66d");
+            dropCoins(f.x, f.y, 8);
           } else {
+            if (Math.random() < .55) dropCoins(f.x, f.y, f.t === "tank" ? 3 : 1);
             const chance = Math.min(.9, (f.t === "grunt" ? .16 : .45) * D.drop);
             if (Math.random() < chance)
               orbs.push({x:f.x, y:f.y, vy:1.9, r:11, k: Math.random() < .5 ? "P" : (Math.random() < .5 ? "H" : "S"), ph:0});
@@ -559,6 +593,7 @@ function update(){
                         else { score += 300; float(ship.x, ship.y-32, "+300", "#4dff9e"); } }
       if (o.k === "L"){ ship.laserT = LASER_DUR; shake = 16; S.big();
                         float(ship.x, ship.y-32, "LASER 3s!", "#ff3bd0"); }
+      if (o.k === "C"){ coinsGot++; float(ship.x, ship.y-32, "+1 COIN", "#ffe066"); }
       if (o.k === "S"){ ship.shield = 1;
                         ship.sT = Math.max(60*4, 60*8 - D.t*60*.25) | 0;
                         float(ship.x, ship.y-32, "SHIELD", "#ffe66d"); }
@@ -585,8 +620,9 @@ function update(){
         shake = Math.max(shake, f.boss ? 30 : 6);
         if (f.boss){
           for (const k of ["P","H","S"]) orbs.push({x:f.x + rnd(-30,30), y:f.y, vy:1.9, r:11, k, ph:0});
+          dropCoins(f.x, f.y, 8);
           float(f.x, f.y-46, "BOSS DOWN!", "#ffe66d"); S.big();
-        } else S.boom();
+        } else { S.boom(); if (Math.random() < .55) dropCoins(f.x, f.y, 1); }
         foes.splice(i,1);
       }
     }
@@ -630,7 +666,7 @@ function gameOver(){
   burst(ship.x, ship.y, 50, "#ff2fd0", 7, 50);
   shake = 30; S.dead();
   const s = Math.floor(score), rec = s > best;
-  try { window.parent.postMessage({ type: "nimiq-run", slug: "shooter", score: s, durationSec: gameT / 60, wave: wave, kills: kills, maxCombo: maxCombo }, window.location.origin); } catch (e) {}
+  try { window.parent.postMessage({ type: "nimiq-run", slug: "shooter", score: s, durationSec: gameT / 60, wave: wave, kills: kills, maxCombo: maxCombo, coins: coinsGot }, window.location.origin); } catch (e) {}
   if (rec){ best = s; localStorage.setItem("cosnimiq.best", best); }
   document.getElementById("overTitle").textContent = rec ? "NEW RECORD!" : "GAME OVER";
   document.getElementById("fScore").textContent = s;
@@ -745,6 +781,10 @@ function drawHUD(){
   glow("#00ffff", 12, () => { ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(s, 14, 12); });
   ctx.font = "bold 13px 'Trebuchet MS',sans-serif";
   ctx.fillStyle = "#7fd8ff"; ctx.textAlign = "left"; ctx.fillText("BEST " + best, 14, 42);
+  drawCoin(24, 84, 9, 0);
+  ctx.fillStyle = "#ffe066"; ctx.font = "900 15px 'Trebuchet MS',sans-serif";
+  ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(String(coinsGot), 38, 84);
+  ctx.textBaseline = "top";
   ctx.textAlign = "right";
   glow("#ff2fd0", 10, () => { ctx.fillStyle = "#ff8ee8";
     ctx.font = "900 17px 'Trebuchet MS',sans-serif"; ctx.fillText("WAVE " + wave, W-14, 14); });
@@ -820,6 +860,7 @@ function draw(){
 
   /* orbs */
   for (const o of orbs){
+    if (o.k === "C"){ drawCoin(o.x, o.y, o.r, o.ph); continue; }
     const col = o.k === "P" ? "#0ff" : o.k === "H" ? "#4dff9e" : o.k === "L" ? "#ff3bd0" : "#ffe66d";
     ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.ph);
     glow(col, 20, () => {

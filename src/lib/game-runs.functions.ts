@@ -112,8 +112,13 @@ const submitSchema = z.object({
 }).refine((d) => d.inputs.every((v) => v <= MAX_INPUT[d.slug]), "Input out of range");
 
 export type SubmitGameRunResult =
-  | { saved: true; score: number }
-  | { saved: false; reason: "not-signed-in" | "invalid-session" | "not-better" | "error"; score?: number };
+  | { saved: true; score: number; coinsEarned?: number }
+  | {
+      saved: false;
+      reason: "not-signed-in" | "invalid-session" | "not-better" | "error";
+      score?: number;
+      coinsEarned?: number;
+    };
 
 /**
  * The only way a score can reach the leaderboard. The client sends its
@@ -176,6 +181,9 @@ export const submitGameRun = createServerFn({ method: "POST" })
     // The client's input log is the only untrusted input from here on. The
     // score below is computed entirely server-side from the seed + inputs.
     const result = simulatorFor(data.slug)(session.seed, data.inputs);
+    // Coins are replayed server-side too, so the client cannot invent them.
+    const { awardCoins } = await import("./coins.server");
+    const coinsEarned = await awardCoins(wallet, (result as { coins?: number }).coins ?? 0);
     if (session.league_id) {
       const { recordLeagueScore } = await import("./leagues.server");
       await recordLeagueScore(session.league_id, wallet, data.slug, result.score,
@@ -195,16 +203,16 @@ export const submitGameRun = createServerFn({ method: "POST" })
     if (existing) {
       const current = Number(existing.value);
       const better = game.order === "asc" ? result.score < current : result.score > current;
-      if (!better) return { saved: false, reason: "not-better", score: result.score };
+      if (!better) return { saved: false, reason: "not-better", score: result.score, coinsEarned };
     }
 
     const { error } = await supabaseAdmin.from("scores").upsert(
       { wallet, game_slug: data.slug, value: result.score, updated_at: new Date().toISOString() },
       { onConflict: "wallet,game_slug" },
     );
-    if (error) return { saved: false, reason: "error", score: result.score };
+    if (error) return { saved: false, reason: "error", score: result.score, coinsEarned };
 
-    return { saved: true, score: result.score };
+    return { saved: true, score: result.score, coinsEarned };
   });
 
 const telemetrySchema = z.object({
@@ -215,6 +223,7 @@ const telemetrySchema = z.object({
   wave: z.number().int().min(0).max(10_000),
   kills: z.record(z.string().max(20), z.number().int().min(0).max(100_000)),
   maxCombo: z.number().int().min(0).max(100_000).optional(),
+  coins: z.number().int().min(0).max(100_000).optional(),
 });
 
 /**
@@ -277,6 +286,15 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
       return { saved: false, reason: "invalid-session" };
     }
 
+    // Reported coins are clamped to what the run could plausibly yield.
+    const totalKills = Object.values(data.kills).reduce((sum, n) => sum + n, 0);
+    const { maxPlausibleCoins } = await import("./coins");
+    const { awardCoins } = await import("./coins.server");
+    const coinsEarned = await awardCoins(
+      wallet,
+      Math.min(data.coins ?? 0, maxPlausibleCoins(totalKills, data.durationSec)),
+    );
+
     const score = Math.floor(data.score);
     if (session.league_id) {
       const { recordLeagueScore } = await import("./leagues.server");
@@ -288,12 +306,14 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
       .eq("wallet", wallet)
       .eq("game_slug", data.slug)
       .maybeSingle();
-    if (existing && score <= Number(existing.value)) return { saved: false, reason: "not-better", score };
+    if (existing && score <= Number(existing.value)) {
+      return { saved: false, reason: "not-better", score, coinsEarned };
+    }
 
     const { error } = await supabaseAdmin.from("scores").upsert(
       { wallet, game_slug: data.slug, value: score, updated_at: new Date().toISOString() },
       { onConflict: "wallet,game_slug" },
     );
-    if (error) return { saved: false, reason: "error", score };
-    return { saved: true, score };
+    if (error) return { saved: false, reason: "error", score, coinsEarned };
+    return { saved: true, score, coinsEarned };
   });

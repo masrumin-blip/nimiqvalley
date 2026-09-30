@@ -42,6 +42,7 @@ function Index() {
     bossActive: false,
     bossHp: 0,
     bossName: "",
+    coins: 0,
   });
   const [hiscore, setHiscore] = useState(0);
   const [playerColor, setPlayerColor] = useState<PlayerColor>("yellow");
@@ -101,6 +102,7 @@ function Index() {
             durationSec: game.playSeconds,
             wave: game.wave,
             kills: game.kills,
+            coins: game.coins,
           },
         }).catch(() => {});
       }
@@ -327,8 +329,11 @@ function Index() {
             <strong className="text-right text-[9px]">{hud.enemies}</strong>
             <span className="opacity-65">SCORE</span>
             <strong className="text-right text-[9px] text-[color:var(--neon-magenta)]">{hud.score}</strong>
+            <span className="opacity-65">COINS</span>
+            <strong className="text-right text-[9px] text-[#ffe066]">{hud.coins}</strong>
             <span className="opacity-65">BEST</span>
             <strong className="text-right text-[8px]">{hiscore}</strong>
+
           </section>
         </aside>
       )}

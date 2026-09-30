@@ -37,6 +37,7 @@ function ShooterRoute() {
         wave?: number;
         kills?: Record<string, number>;
         maxCombo?: number;
+        coins?: number;
       };
       if (data?.slug !== "shooter") return;
       if (data.type === "nimiq-start") {
@@ -59,6 +60,7 @@ function ShooterRoute() {
             wave: Math.floor(Number(data.wave) || 0),
             kills: data.kills ?? {},
             maxCombo: Math.floor(Number(data.maxCombo) || 0),
+            coins: Math.max(0, Math.floor(Number(data.coins) || 0)),
           },
         }).catch(() => {});
       }

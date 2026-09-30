@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { KeyRound, Loader2, MessageCircle } from "lucide-react";
+import { Coins, KeyRound, Loader2, MessageCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { CoinPurse } from "@/components/CoinPurse";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +25,7 @@ const KEY_PACKS: KeyPack[] = [
   { id: "season", keys: 10, label: "Season pack", note: "Ten online matches" },
 ];
 
-export type ShopTab = "keys" | "chat";
+export type ShopTab = "keys" | "chat" | "coins";
 
 const usdtFor = (nim: number, usd: number) => Math.max(0.0001, Math.ceil(nim * usd * 10_000) / 10_000);
 
@@ -137,8 +138,13 @@ export function KeyShopDialog({
         <div className="flex gap-1 rounded-xl bg-muted/50 p-1">
           {tabBtn("keys", "Match keys", KeyRound)}
           {tabBtn("chat", "AI chat", MessageCircle)}
+          {tabBtn("coins", "Coins", Coins)}
         </div>
 
+        {tab === "coins" ? (
+          <CoinPurse enabled={open} />
+        ) : (
+        <>
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">Pay with</span>
           <div className="flex gap-1 rounded-full bg-muted/50 p-1">
@@ -250,6 +256,9 @@ export function KeyShopDialog({
               I already paid, check again
             </Button>
           </div>
+        )}
+
+        </>
         )}
 
         {credits && (

@@ -2,7 +2,9 @@ import type { ReactElement } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { startGameRun, submitGameRun } from "@/lib/game-runs.functions";
+import { drawHexCoin } from "@/lib/coin-art";
 import { currentLeagueId } from "@/lib/verification-info";
+
 import {
   GROUND,
   PLAYER_H,
@@ -448,7 +450,7 @@ function IconGlyph({ kind }: { kind: EntityKind }) {
   return <svg className="tut-icon" viewBox="0 0 24 24" aria-hidden="true">{shapes[kind]}</svg>;
 }
 
-function synth(type: "jump" | "slash" | "hit" | "kill", muted: boolean) {
+function synth(type: "jump" | "slash" | "hit" | "kill" | "coin", muted: boolean) {
   if (muted || typeof window === "undefined") return;
   const AudioCtx = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioCtx) return;
@@ -461,7 +463,9 @@ function synth(type: "jump" | "slash" | "hit" | "kill", muted: boolean) {
     slash: [760, 180, 0.08],
     hit: [120, 42, 0.2],
     kill: [420, 900, 0.09],
+    coin: [980, 1580, 0.08],
   };
+
   const config = tones[type];
   osc.type = type === "hit" ? "sawtooth" : "square";
   osc.frequency.setValueAtTime(config[0], now);
@@ -480,6 +484,8 @@ export function MininjaGame() {
   const [phase, setPhase] = useState<Phase>("ready");
   const [score, setScore] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [coins, setCoins] = useState(0);
+
 
   // Seeds come from the server so runs can be verified by replay.
   const nextSessionRef = useRef<{ sessionId: string; seed: number } | null>(null);
@@ -503,6 +509,8 @@ export function MininjaGame() {
     const seed = session?.seed ?? Math.floor(Math.random() * 2 ** 31);
     gameRef.current = freshGame("playing", seed, session?.sessionId ?? null);
     setScore(0);
+    setCoins(0);
+
     setPhase("playing");
     void prefetchSession();
   }, [prefetchSession]);
@@ -524,6 +532,8 @@ export function MininjaGame() {
   const exitToMenu = useCallback(() => {
     gameRef.current = freshGame("ready");
     setScore(0);
+    setCoins(0);
+
     setPhase("ready");
   }, []);
 
@@ -590,14 +600,20 @@ export function MininjaGame() {
             synth("kill", mutedRef.current);
             for (let i = 0; i < 13; i++) g.particles.push({ x: k.x, y: k.y, vx: -120 + Math.random() * 250, vy: -180 + Math.random() * 260, life: 0.45, color: i % 2 ? "#ff43c7" : "#34edff", size: 3 + Math.random() * 5 });
           }
+          for (const c of ev.coins) {
+
+            synth("coin", mutedRef.current);
+            for (let i = 0; i < 8; i++) g.particles.push({ x: c.x, y: c.y, vx: -80 + Math.random() * 160, vy: -160 + Math.random() * 120, life: 0.4, color: i % 2 ? "#ffe066" : "#fff3a8", size: 3 + Math.random() * 4 });
+          }
           if (ev.died) {
+
             g.phase = "gameover"; synth("hit", mutedRef.current);
             const finalScore = finalMininjaScore(g);
             const savedBest = Number(window.localStorage.getItem("neon-ninja-best") ?? 0);
             const nextBest = Math.max(savedBest, finalScore);
             window.localStorage.setItem("neon-ninja-best", String(nextBest));
             bestRef.current = nextBest;
-            setScore(finalScore); setPhase("gameover");
+            setScore(finalScore); setCoins(g.coinsGot); setPhase("gameover");
             // Only the input log is sent; the server replays it to compute the score.
             const sessionId = g.sessionId;
             g.sessionId = null;
@@ -609,18 +625,24 @@ export function MininjaGame() {
         g.particles.forEach((p) => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; p.life -= dt; });
         g.particles = g.particles.filter((p) => p.life > 0).slice(-60);
         hudTick += dt;
-        if (hudTick > 0.12) { setScore(Math.floor(g.score)); hudTick = 0; }
+        if (hudTick > 0.12) { setScore(Math.floor(g.score)); setCoins(g.coinsGot); hudTick = 0; }
       }
 
       // World is drawn zoomed out; HUD and overlays stay in canvas pixel space.
       ctx.setTransform(CAMERA_SCALE, 0, 0, CAMERA_SCALE, 0, 0);
       drawCity(ctx, g.cityOffset);
       g.entities.forEach((e) => drawEntity(ctx, e));
+      g.coins.forEach((c) => drawHexCoin(ctx, c.x, c.y, c.r, c.age));
+
       g.particles.forEach((p) => { ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; });
       drawNinja(ctx, g);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.textAlign = "left"; ctx.fillStyle = "#eafbff"; ctx.font = "800 24px sans-serif"; ctx.fillText(String(Math.floor(g.score)).padStart(6, "0"), 30, 48);
       ctx.fillStyle = "#44ebff"; ctx.font = "700 14px sans-serif"; ctx.fillText(`LEVEL ${1 + Math.floor(g.activeTime / 15)}`, 31, 71);
+      // Coin purse counter, kept apart from the score on purpose.
+      drawHexCoin(ctx, 40, 96, 11, 0);
+      ctx.fillStyle = "#ffe066"; ctx.font = "800 16px sans-serif"; ctx.fillText(String(g.coinsGot), 56, 102);
+
       drawOverlay(g);
       frame = requestAnimationFrame(loop);
     };
@@ -638,8 +660,9 @@ export function MininjaGame() {
           <h1>NIMIQ MININJA</h1>
         </div>
         <div className="header-actions">
-          
+          <span className="coin-tally" title="Coins collected this run">🪙 {coins}</span>
           <button className="icon-button" type="button" onClick={setSound} aria-label={muted ? "Unmute sound" : "Mute sound"} title={muted ? "Unmute" : "Mute"}>
+
             {muted ? <VolumeX /> : <Volume2 />}
           </button>
           <button className="icon-button" type="button" onClick={togglePause} aria-label={phase === "paused" ? "Resume game" : "Pause game"} title={phase === "paused" ? "Resume" : "Pause"} disabled={phase === "ready" || phase === "gameover"}>

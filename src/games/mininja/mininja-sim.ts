@@ -35,6 +35,17 @@ export type Entity = {
   baseY?: number;
 };
 
+/** Pure reward pickup: never changes the score, only the player coin purse. */
+export type Coin = {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  age: number;
+};
+
+export const COIN_R = 20;
+
 export interface MininjaSim {
   tick: number;
   over: boolean;
@@ -50,6 +61,9 @@ export interface MininjaSim {
   activeTime: number;
   spawnIn: number;
   entities: Entity[];
+  coins: Coin[];
+  coinIn: number;
+  coinsGot: number;
   nextId: number;
   cityOffset: number;
 }
@@ -58,8 +72,10 @@ export interface MininjaEvents {
   jumped: boolean;
   slashed: boolean;
   kills: { x: number; y: number }[];
+  coins: { x: number; y: number }[];
   died: boolean;
 }
+
 
 type Rng = () => number;
 
@@ -79,7 +95,11 @@ export function createMininjaSim(): MininjaSim {
     activeTime: 0,
     spawnIn: 1.35,
     entities: [],
+    coins: [],
+    coinIn: 2.1,
+    coinsGot: 0,
     nextId: 1,
+
     cityOffset: 0,
   };
 }
@@ -125,9 +145,27 @@ function spawn(g: MininjaSim, rng: Rng) {
   g.spawnIn = (clearDistance + variationDistance) / g.speed;
 }
 
+/**
+ * Coins are a reward currency only: they never touch the score, so the
+ * leaderboard stays pure while players still earn something to redeem.
+ * Spawned from the same seeded rng so the server replay matches the browser.
+ */
+function spawnCoins(g: MininjaSim, rng: Rng) {
+  const high = rng() < 0.45;
+  // Low coins are grabbed while running; high coins sit inside the jump arc.
+  const y = high ? GROUND - 196 : GROUND - 62;
+  const count = 2 + Math.floor(rng() * 3);
+  const gap = 78;
+  for (let i = 0; i < count; i++) {
+    g.coins.push({ id: g.nextId++, x: VIEW + 40 + i * gap, y, r: COIN_R, age: 0 });
+  }
+  g.coinIn = 2.4 + rng() * 2.6;
+}
+
 /** Advances one fixed tick, mutating `g`. */
 export function stepMininja(g: MininjaSim, rng: Rng, jump: boolean, slash: boolean): MininjaEvents {
-  const ev: MininjaEvents = { jumped: false, slashed: false, kills: [], died: false };
+  const ev: MininjaEvents = { jumped: false, slashed: false, kills: [], coins: [], died: false };
+
   if (g.over) return ev;
   g.tick += 1;
   const dt = TICK_DT;
@@ -149,6 +187,10 @@ export function stepMininja(g: MininjaSim, rng: Rng, jump: boolean, slash: boole
   g.score += dt * (12 + g.speed / 40);
   g.spawnIn -= dt;
   if (g.spawnIn <= 0) spawn(g, rng);
+  g.coinIn -= dt;
+  // Only drop coins on a clear stretch so they never sit inside an obstacle.
+  if (g.coinIn <= 0 && g.spawnIn > 0.85) spawnCoins(g, rng);
+
   if (!g.grounded) {
     g.vy += GRAVITY * dt;
     g.y += g.vy * dt;
@@ -196,8 +238,26 @@ export function stepMininja(g: MininjaSim, rng: Rng, jump: boolean, slash: boole
     }
   }
   g.entities = g.entities.filter((e) => e.x + e.w > -30 && !e.dead);
+
+  for (const coin of g.coins) {
+    coin.x -= g.speed * dt;
+    coin.age += dt;
+    if (
+      !g.over &&
+      PLAYER_X + 9 < coin.x + coin.r &&
+      PLAYER_X + PLAYER_W - 9 > coin.x - coin.r &&
+      g.y + 8 < coin.y + coin.r &&
+      g.y + PLAYER_H > coin.y - coin.r
+    ) {
+      coin.age = -1; // marked as collected
+      g.coinsGot += 1;
+      ev.coins.push({ x: coin.x, y: coin.y });
+    }
+  }
+  g.coins = g.coins.filter((c) => c.age >= 0 && c.x + c.r > -30);
   return ev;
 }
+
 
 /** Inputs are encoded as `tick * 2 + action` (0 = jump, 1 = slash). */
 export function encodeMininjaInput(tick: number, action: 0 | 1) {
@@ -213,5 +273,5 @@ export function simulateMininjaRun(seed: number, inputs: ReadonlyArray<number>, 
   const set = new Set(inputs);
   const g = createMininjaSim();
   for (let t = 0; t < maxTicks && !g.over; t++) stepMininja(g, rng, set.has(t * 2), set.has(t * 2 + 1));
-  return { score: finalMininjaScore(g), ticks: g.tick, died: g.over };
+  return { score: finalMininjaScore(g), ticks: g.tick, died: g.over, coins: g.coinsGot };
 }

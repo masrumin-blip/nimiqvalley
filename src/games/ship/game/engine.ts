@@ -25,6 +25,8 @@ export type Hud = {
   /** 0..1 health of the current boss */
   bossHp: number;
   bossName: string;
+  /** coins picked up this run (reward currency, never part of the score) */
+  coins: number;
 };
 
 export type PlayerColor = "yellow" | "orange" | "magenta" | "lime";
@@ -74,6 +76,16 @@ type Pickup = {
 };
 
 
+/** Reward coin: worth NIM later, worth zero score now. */
+type Coin = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  ph: number;
+};
+
 type Particle = {
   x: number;
   y: number;
@@ -105,6 +117,7 @@ type Mote = {
 };
 
 import { playSfx } from "@/lib/sfx";
+import { drawHexCoin } from "@/lib/coin-art";
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
@@ -211,6 +224,9 @@ export class Game {
   private rings: Ring[] = [];
   private motes: Mote[] = [];
   private pickups: Pickup[] = [];
+  private coinDrops: Coin[] = [];
+  /** Coins collected this run; reported separately from the score. */
+  coins = 0;
   private rapidT = 0;
   private shieldT = 0;
   private doubleT = 0;
@@ -280,6 +296,8 @@ export class Game {
     this.particles = [];
     this.rings = [];
     this.pickups = [];
+    this.coinDrops = [];
+    this.coins = 0;
     this.rapidT = 0;
     this.shieldT = 0;
     this.doubleT = 0;
@@ -328,6 +346,7 @@ export class Game {
       bossActive: !!boss,
       bossHp: boss ? Math.max(0, boss.hp / boss.maxHp) : 0,
       bossName: boss?.name ?? "",
+      coins: this.coins,
     });
   }
 
@@ -495,6 +514,22 @@ export class Game {
     });
   }
 
+  /** Enemies scatter a few coins; bosses always drop a handful. */
+  private dropCoins(x: number, y: number, count: number) {
+    for (let i = 0; i < count; i++) {
+      const a = rand(0, Math.PI * 2);
+      const sp = rand(40, 130);
+      this.coinDrops.push({
+        x: clamp(x, 20, W - 20),
+        y: clamp(y, 20, H - 20),
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        life: 11,
+        ph: rand(0, Math.PI * 2),
+      });
+    }
+  }
+
   private explode(x: number, y: number) {
     this.burst(x, y, 45, 34, 1.5);
     this.rings.push({ x, y, r: 8, vr: 460, life: 0.35, max: 0.35, hue: 45 });
@@ -520,6 +555,7 @@ export class Game {
     if (!this.doublePermanent) this.doubleT = Math.max(0, this.doubleT - dt);
     if (this.ammo > this.ammoCap) this.ammo = this.ammoCap;
     if (hadBuff) this.pushHud();
+
 
     // pickups
     for (const p of this.pickups) {
@@ -551,6 +587,36 @@ export class Game {
       }
     }
     this.pickups = this.pickups.filter((p) => p.life > 0);
+
+    // coins
+    let grabbed = 0;
+    for (const coin of this.coinDrops) {
+      coin.life -= dt;
+      coin.ph += dt * 3.4;
+      coin.x += coin.vx * dt;
+      coin.y += coin.vy * dt;
+      coin.vx *= 1 - dt * 2.2;
+      coin.vy *= 1 - dt * 2.2;
+      coin.x = clamp(coin.x, 16, W - 16);
+      coin.y = clamp(coin.y, 16, H - 16);
+      const d = Math.hypot(coin.x - this.px, coin.y - this.py);
+      if (d < 120) {
+        // gentle magnet so coins feel good to collect
+        coin.x += ((this.px - coin.x) / d) * 190 * dt;
+        coin.y += ((this.py - coin.y) / d) * 190 * dt;
+      }
+      if (d < this.pr + 14) {
+        coin.life = 0;
+        this.coins += 1;
+        grabbed++;
+        this.burst(coin.x, coin.y, 48, 8, 0.5);
+      }
+    }
+    if (grabbed > 0) {
+      playSfx("score", 0.25);
+      this.pushHud();
+    }
+    this.coinDrops = this.coinDrops.filter((c) => c.life > 0);
 
 
     // waves
@@ -878,8 +944,10 @@ export class Game {
             life: 16,
           });
         });
+        this.dropCoins(e.x, e.y, 6);
       } else {
         this.dropPickup(e.x, e.y);
+        if (Math.random() < 0.55) this.dropCoins(e.x, e.y, e.kind === "brute" ? 3 : 1);
       }
     }
     if (before !== this.enemies.length) this.pushHud();
@@ -1043,7 +1111,17 @@ export class Game {
       c.shadowBlur = 0;
     }
 
+    // coins
+    for (const coin of this.coinDrops) {
+      const fade = coin.life < 3 && Math.floor(this.t * 8) % 2 === 0 ? 0.4 : 1;
+      c.save();
+      c.globalAlpha = fade;
+      drawHexCoin(c, coin.x, coin.y + Math.sin(this.t * 4 + coin.ph) * 2, 11, coin.ph);
+      c.restore();
+    }
+
     // pickups
+
     for (const p of this.pickups) {
       const col = p.kind === "rapid" ? "#ffd84d" : p.kind === "shield" ? "#fff238" : p.kind === "repair" ? "#4dff9b" : "#ff4db8";
       const bob = Math.sin(this.t * 4 + p.x) * 2.5;

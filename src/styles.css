@@ -1043,7 +1043,9 @@ canvas{
   .tag.pink{ color: oklch(0.95 0.05 350); background: oklch(0.45 0.2 345 / .5); border: 1px solid oklch(0.72 0.22 346); }
   .tag.cyan{ color: oklch(0.93 0.1 205); background: oklch(0.35 0.12 220 / .55); border: 1px solid oklch(0.76 0.16 210); }
   .tag.purple{ color: oklch(0.92 0.09 305); background: oklch(0.38 0.13 300 / .55); border: 1px solid oklch(0.66 0.2 300); }
+  .coin-tally{ display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font: 800 13px var(--font-display); color: oklch(0.92 0.16 95); background: oklch(0.3 0.09 90 / .6); border: 1px solid oklch(0.82 0.17 92); }
   @media (max-width: 700px){.tutorial-panel{ grid-template-columns: 1fr; }}
+
   @media (max-width: 520px){.game-shell{ padding: 8px 7px 16px; }
 .game-header{ margin-bottom: 7px; }
 .score-chip{ display: none; }
