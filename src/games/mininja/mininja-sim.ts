@@ -152,9 +152,9 @@ function spawn(g: MininjaSim, rng: Rng) {
  */
 function spawnCoins(g: MininjaSim, rng: Rng) {
   const high = rng() < 0.45;
-  // Low coins ride at chest height so a running ninja always sweeps them up;
+  // Low coins ride at head height so a plain run always sweeps them up;
   // high coins sit inside the jump arc.
-  const y = high ? GROUND - 186 : GROUND - PLAYER_H * 0.55;
+  const y = high ? GROUND - 186 : GROUND - PLAYER_H * 0.95;
   const count = 2 + Math.floor(rng() * 3);
   const gap = 78;
   for (let i = 0; i < count; i++) {
@@ -242,10 +242,10 @@ export function stepMininja(g: MininjaSim, rng: Rng, jump: boolean, slash: boole
 
   // Pickup box covers the whole ninja, and the coin's travel this tick is
   // swept so a fast run can never tunnel straight past a coin.
-  const grabLeft = PLAYER_X - 6;
-  const grabRight = PLAYER_X + PLAYER_W + 6;
-  const grabTop = g.y - 6;
-  const grabBottom = g.y + PLAYER_H + 6;
+  const grabLeft = PLAYER_X - 10;
+  const grabRight = PLAYER_X + PLAYER_W + 10;
+  const grabTop = g.y - 18;
+  const grabBottom = g.y + PLAYER_H + 18;
   for (const coin of g.coins) {
     const prevX = coin.x;
     coin.x -= g.speed * dt;

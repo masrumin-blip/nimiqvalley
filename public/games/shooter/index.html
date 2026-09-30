@@ -181,28 +181,21 @@ function dropCoins(x, y, n){
     orbs.push({x: x + rnd(-26, 26), y: y + rnd(-14, 14), vy: rnd(1.2, 2.2), r: 11, k: "C", ph: rnd(0, TAU)});
 }
 
-/* Flat-topped yellow hexagon coin. */
+/* Plain yellow flat-topped hexagon, same silhouette as the Nimiq logo. */
 function drawCoin(x, y, r, ph){
-  const sq = .55 + .45 * Math.abs(Math.cos(ph * 2.2));
-  ctx.save(); ctx.translate(x, y); ctx.scale(sq, 1);
-  const g = ctx.createLinearGradient(0, -r, 0, r);
-  g.addColorStop(0, "#fff3a8"); g.addColorStop(.45, "#ffe066"); g.addColorStop(1, "#f5a300");
-  ctx.shadowColor = "#ffd400"; ctx.shadowBlur = 16;
+  const bob = Math.sin(ph * 2.2) * r * 0.06;
+  ctx.save(); ctx.translate(x, y + bob);
   ctx.beginPath();
   for (let i = 0; i < 6; i++){
-    const a = Math.PI/3 * i + Math.PI/6;
+    const a = Math.PI/3 * i;
     const px = Math.cos(a)*r, py = Math.sin(a)*r;
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
-  ctx.closePath(); ctx.fillStyle = g; ctx.fill();
-  ctx.shadowBlur = 0; ctx.lineWidth = Math.max(1.2, r*.12); ctx.strokeStyle = "#9a6a00"; ctx.stroke();
-  ctx.beginPath();
-  for (let i = 0; i < 6; i++){
-    const a = Math.PI/3 * i + Math.PI/6;
-    const px = Math.cos(a)*r*.48, py = Math.sin(a)*r*.48;
-    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-  }
-  ctx.closePath(); ctx.strokeStyle = "rgba(154,106,0,.85)"; ctx.lineWidth = Math.max(1, r*.1); ctx.stroke();
+  ctx.closePath();
+  ctx.fillStyle = "#f6c244";
+  ctx.shadowColor = "#ffd400"; ctx.shadowBlur = 14;
+  ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.restore();
 }
 

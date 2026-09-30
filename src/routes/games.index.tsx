@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { MessagesSquare, ShieldCheck, Trophy } from "lucide-react";
+import { Coins, MessagesSquare, ShieldCheck, Trophy } from "lucide-react";
 import { useState } from "react";
 import { KeyShopDialog } from "@/components/KeyShopDialog";
 import { PlayerBadge } from "@/components/PlayerBadge";
@@ -75,6 +75,18 @@ function GameHub() {
               Leagues
             </Link>
             <KeyShopDialog />
+            <KeyShopDialog
+              initialTab="coins"
+              trigger={
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-black uppercase tracking-wide text-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <Coins className="size-4" aria-hidden="true" />
+                  Redeem Coins
+                </button>
+              }
+            />
             {admin.data?.isAdmin === true && (
               <Link
                 to="/admin/leagues"
