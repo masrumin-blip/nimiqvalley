@@ -2,7 +2,9 @@ import { Canvas } from "@react-three/fiber";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Scene, type Controls } from "./Scene";
-import { reportScore } from "@/lib/report-score";
+import { startGameRun, submitTelemetryRun } from "@/lib/game-runs.functions";
+import { currentLeagueId } from "@/lib/verification-info";
+
 
 type Phase = "ready" | "playing" | "over";
 
@@ -31,9 +33,10 @@ export function RooftopGame() {
   const [impact, setImpact] = useState(false);
   const deathTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deathPending = useRef(false);
+  const sessionRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const stored = Number(localStorage.getItem("nimiq-rooftop-best-coins") ?? 0);
+    const stored = Number(localStorage.getItem("nimiq-rooftop-best-meters") ?? 0);
     if (!Number.isNaN(stored)) setBest(stored);
   }, []);
 
@@ -47,29 +50,58 @@ export function RooftopGame() {
     setSpeed(15);
     setRunId((r) => r + 1);
     controls.current = { left: false, right: false, jumpQueued: false };
+    // One-time server ticket for this run; guests simply play without saving.
+    sessionRef.current = null;
+    void startGameRun({ data: { slug: "rooftop", leagueId: currentLeagueId() } })
+      .then((res) => {
+        sessionRef.current = res.sessionId;
+      })
+      .catch(() => {});
     setPhase("playing");
   }, []);
 
-  const onDead = useCallback((c: number, m: number, cause: "obstacle" | "fall") => {
-    if (deathPending.current) return;
-    deathPending.current = true;
-    setImpact(cause === "obstacle");
-    reportScore("rooftop", c);
-    setCoins(c);
-    setMeters(m);
-    deathTimer.current = setTimeout(
-      () => {
-        setImpact(false);
-        setPhase("over");
-        setBest((b) => {
-          const next = Math.max(b, c);
-          localStorage.setItem("nimiq-rooftop-best-coins", String(next));
-          return next;
-        });
-      },
-      cause === "obstacle" ? 180 : 0,
-    );
-  }, []);
+  const onDead = useCallback(
+    (
+      run: { coins: number; meters: number; seconds: number; jumps: number },
+      cause: "obstacle" | "fall",
+    ) => {
+      if (deathPending.current) return;
+      deathPending.current = true;
+      setImpact(cause === "obstacle");
+      const sessionId = sessionRef.current;
+      sessionRef.current = null;
+      if (sessionId) {
+        void submitTelemetryRun({
+          data: {
+            slug: "rooftop",
+            sessionId,
+            score: run.meters,
+            durationSec: run.seconds,
+            wave: 0,
+            kills: {},
+            jumps: run.jumps,
+            coins: run.coins,
+          },
+        }).catch(() => {});
+      }
+      setCoins(run.coins);
+      setMeters(run.meters);
+      deathTimer.current = setTimeout(
+        () => {
+          setImpact(false);
+          setPhase("over");
+          setBest((b) => {
+            const next = Math.max(b, run.meters);
+            localStorage.setItem("nimiq-rooftop-best-meters", String(next));
+            return next;
+          });
+        },
+        cause === "obstacle" ? 180 : 0,
+      );
+    },
+    [],
+  );
+
 
   useEffect(
     () => () => {
@@ -144,18 +176,22 @@ export function RooftopGame() {
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
         <div className="rounded-2xl border border-game-gold/40 bg-game-panel/75 px-4 py-2.5 shadow-[var(--shadow-panel)] backdrop-blur-xl">
-          <div className="text-[10px] uppercase tracking-[0.3em] opacity-55">Coins</div>
-          <div className="mt-0.5 flex items-center gap-2">
-            <HexCoin className="h-6 w-6 drop-shadow-[0_0_10px_var(--game-coin)]" />
-            <span className="font-[family-name:var(--font-display)] text-4xl leading-none tracking-wide">
-              {coins}
-            </span>
+          <div className="text-[10px] uppercase tracking-[0.3em] opacity-55">Distance</div>
+          <div className="mt-0.5 font-[family-name:var(--font-display)] text-4xl leading-none tracking-wide">
+            {meters}
+            <span className="ml-1 text-lg opacity-70">m</span>
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.22em] opacity-50">{meters} m</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <HexCoin className="h-4 w-4 drop-shadow-[0_0_10px_var(--game-coin)]" />
+            <span className="text-[11px] uppercase tracking-[0.2em] opacity-60">{coins}</span>
+          </div>
         </div>
         <div className="rounded-2xl border border-game-gold/40 bg-game-panel/75 px-4 py-2.5 text-right shadow-[var(--shadow-panel)] backdrop-blur-xl">
           <div className="text-[10px] uppercase tracking-[0.3em] opacity-55">Best</div>
-          <div className="font-[family-name:var(--font-display)] text-2xl leading-none">{best}</div>
+          <div className="font-[family-name:var(--font-display)] text-2xl leading-none">
+            {best}m
+          </div>
+
           <div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-game-ink/15">
             <div
               className="h-full rounded-full bg-gradient-to-r from-game-gold to-game-flame transition-all duration-300"

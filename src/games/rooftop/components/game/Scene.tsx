@@ -76,7 +76,11 @@ type Props = {
   playing: boolean;
   controls: React.RefObject<Controls>;
   onScore: (coins: number, meters: number, speed: number) => void;
-  onDead: (coins: number, meters: number, cause: "obstacle" | "fall") => void;
+  onDead: (
+    run: { coins: number; meters: number; seconds: number; jumps: number },
+    cause: "obstacle" | "fall",
+  ) => void;
+
   runId: number;
 };
 
@@ -309,6 +313,8 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
     step: 0,
     coyote: 0,
     coins: 0,
+    jumps: 0,
+
     time: 0,
   });
   const milestone = useRef(0);
@@ -335,7 +341,9 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
       step: 0,
       coyote: 0,
       coins: 0,
+      jumps: 0,
       time: 0,
+
     };
     milestone.current = 0;
     if (player.current) player.current.position.set(0, 0, 0);
@@ -373,7 +381,9 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
         s.vy = JUMP_V;
         s.grounded = false;
         s.coyote = 0;
+        s.jumps += 1;
         playSfx("jump", 0.7);
+
       }
       c.jumpQueued = false;
 
@@ -423,13 +433,20 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
         s.dead = true;
         playSfx("collision");
         playSfx("gameover", 0.7);
-        onDead(s.coins, Math.floor(s.z), "obstacle");
+        onDead(
+          { coins: s.coins, meters: Math.floor(s.z), seconds: s.time, jumps: s.jumps },
+          "obstacle",
+        );
       }
 
       if (s.y < -14 && !s.dead) {
         s.dead = true;
         playSfx("gameover", 0.7);
-        onDead(s.coins, Math.floor(s.z), "fall");
+        onDead(
+          { coins: s.coins, meters: Math.floor(s.z), seconds: s.time, jumps: s.jumps },
+          "fall",
+        );
+
       }
 
       const last = list.current[list.current.length - 1]!;

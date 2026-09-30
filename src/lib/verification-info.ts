@@ -32,6 +32,8 @@ export const LEAGUE_GAMES = [
   { slug: "jump", name: "Jump for Nimiq", path: "/games/jump", method: "replay" },
   { slug: "ship", name: "Nimiq Spaceship", path: "/games/ship", method: "telemetry" },
   { slug: "shooter", name: "CosNimiq Shooter", path: "/games/shooter", method: "telemetry" },
+  { slug: "rooftop", name: "Nimiq Rooftop", path: "/games/rooftop", method: "telemetry" },
+
 ] as const satisfies ReadonlyArray<{ slug: string; name: string; path: string; method: VerifyMethod }>;
 
 export type LeagueSlug = (typeof LEAGUE_GAMES)[number]["slug"];

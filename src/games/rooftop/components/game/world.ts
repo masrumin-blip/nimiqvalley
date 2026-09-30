@@ -177,10 +177,11 @@ function makeObstacles(p: Platform, d: number): Obstacle[] {
 function makeCoins(p: Platform, prev: Platform): Coin[] {
   const out: Coin[] = [];
   // Arc of coins floating over the gap — rewards a well-timed jump.
+  // Coins are deliberately sparse: only some gaps carry an arc at all.
   const gapStart = prev.z + prev.len;
   const gapLen = p.z - gapStart;
-  if (gapLen > 2) {
-    const n = Math.max(3, Math.round(gapLen / 2.6));
+  if (gapLen > 2 && Math.random() < 0.55) {
+    const n = Math.max(1, Math.round(gapLen / 2.6 / 1.7));
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       out.push({
@@ -195,8 +196,8 @@ function makeCoins(p: Platform, prev: Platform): Coin[] {
     }
   }
   // A short run of coins along the roof.
-  if (Math.random() < 0.75 && p.len > 12) {
-    const n = 3 + Math.floor(Math.random() * 3);
+  if (Math.random() < 0.4 && p.len > 12) {
+    const n = 1 + Math.floor(Math.random() * 2);
     const laneX = p.x + rand(-1, 1) * (p.w / 2 - 2);
     const startZ = p.z + 4 + Math.random() * Math.max(1, p.len - 12);
     for (let i = 0; i < n; i++) {
@@ -205,6 +206,7 @@ function makeCoins(p: Platform, prev: Platform): Coin[] {
   }
   return out;
 }
+
 
 export function makeNext(prev: Platform, distance: number): Platform {
   const d = difficultyAt(distance);

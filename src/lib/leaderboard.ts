@@ -26,7 +26,7 @@ export const LEADERBOARD_GAMES: LeaderboardGame[] = [
   { slug: "race", name: "Nimiq Car Race", metric: "Best lap", order: "asc", format: time },
   { slug: "hexaman", name: "Nimiq the Hexaman", metric: "Score", order: "desc", format: plain },
   { slug: "mininja", name: "Nimiq Mininja", metric: "Score", order: "desc", format: plain },
-  { slug: "rooftop", name: "Nimiq Rooftop", metric: "Coins", order: "desc", format: plain },
+  { slug: "rooftop", name: "Nimiq Rooftop", metric: "Metres", order: "desc", format: plain },
   { slug: "slide", name: "Nimiq Slide", metric: "Score", order: "desc", format: plain },
   { slug: "soccer", name: "Nimiq Soccer", metric: "Wins", order: "desc", format: plain },
   { slug: "tappy", name: "Nimiq Tappy", metric: "Score", order: "desc", format: plain },

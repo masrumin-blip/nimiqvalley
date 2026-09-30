@@ -223,7 +223,9 @@ const telemetrySchema = z.object({
   wave: z.number().int().min(0).max(10_000),
   kills: z.record(z.string().max(20), z.number().int().min(0).max(100_000)),
   maxCombo: z.number().int().min(0).max(100_000).optional(),
+  jumps: z.number().int().min(0).max(100_000).optional(),
   coins: z.number().int().min(0).max(100_000).optional(),
+
 });
 
 /**

@@ -4,7 +4,7 @@
  * combination that the game's own scoring rules could not have produced.
  */
 
-export const TELEMETRY_GAMES = ["ship", "shooter"] as const;
+export const TELEMETRY_GAMES = ["ship", "shooter", "rooftop"] as const;
 export type TelemetrySlug = (typeof TELEMETRY_GAMES)[number];
 
 export interface TelemetryRun {
@@ -16,7 +16,18 @@ export interface TelemetryRun {
   kills: Record<string, number>;
   /** Highest combo reached (shooter only). */
   maxCombo?: number | undefined;
+  /** Jumps performed (rooftop only). */
+  jumps?: number | undefined;
 }
+
+/**
+ * Nimiq Rooftop physics ceiling — run speed starts at 15 m/s, ramps to 35 m/s
+ * and the timed boost tops out at 1.7x, so 59.5 m/s can never be exceeded.
+ */
+const ROOFTOP_MAX_SPEED = 35 * 1.7;
+/** A jump hangs ~0.84s in the air, so jumps can never outpace that cadence. */
+const ROOFTOP_MIN_JUMP_GAP = 0.3;
+
 
 /** Nimiq Spaceship — mirrors SCORES in src/games/ship/game/engine.ts. */
 const SHIP_SCORES: Record<string, number> = {
@@ -40,7 +51,17 @@ export function checkTelemetry(slug: TelemetrySlug, run: TelemetryRun, serverEla
   // In-game time can never exceed real time since the server issued the ticket.
   if (durationSec > serverElapsedSec + 5) return "duration-mismatch";
 
+  if (slug === "rooftop") {
+    // Score is distance in metres; it can never beat the physics speed cap.
+    if (score > durationSec * ROOFTOP_MAX_SPEED + 30) return "distance-too-far";
+    if (Object.keys(kills).length > 0) return "unknown-enemy";
+    const jumps = run.jumps ?? 0;
+    if (jumps > durationSec / ROOFTOP_MIN_JUMP_GAP + 2) return "jump-rate";
+    return null;
+  }
+
   const table = slug === "ship" ? SHIP_SCORES : SHOOTER_SCORES;
+
   for (const k of Object.keys(kills)) if (!(k in table)) return "unknown-enemy";
 
   const n = totalKills(kills);
