@@ -34,9 +34,14 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(async () 
   const { requireAdmin, treasuryNim } = await import("./admin.server");
   await requireAdmin();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: leagues }, { data: payouts }] = await Promise.all([
+  const [{ data: leagues }, { data: payouts }, { data: redemptions }] = await Promise.all([
     supabaseAdmin.from("leagues").select("id, title, token, pool, status, ends_at"),
     supabaseAdmin.from("league_payouts").select("*").order("claimed_at", { ascending: false }).limit(300),
+    supabaseAdmin
+      .from("coin_redemptions")
+      .select("id, wallet, coins, nim_amount, status, tx_hash, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
   const byId = new Map((leagues ?? []).map((l) => [l.id, l]));
   const now = Date.now();
