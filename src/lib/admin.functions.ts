@@ -63,12 +63,23 @@ export const adminOverview = createServerFn({ method: "GET" }).handler(async () 
       claimedAt: p.claimed_at,
     };
   });
+  const coinRows: AdminRedemption[] = (redemptions ?? []).map((r) => ({
+    id: r.id,
+    wallet: r.wallet,
+    coins: Number(r.coins),
+    nim: Number(r.nim_amount),
+    status: r.status,
+    txHash: r.tx_hash,
+    createdAt: r.created_at,
+  }));
   return {
     activeLeagues: active.length,
     poolNim: sum("nim"),
     poolUsdt: sum("usdt"),
     pending: rows.filter((r) => r.status === "pending"),
     paid: rows.filter((r) => r.status === "paid"),
+    coinPending: coinRows.filter((r) => r.status === "pending"),
+    coinPaid: coinRows.filter((r) => r.status === "paid"),
     treasuryNim: treasuryNim(),
   };
 });
