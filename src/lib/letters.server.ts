@@ -110,10 +110,10 @@ function txMemo(tx: RawTx): string {
 }
 
 /**
- * Find a fresh NIM transfer to the recipient with the exact amount.
- * When opts.memo is given, the recipient's incoming transactions are searched and the
- * transfer must carry that memo (sender does not need to match — the memo proves intent).
- * Otherwise the sender's transactions are searched and the sender must match.
+ * Find a fresh NIM transfer from the sender to the recipient with the exact amount.
+ * When opts.memo is given, the recipient's incoming transactions are searched (Nimiq Pay
+ * settles through a relayer contract, so `from` is not the real payer); the sender must
+ * still appear in the transaction and the memo must match, unless the relayer stripped it.
  */
 export async function findNimTransfer(
   sender: string,
@@ -126,7 +126,8 @@ export async function findNimTransfer(
   const maxAge = opts.maxAgeMs ?? 15 * 60_000;
   const byRecipient = Boolean(opts.memo);
   const memoNeedle = (opts.memo ?? "").toLowerCase();
-  const sinceMs = opts.since ? new Date(opts.since).getTime() - 60_000 : 0;
+  const sinceRaw = opts.since ? new Date(opts.since).getTime() : NaN;
+  const sinceMs = Number.isFinite(sinceRaw) ? sinceRaw - 60_000 : 0;
   for (;;) {
     const raw = await nimRpc<RawTx[]>("getTransactionsByAddress", [norm(byRecipient ? recipient : sender), 50, null]);
     if (Array.isArray(raw)) {
@@ -134,11 +135,11 @@ export async function findNimTransfer(
         const hash = String(tx.hash ?? "").toLowerCase();
         const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
         const ts = typeof tx.timestamp === "number" ? (tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp) : Date.now();
-        const senderOk = byRecipient ? true : norm(tx.from ?? tx.sender ?? "") === norm(sender);
-        // Contract txs (Nimiq Pay) carry no plain memo; matching the recipient in relatedAddresses is enough.
+        // The payer is either the direct sender or, for relayer payments, one of relatedAddresses.
+        const senderOk = addressInTx(tx, sender);
+        // Relayer txs may carry no plain memo; then the payer address in the tx proves intent.
         const memoOk = byRecipient
-          ? txMemo(tx).toLowerCase().includes(memoNeedle) ||
-            (isContractTx(tx) && (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === norm(recipient)))
+          ? txMemo(tx).toLowerCase().includes(memoNeedle) || (isContractTx(tx) && !txMemo(tx))
           : true;
         if (
           hash.length >= 8 &&
