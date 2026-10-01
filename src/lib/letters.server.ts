@@ -93,6 +93,14 @@ function recipientMatches(tx: RawTx, recipient: string): boolean {
   return (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === want);
 }
 
+/** True when the address is the tx sender, the tx recipient, or a relayer-related party. */
+function addressInTx(tx: RawTx, address: string): boolean {
+  const want = norm(address);
+  if (!want) return false;
+  if (norm(tx.from ?? tx.sender ?? "") === want) return true;
+  return (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === want);
+}
+
 function hexToText(hex: string): string {
   try {
     const clean = hex.replace(/^0x/, "");
