@@ -95,11 +95,11 @@ interface NpcState extends VillageNpc {
 }
 
 const PALETTE = {
-  grassA: "#8ed081",
-  grassB: "#6fbf73",
-  grassDeep: "#4f9e5d",
-  path: "#e6d3a3",
-  pathEdge: "#cbb185",
+  grassA: "#8cbf6a",
+  grassB: "#6fa65a",
+  grassDeep: "#557f45",
+  path: "#d9b98a",
+  pathEdge: "#a8875c",
   water: "#63c7e8",
   waterDeep: "#2f9fce",
   ocean: "#277da1",
@@ -191,9 +191,13 @@ function drawHouseSprite(
   const [sx, sy, sw, sh] = crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "rgba(30,60,40,0.18)";
+  ctx.fillStyle = "rgba(150,118,74,0.45)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 8, dw * 0.38, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 10, dw * 0.48, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(40,48,28,0.26)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 8, dw * 0.38, 12, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, x - dw / 2, y - dh + 12, dw, dh);
   if (mine) {
@@ -462,8 +466,23 @@ function drawBuildingSprite(ctx: CanvasRenderingContext2D, image: HTMLImageEleme
   const [sx, sy, sw, sh] = building.crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
+  // packed-earth footprint + soft contact shadow so the building sits on the ground
+  ctx.fillStyle = "rgba(150,118,74,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(building.x, building.y + 10, building.width * 0.5, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(40,48,28,0.26)";
+  ctx.beginPath();
+  ctx.ellipse(building.x, building.y + 8, building.width * 0.42, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, building.x - building.width / 2, building.y - building.height + 18, building.width, building.height);
   ctx.restore();
+}
+
+/** Deterministic pseudo-random in [0,1) so ground details stay put every frame. */
+function hash01(n: number): number {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
 }
 
 function drawAnimalSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, animal: AnimalSpot, t: number) {
