@@ -89,7 +89,33 @@ export const REST_SPOTS: RestSpot[] = [
   { id: "rain", name: "Misty Forest", x: 650, y: 1680, kind: "campfire", radius: 210 },
 ];
 
+/** Small satellite islets in the open-water corners, each linked to the main island by a plank bridge. */
+export const ISLETS = [
+  { id: "nw", x: 165, y: 140, rx: 120, ry: 88, bridge: { x1: 340, y1: 300, x2: 220, y2: 190 }, hut: { x: 130, y: 120, w: 64, h: 30 } },
+  { id: "se", x: 2440, y: 1815, rx: 120, ry: 88, bridge: { x1: 2260, y1: 1650, x2: 2385, y2: 1765 }, hut: null },
+] as const;
+const BRIDGE_HALF = 22;
+
+function onBridge(x: number, y: number): boolean {
+  for (const { bridge: b } of ISLETS) {
+    const dx = b.x2 - b.x1, dy = b.y2 - b.y1;
+    const t = Math.max(0, Math.min(1, ((x - b.x1) * dx + (y - b.y1) * dy) / (dx * dx + dy * dy)));
+    if (Math.hypot(x - (b.x1 + dx * t), y - (b.y1 + dy * t)) <= BRIDGE_HALF) return true;
+  }
+  return false;
+}
+
 export function insideIsland(x: number, y: number, padding = 0): boolean {
+  for (const i of ISLETS) {
+    const rx = i.rx - padding, ry = i.ry - padding;
+    if (rx > 0 && ry > 0 && ((x - i.x) / rx) ** 2 + ((y - i.y) / ry) ** 2 <= 1) return true;
+  }
+  // Bridges are walkable for characters, but never chosen as tree spots (large padding).
+  if (padding < 50 && onBridge(x, y)) return true;
+  return insideMain(x, y, padding);
+}
+
+function insideMain(x: number, y: number, padding: number): boolean {
   const rx = 1210 - padding;
   const ry = 885 - padding;
   if (rx <= 0 || ry <= 0) return false;
@@ -179,6 +205,7 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
   for(const b of BUILDINGS){
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
+  for(const i of ISLETS) if(i.hut) rects.push({x:i.hut.x-i.hut.w/2,y:i.hut.y-i.hut.h,w:i.hut.w,h:i.hut.h});
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
   for(const animal of ANIMALS){
     const size = ANIMAL_FOOTPRINTS[animal.kind];

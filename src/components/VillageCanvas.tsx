@@ -21,6 +21,7 @@ import houseTierSprites from "@/assets/village-house-tiers.png";
 import {
   ANIMALS,
   BUILDINGS,
+  ISLETS,
   buildColliders,
   buildTrees,
   circleBlocked,
@@ -187,17 +188,15 @@ function drawHouseSprite(
   mine: boolean,
   t: number,
 ) {
-  const { crop, width: dw, height: dh } = HOUSE_SPRITES[tier];
+  const { crop, width: dw, height: dh, footprint } = HOUSE_SPRITES[tier];
   const [sx, sy, sw, sh] = crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "rgba(150,118,74,0.45)";
+  // thin contact shadow hugging the wall base (footprint), not the sprite's front steps
+  const baseY = y + footprint.bottom - 4;
+  ctx.fillStyle = "rgba(40,48,28,0.24)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 10, dw * 0.48, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(40,48,28,0.26)";
-  ctx.beginPath();
-  ctx.ellipse(x, y + 8, dw * 0.38, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, baseY, footprint.width * 0.56, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, x - dw / 2, y - dh + 12, dw, dh);
   if (mine) {
@@ -466,14 +465,11 @@ function drawBuildingSprite(ctx: CanvasRenderingContext2D, image: HTMLImageEleme
   const [sx, sy, sw, sh] = building.crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  // packed-earth footprint + soft contact shadow so the building sits on the ground
-  ctx.fillStyle = "rgba(150,118,74,0.45)";
+  // thin contact shadow along the solid wall base so it never spills onto paths
+  const [ox, oy, cw, ch] = building.collider;
+  ctx.fillStyle = "rgba(40,48,28,0.24)";
   ctx.beginPath();
-  ctx.ellipse(building.x, building.y + 10, building.width * 0.5, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(40,48,28,0.26)";
-  ctx.beginPath();
-  ctx.ellipse(building.x, building.y + 8, building.width * 0.42, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(building.x + ox + cw / 2, building.y + oy + ch - 3, cw * 0.56, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, building.x - building.width / 2, building.y - building.height + 18, building.width, building.height);
   ctx.restore();
@@ -816,6 +812,61 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       islandPath(ctx, 28);
       ctx.fillStyle = PALETTE.sand;
       ctx.fill();
+
+      // satellite islets + plank bridges
+      for (const isl of ISLETS) {
+        const layers: [number, string][] = [[0, PALETTE.wetSand], [16, PALETTE.sand], [40, PALETTE.grassA]];
+        for (const [inset, color] of layers) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.ellipse(isl.x, isl.y, isl.rx + 18 - inset, isl.ry + 18 - inset, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const b = isl.bridge;
+        const ang = Math.atan2(b.y2 - b.y1, b.x2 - b.x1);
+        const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1);
+        ctx.save();
+        ctx.translate(b.x1, b.y1);
+        ctx.rotate(ang);
+        ctx.fillStyle = "rgba(20,40,60,0.25)";
+        ctx.fillRect(-10, -20, len + 20, 44);
+        ctx.fillStyle = "#6b4a2b";
+        for (let px = 0; px <= len; px += 46) ctx.fillRect(px - 3, -24, 7, 48);
+        for (let px = -8; px < len + 8; px += 9) {
+          ctx.fillStyle = (px / 9) % 2 < 1 ? "#b48a58" : "#a27a4b";
+          ctx.fillRect(px, -19, 8, 38);
+        }
+        ctx.fillStyle = "#7a5634";
+        ctx.fillRect(-8, -21, len + 16, 3);
+        ctx.fillRect(-8, 18, len + 16, 3);
+        ctx.restore();
+        if (isl.hut) {
+          const h = isl.hut;
+          ctx.fillStyle = "rgba(40,48,28,0.24)";
+          ctx.beginPath();
+          ctx.ellipse(h.x, h.y - 2, h.w * 0.6, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#9c6b3f";
+          ctx.fillRect(h.x - h.w / 2, h.y - 40, h.w, 40);
+          ctx.fillStyle = "#5a3a22";
+          ctx.fillRect(h.x - 8, h.y - 22, 16, 22);
+          ctx.fillStyle = "#b5523a";
+          ctx.beginPath();
+          ctx.moveTo(h.x - h.w / 2 - 10, h.y - 38);
+          ctx.lineTo(h.x, h.y - 70);
+          ctx.lineTo(h.x + h.w / 2 + 10, h.y - 38);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          // small boat dock on the outer edge
+          ctx.fillStyle = "#a27a4b";
+          ctx.fillRect(isl.x + 40, isl.y + 30, 70, 18);
+          ctx.fillStyle = "#c0603f";
+          ctx.beginPath();
+          ctx.ellipse(isl.x + 95, isl.y + 66, 26, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
 
       // grass
       const grad = ctx.createLinearGradient(0, 0, 0, WORLD_H);
