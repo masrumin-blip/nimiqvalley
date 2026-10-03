@@ -95,11 +95,11 @@ interface NpcState extends VillageNpc {
 }
 
 const PALETTE = {
-  grassA: "#8ed081",
-  grassB: "#6fbf73",
-  grassDeep: "#4f9e5d",
-  path: "#e6d3a3",
-  pathEdge: "#cbb185",
+  grassA: "#8cbf6a",
+  grassB: "#6fa65a",
+  grassDeep: "#557f45",
+  path: "#d9b98a",
+  pathEdge: "#a8875c",
   water: "#63c7e8",
   waterDeep: "#2f9fce",
   ocean: "#277da1",
@@ -191,9 +191,13 @@ function drawHouseSprite(
   const [sx, sy, sw, sh] = crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "rgba(30,60,40,0.18)";
+  ctx.fillStyle = "rgba(150,118,74,0.45)";
   ctx.beginPath();
-  ctx.ellipse(x, y + 8, dw * 0.38, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 10, dw * 0.48, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(40,48,28,0.26)";
+  ctx.beginPath();
+  ctx.ellipse(x, y + 8, dw * 0.38, 12, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, x - dw / 2, y - dh + 12, dw, dh);
   if (mine) {
@@ -462,8 +466,23 @@ function drawBuildingSprite(ctx: CanvasRenderingContext2D, image: HTMLImageEleme
   const [sx, sy, sw, sh] = building.crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
+  // packed-earth footprint + soft contact shadow so the building sits on the ground
+  ctx.fillStyle = "rgba(150,118,74,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(building.x, building.y + 10, building.width * 0.5, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(40,48,28,0.26)";
+  ctx.beginPath();
+  ctx.ellipse(building.x, building.y + 8, building.width * 0.42, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, building.x - building.width / 2, building.y - building.height + 18, building.width, building.height);
   ctx.restore();
+}
+
+/** Deterministic pseudo-random in [0,1) so ground details stay put every frame. */
+function hash01(n: number): number {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
 }
 
 function drawAnimalSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, animal: AnimalSpot, t: number) {
@@ -805,64 +824,113 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       ctx.fillStyle = grad;
       islandPath(ctx, 72);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      for (let gx = 0; gx < WORLD_W; gx += 90) {
-        for (let gy = 0; gy < WORLD_H; gy += 90) {
-          const px = gx + ((gy / 90) % 2) * 45;
-          if (((Math.abs(px - WORLD_W / 2) / 1138) ** 4 + (Math.abs(gy - WORLD_H / 2) / 813) ** 4) <= 1) ctx.fillRect(px, gy, 44, 44);
+      // organic grass: soft darker patches + small tufts (deterministic, no flicker)
+      const inIsland = (px: number, py: number) =>
+        (Math.abs(px - WORLD_W / 2) / 1138) ** 4 + (Math.abs(py - WORLD_H / 2) / 813) ** 4 <= 1;
+      ctx.fillStyle = "rgba(70,110,50,0.16)";
+      for (let i = 0; i < 46; i++) {
+        const px = hash01(i * 3.1) * WORLD_W;
+        const py = hash01(i * 7.7) * WORLD_H;
+        if (!inIsland(px, py)) continue;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 60 + hash01(i) * 90, 30 + hash01(i * 2) * 45, hash01(i * 5) * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "rgba(60,100,45,0.55)";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      for (let gx = 0; gx < WORLD_W; gx += 80) {
+        for (let gy = 0; gy < WORLD_H; gy += 80) {
+          const k = gx * 0.37 + gy * 1.13;
+          const px = gx + hash01(k) * 70;
+          const py = gy + hash01(k + 9) * 70;
+          if (!inIsland(px, py)) continue;
+          ctx.moveTo(px - 4, py);
+          ctx.lineTo(px - 6, py - 7);
+          ctx.moveTo(px, py);
+          ctx.lineTo(px, py - 9);
+          ctx.moveTo(px + 4, py);
+          ctx.lineTo(px + 6, py - 7);
         }
       }
+      ctx.stroke();
 
       // paths
-      ctx.strokeStyle = PALETTE.pathEdge;
-      ctx.lineWidth = 78;
       ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      const segments: Array<Array<[number, number]>> = [
+        [[120, 960], [2480, 960]],
+        [[1300, 120], [1300, 1840]],
+        [[480, 410], [1300, 960]],
+        [[2020, 430], [1300, 960]],
+        [[560, 1325], [1300, 960]],
+        [[2050, 1370], [1300, 960]],
+        [[650, 275], [900, 520], [1300, 960]],
+        [[1990, 285], [1700, 570], [1300, 960]],
+        [[2320, 850], [1900, 900], [1300, 960]],
+        [[2000, 1680], [1740, 1440], [1300, 960]],
+        [[650, 1680], [900, 1420], [1300, 960]],
+      ];
       const drawPaths = () => {
         ctx.beginPath();
-        ctx.moveTo(120, 960);
-        ctx.lineTo(2480, 960);
-        ctx.moveTo(1300, 120);
-        ctx.lineTo(1300, 1840);
-        ctx.moveTo(480, 410);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(2020, 430);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(560, 1325);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(2050, 1370);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(650, 275);
-        ctx.lineTo(900, 520);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(1300, 210);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(1990, 285);
-        ctx.lineTo(1700, 570);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(2320, 850);
-        ctx.lineTo(1900, 900);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(2000, 1680);
-        ctx.lineTo(1740, 1440);
-        ctx.lineTo(1300, 960);
-        ctx.moveTo(650, 1680);
-        ctx.lineTo(900, 1420);
-        ctx.lineTo(1300, 960);
+        for (const seg of segments) {
+          seg.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+        }
         ctx.stroke();
       };
+      // worn grass margin
+      ctx.strokeStyle = "rgba(170,150,90,0.35)";
+      ctx.lineWidth = 96;
+      drawPaths();
+      ctx.strokeStyle = PALETTE.pathEdge;
+      ctx.lineWidth = 74;
       drawPaths();
       ctx.strokeStyle = PALETTE.path;
-      ctx.lineWidth = 66;
+      ctx.lineWidth = 62;
+      drawPaths();
+      ctx.strokeStyle = "rgba(240,215,170,0.45)";
+      ctx.lineWidth = 26;
       drawPaths();
 
-      // plaza
+      // plaza (cobbled)
+      ctx.fillStyle = PALETTE.pathEdge;
+      ctx.beginPath();
+      ctx.arc(1300, 960, 190, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = PALETTE.path;
       ctx.beginPath();
-      ctx.arc(1300, 960, 180, 0, Math.PI * 2);
+      ctx.arc(1300, 960, 178, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = PALETTE.pathEdge;
-      ctx.lineWidth = 8;
-      ctx.stroke();
+      ctx.strokeStyle = "rgba(140,108,70,0.35)";
+      ctx.lineWidth = 3;
+      for (const r of [60, 110, 150]) {
+        ctx.beginPath();
+        ctx.arc(1300, 960, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // pebbles scattered along paths
+      ctx.fillStyle = "rgba(130,104,72,0.55)";
+      let pi = 0;
+      for (const seg of segments) {
+        for (let s = 1; s < seg.length; s++) {
+          const [ax, ay] = seg[s - 1]!;
+          const [bx, by] = seg[s]!;
+          const len = Math.hypot(bx - ax, by - ay);
+          const nx = -(by - ay) / len;
+          const ny = (bx - ax) / len;
+          for (let d = 20; d < len; d += 46) {
+            pi++;
+            const off = (hash01(pi) - 0.5) * 70;
+            const px = ax + ((bx - ax) * d) / len + nx * off;
+            const py = ay + ((by - ay) * d) / len + ny * off;
+            ctx.beginPath();
+            ctx.ellipse(px, py, 3 + hash01(pi * 3) * 3, 2 + hash01(pi * 5) * 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
 
       // pond
       ctx.fillStyle = PALETTE.waterDeep;
