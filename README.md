@@ -1,34 +1,56 @@
 # 🌾 NimiqValley
 
-An interactive Web3 portfolio village and arcade hub powered by **Nimiq** 
+> An interactive Web3 portfolio village, retro arcade portal, and community hub powered by **Nimiq** and **Polygon**.
 
-## ✨ Highlights
+NimiqValley connects on-chain crypto assets with interactive gameplay. Built as a dual-chain application, it runs seamlessly in standard web browsers and inside the **Nimiq Pay** mobile wallet as a native Mini App.
 
-- **Interactive Village:** Explore the 2.5D village, talk with AI villagers, and visit the on-chain Post Office.
-- **15 Retro Games:** Arcade mini-games featuring server-side anti-cheat and verified leaderboards.
-- **Crypto Leagues:** Community tournaments with automated prize pools paid in **NIM** and **USDT**.
-- **Shop & Economy:** Key shop and AI passes with real-time NIM/USDT pricing.
+---
 
-## 🛠 Tech Stack
+## 🌟 Core Highlights
 
-- **Frontend & Fullstack:** TanStack Start v1 (React 19), Tailwind CSS v4
-- **Database:** PostgreSQL (Lovable Cloud / Supabase) with Row-Level Security
-- **Web3:** Nimiq RPC 2.0 (Albatross) & Polygon (USDT ERC-20 via Viem)
+- **Interactive 2.5D Village:** A living canvas world with day/night cycles, ambient wildlife, and player houses that dynamically evolve based on live wallet balances (*Poor* to *Sultan* tiers).
+- **On-Chain Post Office:** Send and receive peer-to-peer crypto letters with verified **NIM** and **USDT** gifts attached.
+- **15 Arcade & Multiplayer Games:** A retro game suite featuring single-player games with server-side anti-cheat telemetry and real-time 1v1 PvP modes (Soccer, Checkers, Carrom).
+- **Dual-Token Economy:** Earn in-game coins through gameplay and redeem them for real nimiq coins from the treasury. Buy match keys and AI passes with real-time price feeds.
+- **Crypto Leagues & Tournaments:** Create or compete in community-funded leagues with automated on-chain payouts in NIM or USDT.
+- **Social Arena & AI Villagers:** Global and direct player messaging, plus AI-powered NPC companions with distinct lore and personalities.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Full-Stack Framework:** [TanStack Start v1](https://tanstack.com/start) (React 19, Server Functions, SSR)
+- **Styling:** Tailwind CSS v4
+- **Database & Realtime:** Lovable Cloud (PostgreSQL with Row-Level Security)
+- **Web3 Ecosystem:**
+  - `@nimiq/mini-app-sdk` & `@nimiq/core` (Albatross 2.0 RPC) — Nimiq L1 operations
+  - `viem` — Polygon EVM interactions (USDT ERC-20 transfers)
+
+---
 
 ## 🔐 Required Secrets
 
-Set these in your server environment / secrets settings:
+Set these in your server environment / secrets configuration:
 
-- `ADMIN_WALLETS` – Admin Nimiq wallet addresses (`NQ...`).
-- `LEAGUE_TREASURY_NIM` – Treasury address for NIM deposits.
-- `LEAGUE_TREASURY_POLYGON` – Treasury address for USDT on Polygon (`0x...`).
-- `LEAGUE_TREASURY_POLYGON_KEY` – Private key for USDT automated payouts.
-- `SESSION_SECRET` – Random 32+ char string for session encryption.
+| Variable | Description |
+| :--- | :--- |
+| `SESSION_SECRET` | 32+ character random secret for player session encryption |
+| `ADMIN_WALLETS` | Comma-separated admin Nimiq wallet addresses (`NQ...`) |
+| `LEAGUE_TREASURY_NIM` | Public Nimiq address holding league and redemption funds |
+| `LEAGUE_TREASURY_POLYGON` | Public Polygon address (`0x...`) holding USDT deposits |
+| `LEAGUE_TREASURY_POLYGON_KEY` | Private key for automated Polygon USDT prize distribution |
+| `CRON_SECRET` | Bearer token securing background league settlement tasks |
+
+---
 
 ## 🚀 Quick Start
 
+### 1. Installation
 ```bash
 git clone https://github.com/masrumin-blip/nimiqvalley.git
 cd nimiqvalley
 bun install    # or npm install
 bun dev        # or npm run dev
+bun run build
+bun run preview
+
