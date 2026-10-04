@@ -10,6 +10,9 @@ import npcPipi from "@/assets/npc-pipi.png";
 import npcMomo from "@/assets/npc-momo.png";
 import npcElder from "@/assets/npc-elder.png";
 import npcQueen from "@/assets/npc-queen.png";
+import npcFisher from "@/assets/npc-fisher.png";
+import isletNw from "@/assets/islet-nw.png";
+import isletSe from "@/assets/islet-se.png";
 import animalSprites from "@/assets/village-animals.png";
 import buildingSpritesA from "@/assets/village-buildings-a.png";
 import buildingSpritesB from "@/assets/village-buildings-b.png";
@@ -52,7 +55,7 @@ const CHARACTER_SPRITES: Record<TierId, string> = {
   cool: playerCool,
   sultan: playerSultan,
 };
-const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen];
+const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen, npcFisher];
 /** Every bitmap the village draws; preloaded before the map is shown. */
 const VILLAGE_ASSET_SOURCES = [
   playerPoor,
@@ -192,12 +195,6 @@ function drawHouseSprite(
   const [sx, sy, sw, sh] = crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  // thin contact shadow hugging the wall base (footprint), not the sprite's front steps
-  const baseY = y + footprint.bottom - 4;
-  ctx.fillStyle = "rgba(40,48,28,0.24)";
-  ctx.beginPath();
-  ctx.ellipse(x, baseY, footprint.width * 0.56, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, x - dw / 2, y - dh + 12, dw, dh);
   if (mine) {
     const bob = Math.sin(t / 380) * 4;
@@ -465,12 +462,6 @@ function drawBuildingSprite(ctx: CanvasRenderingContext2D, image: HTMLImageEleme
   const [sx, sy, sw, sh] = building.crop;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  // thin contact shadow along the solid wall base so it never spills onto paths
-  const [ox, oy, cw, ch] = building.collider;
-  ctx.fillStyle = "rgba(40,48,28,0.24)";
-  ctx.beginPath();
-  ctx.ellipse(building.x + ox + cw / 2, building.y + oy + ch - 3, cw * 0.56, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
   ctx.drawImage(image, sx, sy, sw, sh, building.x - building.width / 2, building.y - building.height + 18, building.width, building.height);
   ctx.restore();
 }
@@ -659,6 +650,9 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     barnImage.src = barnSprite;
     const objectImage = new Image();
     objectImage.src = objectSprites;
+    const isletImages = { nw: new Image(), se: new Image() };
+    isletImages.nw.src = isletNw;
+    isletImages.se.src = isletSe;
     const houseImage = new Image();
     houseImage.src = houseTierSprites;
     let colliderTier = tiersRef.current.houseTier;
@@ -813,15 +807,8 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       ctx.fillStyle = PALETTE.sand;
       ctx.fill();
 
-      // satellite islets + plank bridges
+      // satellite islets (pixel-art sprites) + plank bridges
       for (const isl of ISLETS) {
-        const layers: [number, string][] = [[0, PALETTE.wetSand], [16, PALETTE.sand], [40, PALETTE.grassA]];
-        for (const [inset, color] of layers) {
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.ellipse(isl.x, isl.y, isl.rx + 18 - inset, isl.ry + 18 - inset, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
         const b = isl.bridge;
         const ang = Math.atan2(b.y2 - b.y1, b.x2 - b.x1);
         const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1);
@@ -840,31 +827,12 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         ctx.fillRect(-8, -21, len + 16, 3);
         ctx.fillRect(-8, 18, len + 16, 3);
         ctx.restore();
-        if (isl.hut) {
-          const h = isl.hut;
-          ctx.fillStyle = "rgba(40,48,28,0.24)";
-          ctx.beginPath();
-          ctx.ellipse(h.x, h.y - 2, h.w * 0.6, 7, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#9c6b3f";
-          ctx.fillRect(h.x - h.w / 2, h.y - 40, h.w, 40);
-          ctx.fillStyle = "#5a3a22";
-          ctx.fillRect(h.x - 8, h.y - 22, 16, 22);
-          ctx.fillStyle = "#b5523a";
-          ctx.beginPath();
-          ctx.moveTo(h.x - h.w / 2 - 10, h.y - 38);
-          ctx.lineTo(h.x, h.y - 70);
-          ctx.lineTo(h.x + h.w / 2 + 10, h.y - 38);
-          ctx.closePath();
-          ctx.fill();
-        } else {
-          // small boat dock on the outer edge
-          ctx.fillStyle = "#a27a4b";
-          ctx.fillRect(isl.x + 40, isl.y + 30, 70, 18);
-          ctx.fillStyle = "#c0603f";
-          ctx.beginPath();
-          ctx.ellipse(isl.x + 95, isl.y + 66, 26, 10, 0, 0, Math.PI * 2);
-          ctx.fill();
+        const img = isletImages[isl.id];
+        if (img.complete && img.naturalWidth > 0) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, isl.img.x, isl.img.y, isl.img.w, isl.img.h);
+          ctx.restore();
         }
       }
 
@@ -1014,6 +982,18 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         drawables.push({ y: building.y, draw: () => {
           const image = building.sheet === "post" ? postOfficeImage : building.sheet === "barn" ? barnImage : building.sheet === "house-windmill" ? houseWindmillImage : building.sheet === "a" ? buildingImageA : buildingImageB;
           if (image.complete && image.naturalWidth > 0) drawBuildingSprite(ctx, image, building);
+        } });
+      // islet house/roof redrawn so characters walking behind it are hidden
+      for (const isl of ISLETS)
+        drawables.push({ y: isl.solid[0]!.y + isl.solid[0]!.h, draw: () => {
+          const img = isletImages[isl.id];
+          if (!img.complete || img.naturalWidth === 0) return;
+          const kx = img.naturalWidth / isl.img.w, ky = img.naturalHeight / isl.img.h;
+          const r = isl.roof;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, (r.x - isl.img.x) * kx, (r.y - isl.img.y) * ky, r.w * kx, r.h * ky, r.x, r.y, r.w, r.h);
+          ctx.restore();
         } });
       for (const tr of trees)
         drawables.push({ y: tr.y, draw: () => drawTreeSprite(ctx, objectImage, tr.x, tr.y, tr.scale, tr.kind) });

@@ -205,6 +205,8 @@ export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "headphones-loop", name: "Momo", x: 1530, y: 720, spriteRow: 3, speed: 50, idleMs: 1100, path: [{x:1530,y:720},{x:1760,y:960},{x:1530,y:1210},{x:1280,y:960}] },
   { id: "elder-walk", name: "Elder Nuo", x: 690, y: 650, spriteRow: 4, speed: 34, idleMs: 1900, path: [{x:690,y:650},{x:850,y:650},{x:930,y:650},{x:930,y:750},{x:950,y:760},{x:1300,y:960},{x:840,y:1190},{x:560,y:1380},{x:520,y:900},{x:640,y:900},{x:690,y:890}] },
   { id: "queen-parade", name: "Queen Aya", x: 2070, y: 570, spriteRow: 5, speed: 38, idleMs: 1800, path: [{x:2070,y:570},{x:1740,y:760},{x:1450,y:960},{x:1830,y:1160},{x:2290,y:1020}] },
+  // Old fisherman: strolls the south-east shore and keeps crossing the bridge to his island homestead.
+  { id: "fisherman", name: "Pak Bayu", x: 2100, y: 1700, spriteRow: 6, speed: 36, idleMs: 2200, path: [{x:2100,y:1700},{x:2150,y:1770},{x:2262,y:1862},{x:2290,y:1868},{x:2380,y:1880},{x:2510,y:1860},{x:2380,y:1880},{x:2290,y:1868},{x:2262,y:1862},{x:2150,y:1770}] },
 ];
 
 function rng(seed: number) { let s=seed; return () => ((s=(s*1664525+1013904223)%4294967296)/4294967296); }
