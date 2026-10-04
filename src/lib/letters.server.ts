@@ -149,6 +149,7 @@ export async function findNimTransfer(
           : true;
         if (
           hash.length >= 8 &&
+          tx.executionResult !== false &&
           senderOk &&
           recipientMatches(tx, recipient) &&
           Math.abs(value - nim) < 0.00001 &&
