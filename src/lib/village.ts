@@ -21,7 +21,7 @@ export interface BuildingSpot {
 }
 export type AnimalKind = "cow" | "pig" | "sheep" | "chicken" | "frog" | "butterfly";
 export interface AnimalSpot { id: string; kind: AnimalKind; x: number; y: number; phase: number; range?: number }
-export type NpcSpriteRow = 0 | 1 | 2 | 3 | 4 | 5;
+export type NpcSpriteRow = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export interface VillageNpc {
   id: string; name: string; x: number; y: number; spriteRow: NpcSpriteRow;
   speed: number; idleMs: number; path: Array<{ x: number; y: number }>;
@@ -241,7 +241,7 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
   for(const b of BUILDINGS){
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
-  for(const i of ISLETS) if(i.hut) rects.push({x:i.hut.x-i.hut.w/2,y:i.hut.y-i.hut.h,w:i.hut.w,h:i.hut.h});
+  for(const i of ISLETS) for(const s of i.solid) rects.push({...s});
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
   for(const animal of ANIMALS){
     const size = ANIMAL_FOOTPRINTS[animal.kind];
