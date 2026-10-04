@@ -98,7 +98,7 @@ export const submitScore = createServerFn({ method: "POST" })
 
     // These games are verified by server-side replay (see game-runs.functions.ts);
     // a raw claimed score is never accepted for them.
-    if (["tappy", "crossing", "mininja", "jump", "ship", "shooter"].includes(data.slug)) {
+    if (["tappy", "crossing", "mininja", "jump", "ship", "shooter", "rooftop", "slide"].includes(data.slug)) {
       return { saved: false as const, reason: "verified-only" as const };
     }
 
