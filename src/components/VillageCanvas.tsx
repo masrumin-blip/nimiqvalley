@@ -778,8 +778,10 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         onPostOfficeChange?.(isNearPost);
       }
 
-      const camX = Math.max(0, Math.min(WORLD_W - viewW, s.x - viewW / 2));
-      const camY = Math.max(0, Math.min(WORLD_H - viewH, s.y - viewH / 2));
+      // Let the camera drift past the map edge (over open sea) so corner islets are never hidden behind the HUD.
+      const CAM_PAD = 200;
+      const camX = Math.max(-CAM_PAD, Math.min(WORLD_W - viewW + CAM_PAD, s.x - viewW / 2));
+      const camY = Math.max(-CAM_PAD, Math.min(WORLD_H - viewH + CAM_PAD, s.y - viewH / 2));
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, vw, vh);
@@ -789,7 +791,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
 
       // ocean and layered island shore
       ctx.fillStyle = PALETTE.ocean;
-      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      ctx.fillRect(-400, -400, WORLD_W + 800, WORLD_H + 800);
       ctx.strokeStyle = PALETTE.oceanLight;
       ctx.lineWidth = 3;
       for (let wy = 55; wy < WORLD_H; wy += 70) {

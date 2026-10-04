@@ -118,12 +118,12 @@ export const ISLETS: Islet[] = [
   {
     // Fisherman's island homestead with garden, well and dock.
     id: "se",
-    img: { x: 2235, y: 1720, w: 360, h: 219 },
-    walk: { x: 2425, y: 1838, rx: 150, ry: 82 },
-    decks: [{ x: 2248, y: 1850, w: 78, h: 32 }],
-    solid: [{ x: 2321, y: 1765, w: 152, h: 80 }],
-    roof: { x: 2300, y: 1720, w: 200, h: 128 },
-    bridge: { x1: 2150, y1: 1770, x2: 2262, y2: 1862 },
+    img: { x: 2200, y: 1601, w: 594, h: 398 },
+    walk: { x: 2518, y: 1840, rx: 250, ry: 140 },
+    decks: [{ x: 2221, y: 1875, w: 129, h: 53 }],
+    solid: [{ x: 2354, y: 1771, w: 233, h: 85 }],
+    roof: { x: 2348, y: 1601, w: 244, h: 215 },
+    bridge: { x1: 2130, y1: 1760, x2: 2240, y2: 1895 },
   },
 ];
 const BRIDGE_HALF = 22;
@@ -206,7 +206,7 @@ export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "elder-walk", name: "Elder Nuo", x: 690, y: 650, spriteRow: 4, speed: 34, idleMs: 1900, path: [{x:690,y:650},{x:850,y:650},{x:930,y:650},{x:930,y:750},{x:950,y:760},{x:1300,y:960},{x:840,y:1190},{x:560,y:1380},{x:520,y:900},{x:640,y:900},{x:690,y:890}] },
   { id: "queen-parade", name: "Queen Aya", x: 2070, y: 570, spriteRow: 5, speed: 38, idleMs: 1800, path: [{x:2070,y:570},{x:1740,y:760},{x:1450,y:960},{x:1830,y:1160},{x:2290,y:1020}] },
   // Old fisherman: strolls the south-east shore and keeps crossing the bridge to his island homestead.
-  { id: "fisherman", name: "Pak Bayu", x: 2100, y: 1700, spriteRow: 6, speed: 36, idleMs: 2200, path: [{x:2100,y:1700},{x:2150,y:1770},{x:2262,y:1862},{x:2290,y:1868},{x:2380,y:1880},{x:2510,y:1860},{x:2380,y:1880},{x:2290,y:1868},{x:2262,y:1862},{x:2150,y:1770}] },
+  { id: "fisherman", name: "Pak Bayu", x: 2100, y: 1700, spriteRow: 6, speed: 36, idleMs: 2200, path: [{x:2100,y:1700},{x:2130,y:1760},{x:2240,y:1895},{x:2290,y:1900},{x:2420,y:1900},{x:2600,y:1900},{x:2420,y:1900},{x:2290,y:1900},{x:2240,y:1895},{x:2130,y:1760}] },
 ];
 
 function rng(seed: number) { let s=seed; return () => ((s=(s*1664525+1013904223)%4294967296)/4294967296); }
