@@ -21,7 +21,7 @@ export interface BuildingSpot {
 }
 export type AnimalKind = "cow" | "pig" | "sheep" | "chicken" | "frog" | "butterfly";
 export interface AnimalSpot { id: string; kind: AnimalKind; x: number; y: number; phase: number; range?: number }
-export type NpcSpriteRow = 0 | 1 | 2 | 3 | 4 | 5;
+export type NpcSpriteRow = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export interface VillageNpc {
   id: string; name: string; x: number; y: number; spriteRow: NpcSpriteRow;
   speed: number; idleMs: number; path: Array<{ x: number; y: number }>;
@@ -89,11 +89,43 @@ export const REST_SPOTS: RestSpot[] = [
   { id: "rain", name: "Misty Forest", x: 650, y: 1680, kind: "campfire", radius: 210 },
 ];
 
-/** Small satellite islets in the open-water corners, each linked to the main island by a plank bridge. */
-export const ISLETS = [
-  { id: "nw", x: 165, y: 140, rx: 120, ry: 88, bridge: { x1: 340, y1: 300, x2: 220, y2: 190 }, hut: { x: 130, y: 120, w: 64, h: 30 } },
-  { id: "se", x: 2440, y: 1815, rx: 120, ry: 88, bridge: { x1: 2260, y1: 1650, x2: 2385, y2: 1765 }, hut: null },
-] as const;
+/**
+ * Satellite islets in the open-water corners, drawn from pixel-art sprites and linked to the
+ * main island by a plank bridge. `img` = sprite draw rect, `walk` = walkable ellipse,
+ * `deck` = extra walkable rect, `solid` = blocked buildings, `roof` = part redrawn above characters.
+ */
+type Box = { x: number; y: number; w: number; h: number };
+export type Islet = {
+  id: "nw" | "se";
+  img: Box;
+  walk: { x: number; y: number; rx: number; ry: number } | null;
+  decks: Box[];
+  solid: Box[];
+  roof: Box;
+  bridge: { x1: number; y1: number; x2: number; y2: number };
+};
+export const ISLETS: Islet[] = [
+  {
+    // Fisherman's stilt house on a plank deck over the water.
+    id: "nw",
+    img: { x: 40, y: 22, w: 280, h: 245 },
+    walk: null,
+    decks: [{ x: 48, y: 96, w: 264, h: 120 }],
+    solid: [{ x: 124, y: 60, w: 146, h: 108 }],
+    roof: { x: 120, y: 22, w: 154, h: 150 },
+    bridge: { x1: 380, y1: 330, x2: 290, y2: 205 },
+  },
+  {
+    // Fisherman's island homestead with garden, well and dock.
+    id: "se",
+    img: { x: 2235, y: 1720, w: 360, h: 219 },
+    walk: { x: 2425, y: 1838, rx: 150, ry: 82 },
+    decks: [{ x: 2248, y: 1850, w: 78, h: 32 }],
+    solid: [{ x: 2321, y: 1765, w: 152, h: 80 }],
+    roof: { x: 2300, y: 1720, w: 200, h: 128 },
+    bridge: { x1: 2150, y1: 1770, x2: 2262, y2: 1862 },
+  },
+];
 const BRIDGE_HALF = 22;
 
 function onBridge(x: number, y: number): boolean {
@@ -106,12 +138,14 @@ function onBridge(x: number, y: number): boolean {
 }
 
 export function insideIsland(x: number, y: number, padding = 0): boolean {
-  for (const i of ISLETS) {
-    const rx = i.rx - padding, ry = i.ry - padding;
-    if (rx > 0 && ry > 0 && ((x - i.x) / rx) ** 2 + ((y - i.y) / ry) ** 2 <= 1) return true;
+  // Islets and bridges are walkable for characters, but never chosen as tree spots (large padding).
+  if (padding < 50) {
+    for (const i of ISLETS) {
+      if (i.walk && ((x - i.walk.x) / i.walk.rx) ** 2 + ((y - i.walk.y) / i.walk.ry) ** 2 <= 1) return true;
+      if (i.decks.some((d) => x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h)) return true;
+    }
+    if (onBridge(x, y)) return true;
   }
-  // Bridges are walkable for characters, but never chosen as tree spots (large padding).
-  if (padding < 50 && onBridge(x, y)) return true;
   return insideMain(x, y, padding);
 }
 
@@ -171,6 +205,8 @@ export const VILLAGE_NPCS: VillageNpc[] = [
   { id: "headphones-loop", name: "Momo", x: 1530, y: 720, spriteRow: 3, speed: 50, idleMs: 1100, path: [{x:1530,y:720},{x:1760,y:960},{x:1530,y:1210},{x:1280,y:960}] },
   { id: "elder-walk", name: "Elder Nuo", x: 690, y: 650, spriteRow: 4, speed: 34, idleMs: 1900, path: [{x:690,y:650},{x:850,y:650},{x:930,y:650},{x:930,y:750},{x:950,y:760},{x:1300,y:960},{x:840,y:1190},{x:560,y:1380},{x:520,y:900},{x:640,y:900},{x:690,y:890}] },
   { id: "queen-parade", name: "Queen Aya", x: 2070, y: 570, spriteRow: 5, speed: 38, idleMs: 1800, path: [{x:2070,y:570},{x:1740,y:760},{x:1450,y:960},{x:1830,y:1160},{x:2290,y:1020}] },
+  // Old fisherman: strolls the south-east shore and keeps crossing the bridge to his island homestead.
+  { id: "fisherman", name: "Pak Bayu", x: 2100, y: 1700, spriteRow: 6, speed: 36, idleMs: 2200, path: [{x:2100,y:1700},{x:2150,y:1770},{x:2262,y:1862},{x:2290,y:1868},{x:2380,y:1880},{x:2510,y:1860},{x:2380,y:1880},{x:2290,y:1868},{x:2262,y:1862},{x:2150,y:1770}] },
 ];
 
 function rng(seed: number) { let s=seed; return () => ((s=(s*1664525+1013904223)%4294967296)/4294967296); }
@@ -205,7 +241,7 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
   for(const b of BUILDINGS){
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
-  for(const i of ISLETS) if(i.hut) rects.push({x:i.hut.x-i.hut.w/2,y:i.hut.y-i.hut.h,w:i.hut.w,h:i.hut.h});
+  for(const i of ISLETS) for(const s of i.solid) rects.push({...s});
   for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
   for(const animal of ANIMALS){
     const size = ANIMAL_FOOTPRINTS[animal.kind];
