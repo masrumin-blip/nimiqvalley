@@ -104,6 +104,25 @@ export type Islet = {
   roof: Box;
   bridge: { x1: number; y1: number; x2: number; y2: number };
 };
+/** Fisherman's island homestead. All shapes are authored in sprite pixels (1123x752) and scaled to world units. */
+function seIslet(): Islet {
+  const X = 2300, Y = 1690, W = 713, k = W / 1123;
+  const b = (x: number, y: number, w: number, h: number): Box => ({ x: X + x * k, y: Y + y * k, w: w * k, h: h * k });
+  return {
+    id: "se",
+    img: { x: X, y: Y, w: W, h: 752 * k },
+    walk: { x: X + 650 * k, y: Y + 480 * k, rx: 430 * k, ry: 250 * k },
+    decks: [b(70, 480, 200, 100)],
+    solid: [
+      b(220, 120, 730, 150), b(290, 280, 440, 200), b(860, 250, 115, 80),
+      b(720, 350, 50, 90), b(600, 420, 95, 50), b(530, 465, 45, 45), b(315, 445, 95, 65),
+      b(770, 345, 150, 80), b(930, 390, 85, 100), b(60, 290, 175, 120), b(880, 550, 210, 150),
+      b(620, 530, 210, 120), b(838, 540, 35, 65), b(440, 585, 130, 75), b(285, 595, 140, 100),
+    ],
+    roof: b(280, 0, 461, 406),
+    bridge: { x1: 2130, y1: 1760, x2: X + 80 * k, y2: Y + 530 * k },
+  };
+}
 export const ISLETS: Islet[] = [
   {
     // Fisherman's stilt house on a plank deck over the water.
@@ -115,16 +134,7 @@ export const ISLETS: Islet[] = [
     roof: { x: 120, y: 22, w: 154, h: 150 },
     bridge: { x1: 380, y1: 330, x2: 290, y2: 205 },
   },
-  {
-    // Fisherman's island homestead with garden, well and dock.
-    id: "se",
-    img: { x: 2200, y: 1601, w: 594, h: 398 },
-    walk: { x: 2518, y: 1840, rx: 250, ry: 140 },
-    decks: [{ x: 2221, y: 1875, w: 129, h: 53 }],
-    solid: [{ x: 2354, y: 1771, w: 233, h: 85 }],
-    roof: { x: 2348, y: 1601, w: 244, h: 215 },
-    bridge: { x1: 2130, y1: 1760, x2: 2240, y2: 1895 },
-  },
+  seIslet(),
 ];
 const BRIDGE_HALF = 22;
 
