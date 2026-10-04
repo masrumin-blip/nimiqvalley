@@ -10,7 +10,6 @@ import npcPipi from "@/assets/npc-pipi.png";
 import npcMomo from "@/assets/npc-momo.png";
 import npcElder from "@/assets/npc-elder.png";
 import npcQueen from "@/assets/npc-queen.png";
-import npcFisher from "@/assets/npc-fisher.png";
 import isletNw from "@/assets/islet-nw.png";
 import isletSe from "@/assets/islet-se.png";
 import animalSprites from "@/assets/village-animals.png";
@@ -55,7 +54,7 @@ const CHARACTER_SPRITES: Record<TierId, string> = {
   cool: playerCool,
   sultan: playerSultan,
 };
-const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen, npcFisher];
+const NPC_SPRITES = [npcKai, npcLani, npcPipi, npcMomo, npcElder, npcQueen];
 /** Every bitmap the village draws; preloaded before the map is shown. */
 const VILLAGE_ASSET_SOURCES = [
   playerPoor,
