@@ -31,7 +31,7 @@ export const getNimBalance = createServerFn({ method: "POST" })
           jsonrpc: "2.0",
           id: 1,
           method: "getAccountByAddress",
-          params: [data.address],
+          params: [data.address.replace(/\s+/g, "").toUpperCase().match(/.{1,4}/g)!.join(" ")],
         }),
       });
       if (!res.ok) throw new Error(`rpc http ${res.status}`);

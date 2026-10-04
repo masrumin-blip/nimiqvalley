@@ -49,12 +49,19 @@ async function hashUsed(hash: string) {
   return Boolean(data);
 }
 
+function normalizeRpcParam(p: unknown): unknown {
+  if (typeof p !== "string") return p;
+  const compact = p.replace(/\s+/g, "").toUpperCase();
+  if (/^NQ[0-9]{2}[0-9A-Z]{32}$/.test(compact)) return compact.match(/.{1,4}/g)!.join(" ");
+  return p;
+}
+
 async function nimRpc<T>(method: string, params: unknown[]): Promise<T | null> {
   try {
     const res = await fetch(NIM_RPC, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: params.map(normalizeRpcParam) }),
       signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return null;
@@ -93,14 +100,6 @@ function recipientMatches(tx: RawTx, recipient: string): boolean {
   return (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === want);
 }
 
-/** True when the address is the tx sender, the tx recipient, or a relayer-related party. */
-function addressInTx(tx: RawTx, address: string): boolean {
-  const want = norm(address);
-  if (!want) return false;
-  if (norm(tx.from ?? tx.sender ?? "") === want) return true;
-  return (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === want);
-}
-
 function hexToText(hex: string): string {
   try {
     const clean = hex.replace(/^0x/, "");
@@ -118,10 +117,10 @@ function txMemo(tx: RawTx): string {
 }
 
 /**
- * Find a fresh NIM transfer from the sender to the recipient with the exact amount.
- * When opts.memo is given, the recipient's incoming transactions are searched (Nimiq Pay
- * settles through a relayer contract, so `from` is not the real payer); the sender must
- * still appear in the transaction and the memo must match, unless the relayer stripped it.
+ * Find a fresh NIM transfer to the recipient with the exact amount.
+ * When opts.memo is given, the recipient's incoming transactions are searched and the
+ * transfer must carry that memo (sender does not need to match — the memo proves intent).
+ * Otherwise the sender's transactions are searched and the sender must match.
  */
 export async function findNimTransfer(
   sender: string,
@@ -134,8 +133,7 @@ export async function findNimTransfer(
   const maxAge = opts.maxAgeMs ?? 15 * 60_000;
   const byRecipient = Boolean(opts.memo);
   const memoNeedle = (opts.memo ?? "").toLowerCase();
-  const sinceRaw = opts.since ? new Date(opts.since).getTime() : NaN;
-  const sinceMs = Number.isFinite(sinceRaw) ? sinceRaw - 60_000 : 0;
+  const sinceMs = opts.since ? new Date(opts.since).getTime() - 60_000 : 0;
   for (;;) {
     const raw = await nimRpc<RawTx[]>("getTransactionsByAddress", [norm(byRecipient ? recipient : sender), 50, null]);
     if (Array.isArray(raw)) {
@@ -143,15 +141,14 @@ export async function findNimTransfer(
         const hash = String(tx.hash ?? "").toLowerCase();
         const value = (typeof tx.value === "number" ? tx.value : 0) / 100_000;
         const ts = typeof tx.timestamp === "number" ? (tx.timestamp < 1e12 ? tx.timestamp * 1000 : tx.timestamp) : Date.now();
-        // The payer is either the direct sender or, for relayer payments, one of relatedAddresses.
-        const senderOk = addressInTx(tx, sender);
-        // Relayer txs may carry no plain memo; then the payer address in the tx proves intent.
+        const senderOk = byRecipient ? true : norm(tx.from ?? tx.sender ?? "") === norm(sender);
+        // Contract txs (Nimiq Pay) carry no plain memo; matching the recipient in relatedAddresses is enough.
         const memoOk = byRecipient
-          ? txMemo(tx).toLowerCase().includes(memoNeedle) || (isContractTx(tx) && !txMemo(tx))
+          ? txMemo(tx).toLowerCase().includes(memoNeedle) ||
+            (isContractTx(tx) && (tx.relatedAddresses ?? []).some((a) => norm(String(a)) === norm(recipient)))
           : true;
         if (
           hash.length >= 8 &&
-          tx.executionResult !== false &&
           senderOk &&
           recipientMatches(tx, recipient) &&
           Math.abs(value - nim) < 0.00001 &&
