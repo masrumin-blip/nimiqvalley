@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Trophy } from "lucide-react";
+import { Flag, PlusCircle, Swords, Trophy } from "lucide-react";
 
 import { PlayerBadge } from "@/components/PlayerBadge";
 import { listLeagues } from "@/lib/leagues.functions";
@@ -42,72 +42,87 @@ function LeaguesPage() {
             </Link>
             <PlayerBadge />
           </div>
-          <div className="arcade-panel mt-5 overflow-hidden p-5 text-center">
-            <div className="arcade-label">★ Tournament Hall ★</div>
-            <h1 className="mt-2 flex items-center justify-center gap-3 font-display text-4xl font-black uppercase tracking-tight text-foreground sm:text-5xl">
-              <Trophy className="arcade-glow size-9 text-primary" aria-hidden="true" />
-              Leagues
-            </h1>
-            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Compete on games with verified scores. Prize pools are locked once funded.
-            </p>
-            <Link to="/leagues/new" className="arcade-btn mt-4 min-h-11 px-5 text-xs">
-              <Plus className="size-4" aria-hidden="true" /> Create league
-            </Link>
-          </div>
+          <h1 className="mt-4 flex items-center gap-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
+            <Trophy className="size-7 text-primary" aria-hidden="true" />
+            Leagues
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Compete on games with verified scores. Prize pools are locked once funded.
+          </p>
+          <Link
+            to="/leagues/new"
+            className="group mt-5 flex min-h-16 items-center gap-3 rounded-2xl border-2 border-primary bg-gradient-to-r from-primary via-accent to-primary px-5 py-3 text-primary-foreground shadow-[0_6px_0_0_color-mix(in_oklab,var(--primary)_45%,transparent),0_0_28px_color-mix(in_oklab,var(--primary)_40%,transparent)] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-none"
+          >
+            <PlusCircle className="size-8 shrink-0 transition-transform group-hover:rotate-90" aria-hidden="true" />
+            <span className="flex flex-col text-left">
+              <span className="text-lg font-black uppercase tracking-wider">Create league</span>
+              <span className="text-[11px] font-semibold opacity-80">Host a tournament · set your prize pool</span>
+            </span>
+          </Link>
         </header>
 
-        {isLoading && (
-          <div className="grid gap-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-2xl border border-border bg-card" />
-            ))}
-          </div>
-        )}
-        {!isLoading && sorted.length === 0 && (
-          <div className="rounded-2xl border-2 border-dashed border-primary/40 p-8 text-center">
-            <div className="arcade-label animate-pulse">Insert coin</div>
-            <p className="mt-2 text-sm text-muted-foreground">No leagues yet. Create the first one.</p>
-          </div>
-        )}
+        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!isLoading && sorted.length === 0 && <p className="text-sm text-muted-foreground">No leagues yet. Create the first one.</p>}
 
         <div className="grid gap-3">
           {sorted.map((l) => {
             const game = LEAGUE_GAMES.find((g) => g.slug === l.gameSlug);
             const phase = leaguePhase(l);
-            const bar =
-              phase === "Live" ? "bg-primary animate-pulse" : phase === "Upcoming" ? "bg-neon-cyan" : phase === "Ended" ? "bg-muted-foreground/40" : "bg-neon-orange";
+            const ended = phase === "Ended";
+            const live = phase === "Live";
+            const left = new Date(l.endsAt).getTime() - Date.now();
+            const leftTxt = `${Math.floor(left / 86400000)}d ${Math.floor((left % 86400000) / 3600000)}h left`;
+            if (ended) {
+              return (
+                <Link key={l.id} to="/leagues/$id" params={{ id: l.id }} className="rounded-2xl border border-dashed border-border bg-muted/30 p-4 transition-colors hover:bg-muted/60">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    <Flag className="size-3.5" aria-hidden="true" /> Concluded · {new Date(l.endsAt).toLocaleDateString()}
+                  </div>
+                  <div className="mt-1 truncate font-bold text-foreground">{l.title}</div>
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-background/60 px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm">
+                      <Trophy className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                      {l.champion ? (
+                        <span className="truncate"><b>{l.champion.name || `${l.champion.wallet.slice(0, 9)}…`}</b> · {l.champion.best}</span>
+                      ) : (
+                        <span className="text-muted-foreground">No champion</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs font-bold text-muted-foreground">{l.pool} {l.token.toUpperCase()} pool</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{game?.name ?? l.gameSlug}</div>
+                </Link>
+              );
+            }
             return (
               <Link
                 key={l.id}
                 to="/leagues/$id"
                 params={{ id: l.id }}
-                className={`arcade-panel group flex overflow-hidden transition-transform hover:-translate-y-0.5 ${phase === "Ended" ? "opacity-70" : ""}`}
+                className={`rounded-2xl border bg-card p-4 transition-all hover:-translate-y-0.5 ${live ? "border-2 border-primary shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_35%,transparent)]" : "border-border hover:bg-accent"}`}
               >
-                <span className={`w-1.5 shrink-0 ${bar}`} aria-hidden="true" />
-                <div className="min-w-0 flex-1 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${phase === "Live" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                        {phase === "Live" ? "● Live" : phase}
-                      </span>
-                      <div className="mt-1.5 truncate font-display text-lg font-black text-foreground">{l.title}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-lg font-black text-foreground">{l.title}</span>
+                  <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${live ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {live && <span className="size-2 animate-pulse rounded-full bg-primary-foreground" />}
+                    {live ? "Live now" : phase}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-2xl font-black tabular-nums text-primary">{l.pool} {l.token.toUpperCase()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {game?.name ?? l.gameSlug} · {l.payout === "winner" ? "Winner takes all" : "Top 3 50/30/20"} · Host {l.creatorName || `${l.creatorWallet.slice(0, 9)}…`}
                     </div>
-                    <div className="shrink-0 text-right">
-                      <div className="arcade-label">Pool</div>
-                      <div className="font-mono text-xl font-black tabular-nums text-primary">
-                        {l.pool} <span className="text-xs">{l.token.toUpperCase()}</span>
-                      </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {live ? `⏳ ${leftTxt}` : `Starts ${new Date(l.startsAt).toLocaleString()}`}
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="rounded-md border border-border bg-background/60 px-2 py-0.5 text-foreground">{game?.name ?? l.gameSlug}</span>
-                    <span className="rounded-md border border-border bg-background/60 px-2 py-0.5 text-muted-foreground">{l.payout === "winner" ? "Winner takes all" : "Top 3 · 50/30/20"}</span>
-                    <span className="rounded-md border border-border bg-background/60 px-2 py-0.5 text-muted-foreground">🏆 {l.creatorName || `${l.creatorWallet.slice(0, 9)}…`}</span>
-                  </div>
-                  <div className="mt-2 font-mono text-[11px] text-muted-foreground">
-                    {new Date(l.startsAt).toLocaleString()} → {new Date(l.endsAt).toLocaleString()}
-                  </div>
+                  {live && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-black uppercase text-primary-foreground">
+                      <Swords className="size-3.5" aria-hidden="true" /> Compete
+                    </span>
+                  )}
                 </div>
               </Link>
             );

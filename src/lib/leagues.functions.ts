@@ -57,16 +57,34 @@ export const getTreasury = createServerFn({ method: "GET" }).handler(async () =>
   };
 });
 
-export const listLeagues = createServerFn({ method: "GET" }).handler(async (): Promise<LeagueDTO[]> => {
+export const listLeagues = createServerFn({ method: "GET" }).handler(async (): Promise<(LeagueDTO & { champion: { wallet: string; best: number; name: string | null } | null })[]> => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { currentWallet } = await import("./session.server");
   const wallet = await currentWallet();
   const { data } = await supabaseAdmin.from("leagues").select("*").order("ends_at", { ascending: false }).limit(200);
-  return withCreatorNames(
+  const list = await withCreatorNames(
     (data ?? [])
       .filter((r) => r.status !== "draft" || (wallet && r.creator_wallet === wallet))
       .map((r) => toDTO(r as never)),
   );
+  const endedIds = list.filter((l) => new Date(l.endsAt).getTime() <= Date.now()).map((l) => l.id);
+  const champs = new Map<string, { wallet: string; best: number; name: string | null }>();
+  if (endedIds.length) {
+    const { data: sc } = await supabaseAdmin
+      .from("league_scores")
+      .select("league_id, wallet, best, updated_at")
+      .in("league_id", endedIds)
+      .order("best", { ascending: false })
+      .order("updated_at", { ascending: true });
+    for (const s of sc ?? []) if (!champs.has(s.league_id)) champs.set(s.league_id, { wallet: s.wallet, best: Number(s.best), name: null });
+    const cw = [...champs.values()].map((c) => c.wallet);
+    if (cw.length) {
+      const { data: pr } = await supabaseAdmin.from("profiles").select("wallet, display_name").in("wallet", cw);
+      const nm = new Map((pr ?? []).map((p) => [p.wallet, p.display_name]));
+      for (const c of champs.values()) c.name = nm.get(c.wallet) ?? null;
+    }
+  }
+  return list.map((l) => ({ ...l, champion: champs.get(l.id) ?? null }));
 });
 
 export const getLeague = createServerFn({ method: "GET" })
@@ -107,6 +125,19 @@ export const getLeague = createServerFn({ method: "GET" })
       : { data: [] as { wallet: string; display_name: string | null }[] };
     const names = new Map((profiles ?? []).map((p) => [p.wallet, p.display_name]));
 
+    const { data: deps } = await supabaseAdmin.from("league_deposits").select("wallet, amount").eq("league_id", row.id);
+    const totals = new Map<string, number>();
+    for (const d of deps ?? []) totals.set(d.wallet, (totals.get(d.wallet) ?? 0) + Number(d.amount));
+    const sumDep = [...totals.values()].reduce((a, b) => a + b, 0);
+    const sw = [...totals.keys()].filter((w) => !names.has(w));
+    if (sw.length) {
+      const { data: sp } = await supabaseAdmin.from("profiles").select("wallet, display_name").in("wallet", sw);
+      for (const p of sp ?? []) names.set(p.wallet, p.display_name);
+    }
+    const sponsors = [...totals.entries()]
+      .map(([w, amount]) => ({ wallet: w, displayName: names.get(w) ?? null, amount: Math.round(amount * 1e5) / 1e5, percent: sumDep ? (amount / sumDep) * 100 : 0 }))
+      .sort((a, b) => b.amount - a.amount);
+
     const ended = Date.now() >= new Date(row.ends_at).getTime();
     let myShare: { amount: number; ranks: number[] } | null = null;
     let myClaim: { status: string; txHash: string | null; amount: number } | null = null;
@@ -130,6 +161,7 @@ export const getLeague = createServerFn({ method: "GET" })
         displayName: names.get(s.wallet) ?? null,
         best: Number(s.best),
       })),
+      sponsors,
       me: wallet,
       myShare,
       myClaim,

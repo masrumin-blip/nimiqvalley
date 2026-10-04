@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Trash2 } from "lucide-react";
+import { Crown, Gamepad2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { PlayerBadge } from "@/components/PlayerBadge";
@@ -158,57 +158,52 @@ function LeagueDetail() {
           <PlayerBadge />
         </div>
 
-        <div className="arcade-panel mt-5 p-5">
-          <div className="flex items-center justify-between gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${phase === "Live" ? "animate-pulse bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-              {phase === "Live" ? "● Live" : phase}
-            </span>
-            <span className="arcade-label">Scoreboard</span>
-          </div>
-          <h1 className="mt-2 font-display text-3xl font-black uppercase tracking-tight text-foreground sm:text-4xl">{l.title}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span>{game?.name}</span>
-            {game && (
-              <>
-                <span>· {VERIFY_METHODS[game.method].name}</span>
-                <VerifyInfoButton method={game.method} gameName={game.name} />
-              </>
-            )}
-          </div>
-
-          <div className="mt-4 text-center">
-            <div className="arcade-label">Prize pool</div>
-            <div className="arcade-glow font-mono text-5xl font-black tabular-nums text-primary">
-              {l.pool} <span className="text-lg">{l.token.toUpperCase()}</span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-background/60 p-3">
-              <div className="arcade-label">{now < start ? "Starts in" : now < end ? "Ends in" : "Status"}</div>
-              <div className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
-                {now < start ? fmt(start - now) : now < end ? fmt(end - now) : "Finished"}
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-background/60 p-3">
-              <div className="arcade-label">Split</div>
-              <div className="mt-1 font-mono text-sm font-bold text-foreground">
-                {shares.map((s, i) => `#${i + 1} ${Math.round(s * 100)}%`).join(" · ")}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground">
-            <span className="font-black uppercase text-primary">🏆 Host </span>
-            Created by <b>{l.creatorName || `${l.creatorWallet.slice(0, 14)}…`}</b> — thanks for sponsoring this league!
-          </div>
-
-          {phase === "Live" && game && (
-            <a href={`${game.path}?league=${l.id}`} className="arcade-btn mt-4 flex min-h-12 w-full px-4 text-sm">
-              ▶ Play in this league
-            </a>
+        <h1 className="mt-4 text-3xl font-black tracking-tight text-foreground">{l.title}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>{game?.name}</span>
+          {game && (
+            <>
+              <span>· {VERIFY_METHODS[game.method].name}</span>
+              <VerifyInfoButton method={game.method} gameName={game.name} />
+            </>
           )}
         </div>
+
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-foreground">
+          <span className="font-black uppercase text-primary">🏆 Host</span>
+          <span>Created by <b>{l.creatorName || `${l.creatorWallet.slice(0, 14)}…`}</b> — thanks for sponsoring this league!</span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground">{phase}</div>
+            <div className="mt-1 font-mono text-lg font-bold text-foreground">
+              {now < start ? `Starts in ${fmt(start - now)}` : now < end ? `Ends in ${fmt(end - now)}` : "Finished"}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground">Prize pool</div>
+            <div className="mt-1 text-lg font-bold text-foreground">{l.pool} {l.token.toUpperCase()}</div>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground">Split</div>
+            <div className="mt-1 text-sm font-bold text-foreground">
+              {shares.map((s, i) => `#${i + 1} ${Math.round(s * 100)}%`).join(" · ")}
+            </div>
+          </div>
+        </div>
+
+        {phase === "Live" && game && (
+          <a
+            href={`${game.path}?league=${l.id}`}
+            className="group mt-5 flex min-h-16 flex-col items-center justify-center rounded-2xl border-2 border-primary bg-gradient-to-r from-primary via-accent to-primary px-4 py-3 text-primary-foreground shadow-[0_6px_0_0_color-mix(in_oklab,var(--primary)_45%,transparent),0_0_32px_color-mix(in_oklab,var(--primary)_45%,transparent)] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-none"
+          >
+            <span className="flex items-center gap-2 text-lg font-black uppercase tracking-wider">
+              <Gamepad2 className="size-6 transition-transform group-hover:rotate-12" aria-hidden="true" /> Play in this league
+            </span>
+            <span className="text-[11px] font-semibold opacity-80">Verified scores go straight to the standings</span>
+          </a>
+        )}
 
         {l.status === "draft" && (
           <div className="mt-4 rounded-xl border border-border bg-card p-3">
@@ -314,25 +309,41 @@ function LeagueDetail() {
 
         {msg && <p className="mt-3 text-sm text-foreground">{msg}</p>}
 
-        <section className="arcade-panel mt-6 overflow-hidden">
-          <div className="border-b border-border px-4 py-3 text-center">
-            <span className="arcade-label">— High scores —</span>
-          </div>
+        <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <h2 className="text-sm font-black uppercase tracking-wider text-foreground">🏆 Prize pool sponsors</h2>
+          {data.sponsors.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">No contributions yet.</p>
+          ) : (
+            <ol className="mt-3 grid gap-2">
+              {data.sponsors.map((s, i) => (
+                <li key={s.wallet} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${i === 0 ? "border border-primary/50 bg-primary/10" : "bg-muted/40"}`}>
+                  <span className="w-6 text-center font-black text-muted-foreground">{i === 0 ? <Crown className="mx-auto size-4 text-primary" aria-label="Top patron" /> : i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-bold text-foreground">{s.displayName || shortWallet(s.wallet)}</span>
+                    {i === 0 && <span className="text-[10px] font-black uppercase text-primary">Top patron</span>}
+                  </span>
+                  <span className="text-right">
+                    <span className="block font-bold tabular-nums text-foreground">{s.amount} {l.token.toUpperCase()}</span>
+                    <span className="text-[10px] text-muted-foreground">{s.percent.toFixed(1)}%</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
           <div className="grid grid-cols-[3rem_1fr_6rem] gap-2 border-b border-border px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            <span>Rank</span><span>Player</span><span className="text-right">Best</span>
+            <span>#</span><span>Player</span><span className="text-right">Best</span>
           </div>
-          {data.rows.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">No scores yet. Be the first!</p>}
-          {data.rows.map((r) => {
-            const medal = r.rank === 1 ? "text-neon-yellow" : r.rank === 2 ? "text-foreground/80" : r.rank === 3 ? "text-neon-orange" : "text-muted-foreground";
-            const rowBg = r.wallet === data.me ? "bg-primary/15 font-bold ring-1 ring-inset ring-primary" : r.rank <= 3 ? "bg-primary/5" : "";
-            return (
-              <div key={r.wallet} className={`grid grid-cols-[3rem_1fr_6rem] items-center gap-2 border-b border-border/50 px-4 py-2.5 text-sm last:border-0 ${rowBg}`}>
-                <span className={`font-mono font-black ${medal}`}>{r.rank <= 3 ? ["🥇", "🥈", "🥉"][r.rank - 1] : String(r.rank).padStart(2, "0")}</span>
-                <span className="truncate text-foreground">{r.displayName || shortWallet(r.wallet)}</span>
-                <span className={`text-right font-mono font-black tabular-nums ${r.rank <= 3 ? "text-primary" : "text-foreground"}`}>{r.best}</span>
-              </div>
-            );
-          })}
+          {data.rows.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No scores yet.</p>}
+          {data.rows.map((r) => (
+            <div key={r.wallet} className={`grid grid-cols-[3rem_1fr_6rem] items-center gap-2 border-b border-border/50 px-4 py-2 text-sm last:border-0 ${r.wallet === data.me ? "bg-primary/10 font-bold" : ""}`}>
+              <span className="text-muted-foreground">{r.rank}</span>
+              <span className="truncate">{r.displayName || shortWallet(r.wallet)}</span>
+              <span className="text-right tabular-nums">{r.best}</span>
+            </div>
+          ))}
         </section>
       </div>
     </main>
