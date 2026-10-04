@@ -89,11 +89,43 @@ export const REST_SPOTS: RestSpot[] = [
   { id: "rain", name: "Misty Forest", x: 650, y: 1680, kind: "campfire", radius: 210 },
 ];
 
-/** Small satellite islets in the open-water corners, each linked to the main island by a plank bridge. */
-export const ISLETS = [
-  { id: "nw", x: 165, y: 140, rx: 120, ry: 88, bridge: { x1: 340, y1: 300, x2: 220, y2: 190 }, hut: { x: 130, y: 120, w: 64, h: 30 } },
-  { id: "se", x: 2440, y: 1815, rx: 120, ry: 88, bridge: { x1: 2260, y1: 1650, x2: 2385, y2: 1765 }, hut: null },
-] as const;
+/**
+ * Satellite islets in the open-water corners, drawn from pixel-art sprites and linked to the
+ * main island by a plank bridge. `img` = sprite draw rect, `walk` = walkable ellipse,
+ * `deck` = extra walkable rect, `solid` = blocked buildings, `roof` = part redrawn above characters.
+ */
+type Box = { x: number; y: number; w: number; h: number };
+export type Islet = {
+  id: "nw" | "se";
+  img: Box;
+  walk: { x: number; y: number; rx: number; ry: number } | null;
+  decks: Box[];
+  solid: Box[];
+  roof: Box;
+  bridge: { x1: number; y1: number; x2: number; y2: number };
+};
+export const ISLETS: Islet[] = [
+  {
+    // Fisherman's stilt house on a plank deck over the water.
+    id: "nw",
+    img: { x: 40, y: 22, w: 280, h: 245 },
+    walk: null,
+    decks: [{ x: 48, y: 96, w: 264, h: 120 }],
+    solid: [{ x: 124, y: 60, w: 146, h: 108 }],
+    roof: { x: 120, y: 22, w: 154, h: 150 },
+    bridge: { x1: 380, y1: 330, x2: 290, y2: 205 },
+  },
+  {
+    // Fisherman's island homestead with garden, well and dock.
+    id: "se",
+    img: { x: 2235, y: 1720, w: 360, h: 219 },
+    walk: { x: 2425, y: 1838, rx: 150, ry: 82 },
+    decks: [{ x: 2248, y: 1850, w: 78, h: 32 }],
+    solid: [{ x: 2321, y: 1765, w: 152, h: 80 }],
+    roof: { x: 2300, y: 1720, w: 200, h: 128 },
+    bridge: { x1: 2150, y1: 1770, x2: 2262, y2: 1862 },
+  },
+];
 const BRIDGE_HALF = 22;
 
 function onBridge(x: number, y: number): boolean {
@@ -106,12 +138,14 @@ function onBridge(x: number, y: number): boolean {
 }
 
 export function insideIsland(x: number, y: number, padding = 0): boolean {
-  for (const i of ISLETS) {
-    const rx = i.rx - padding, ry = i.ry - padding;
-    if (rx > 0 && ry > 0 && ((x - i.x) / rx) ** 2 + ((y - i.y) / ry) ** 2 <= 1) return true;
+  // Islets and bridges are walkable for characters, but never chosen as tree spots (large padding).
+  if (padding < 50) {
+    for (const i of ISLETS) {
+      if (i.walk && ((x - i.walk.x) / i.walk.rx) ** 2 + ((y - i.walk.y) / i.walk.ry) ** 2 <= 1) return true;
+      if (i.decks.some((d) => x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h)) return true;
+    }
+    if (onBridge(x, y)) return true;
   }
-  // Bridges are walkable for characters, but never chosen as tree spots (large padding).
-  if (padding < 50 && onBridge(x, y)) return true;
   return insideMain(x, y, padding);
 }
 
