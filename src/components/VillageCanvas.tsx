@@ -1058,7 +1058,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       for (const animal of ANIMALS)
         drawables.push({ y: animal.y + (animal.kind === "butterfly" ? 30 : 0), draw: () => drawAnimalSprite(ctx, animalImage, animal, t) });
       for (const spot of REST_SPOTS)
-        drawables.push({ y: spot.y, draw: () => drawRestSpot(ctx, spot, t) });
+        if (!spot.hidden) drawables.push({ y: spot.y, draw: () => drawRestSpot(ctx, spot, t) });
       for (const l of LANTERNS)
         drawables.push({
           y: l.y,

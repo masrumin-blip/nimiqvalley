@@ -8,6 +8,8 @@ import auroraHtml from "@/sceneries/aurora.html?raw";
 import sunriseHtml from "@/sceneries/danau-sunrise.html?raw";
 import sunsetHtml from "@/sceneries/danau-sunset.html?raw";
 import rainHtml from "@/sceneries/hutan-hujan.html?raw";
+import samudraHtml from "@/sceneries/senja-samudra.html?raw";
+import bukitHtml from "@/sceneries/senja-bukit.html?raw";
 
 const SCENES: Record<SceneryId, string> = {
   ocean: oceanHtml,
@@ -16,6 +18,8 @@ const SCENES: Record<SceneryId, string> = {
   sunrise: sunriseHtml,
   sunset: sunsetHtml,
   rain: rainHtml,
+  samudra: samudraHtml,
+  bukit: bukitHtml,
 };
 
 const REDUCED_MOTION_STYLE = `<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important}}</style>`;
