@@ -26,7 +26,7 @@ export interface VillageNpc {
   id: string; name: string; x: number; y: number; spriteRow: NpcSpriteRow;
   speed: number; idleMs: number; path: Array<{ x: number; y: number }>;
 }
-export type SceneryId = "ocean" | "hill" | "aurora" | "sunrise" | "sunset" | "rain";
+export type SceneryId = "ocean" | "hill" | "aurora" | "sunrise" | "sunset" | "rain" | "samudra" | "bukit";
 export type RestSpotKind = "bench" | "gazebo" | "deck" | "picnic" | "campfire" | "swing";
 export interface RestSpot {
   id: SceneryId;
@@ -35,6 +35,8 @@ export interface RestSpot {
   y: number;
   kind: RestSpotKind;
   radius: number;
+  /** Islet viewpoints: no furniture drawn and no collider. */
+  hidden?: boolean;
 }
 
 export interface HouseSpriteSpec {
@@ -87,6 +89,8 @@ export const REST_SPOTS: RestSpot[] = [
   { id: "sunrise", name: "Sunrise Lake", x: 2320, y: 850, kind: "deck", radius: 220 },
   { id: "sunset", name: "Sunset Lake", x: 2000, y: 1680, kind: "picnic", radius: 210 },
   { id: "rain", name: "Misty Forest", x: 650, y: 1680, kind: "campfire", radius: 210 },
+  { id: "samudra", name: "Ocean Dusk", x: 100, y: 190, kind: "deck", radius: 110, hidden: true },
+  { id: "bukit", name: "Forest Hills at Dusk", x: 2560, y: 1985, kind: "deck", radius: 130, hidden: true },
 ];
 
 /**
@@ -262,7 +266,7 @@ export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
     for(const [ox,oy,w,h] of [b.collider,...(b.extraColliders??[])]) rects.push({x:b.x+ox,y:b.y+oy,w,h});
   }
   for(const i of ISLETS) for(const s of i.solid) rects.push({...s});
-  for(const spot of REST_SPOTS) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
+  for(const spot of REST_SPOTS) if(!spot.hidden) rects.push({x:spot.x-46,y:spot.y-38,w:92,h:62});
   for(const animal of ANIMALS){
     const size = ANIMAL_FOOTPRINTS[animal.kind];
     if(!size) continue;
