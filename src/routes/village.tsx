@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail } from "lucide-react";
+import { Mail, BookOpen } from "lucide-react";
+import ChronicleDialog from "@/components/ChronicleDialog";
 import PostOfficeDialog from "@/components/PostOfficeDialog";
 import LetterPopup from "@/components/LetterPopup";
 import { fetchInbox, fetchLetter, openLetter } from "@/lib/letters.functions";
@@ -130,6 +131,8 @@ function VillagePage() {
   const [nearbyViewpoint, setNearbyViewpoint] = useState<RestSpot | null>(null);
   const [activeViewpoint, setActiveViewpoint] = useState<RestSpot | null>(null);
   const [nearPost, setNearPost] = useState(false);
+  const [nearMonument, setNearMonument] = useState(false);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
   const postBadgeRef = useRef(0);
   const { letter: sharedLetter } = Route.useSearch();
 
@@ -267,6 +270,7 @@ function VillagePage() {
           onViewpointChange={onViewpointChange}
           paused={Boolean(activeViewpoint)}
           onPostOfficeChange={setNearPost}
+          onMonumentChange={setNearMonument}
           postBadgeRef={postBadgeRef}
           spawnAtPostOffice={Boolean(sharedLetter)}
         />
@@ -453,6 +457,14 @@ function VillagePage() {
         </div>
       )}
       <PostOffice wallet={player?.wallet ?? null} near={nearPost && !activeViewpoint} badgeRef={postBadgeRef} />
+      {nearMonument && !activeViewpoint && (
+        <div className="absolute bottom-24 right-4 z-30">
+          <Button onClick={() => setChronicleOpen(true)} className="min-h-11 rounded-xl px-5 text-sm font-semibold shadow-lg">
+            <BookOpen className="size-4" /> Read the Chronicle
+          </Button>
+        </div>
+      )}
+      <ChronicleDialog open={chronicleOpen} onOpenChange={setChronicleOpen} />
       {activeViewpoint && <SceneryView spot={activeViewpoint} onClose={closeScenery} />}
       </main>
     </GameStage>

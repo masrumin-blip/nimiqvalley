@@ -159,9 +159,20 @@ export function insideIsland(x: number, y: number, padding = 0): boolean {
   return insideMain(x, y, padding);
 }
 
-function insideMain(x: number, y: number, padding: number): boolean {
-  const rx = 1210 - padding;
-  const ry = 885 - padding;
+/** Organic shoreline: gentle coves and headlands around the base superellipse (never shrinks below 97%). */
+export function mainShoreScale(theta: number): number {
+  const v = 1 + 0.035 * Math.sin(3 * theta + 0.6) + 0.022 * Math.sin(7 * theta + 2.1) + 0.01 * Math.sin(13 * theta + 1.3);
+  return Math.max(0.97, v);
+}
+export const MAIN_RX = 1210;
+export const MAIN_RY = 885;
+
+export function insideMain(x: number, y: number, padding: number): boolean {
+  const ux = (x - WORLD_W / 2) / MAIN_RX;
+  const uy = (y - WORLD_H / 2) / MAIN_RY;
+  const sc = mainShoreScale(Math.atan2(uy, ux));
+  const rx = MAIN_RX * sc - padding;
+  const ry = MAIN_RY * sc - padding;
   if (rx <= 0 || ry <= 0) return false;
   const nx = Math.abs(x - WORLD_W / 2) / rx;
   const ny = Math.abs(y - WORLD_H / 2) / ry;
@@ -237,7 +248,7 @@ export function buildTrees(): Tree[] {
 export const LANTERNS: Lantern[]=[{x:1120,y:800},{x:1480,y:800},{x:1120,y:1120},{x:1480,y:1120},{x:420,y:960},{x:2250,y:960}];
 
 export function buildColliders(playerHouseTier: TierId, trees: Tree[]):Rect[]{
-  const rects:Rect[]=[];
+  const rects:Rect[]=[{ x: MONUMENT.x - 36, y: MONUMENT.y - 34, w: 72, h: 40 }];
   for(const h of [...NEIGHBOR_HOUSES,{...PLAYER_HOUSE,tier:playerHouseTier,owner:"you"}]) {
     const { footprint } = HOUSE_SPRITES[h.tier];
     rects.push({
@@ -272,4 +283,6 @@ export function circleBlocked(x:number,y:number,radius:number,rects:Rect[]):bool
   return px*px+py*py<1;
 }
 /** The post office sits beside the player's home, with its entrance accessible from the south. */
+/** Hero statue in the plaza; reading it opens the Nimiq Chronicle. */
+export const MONUMENT = { x: 1300, y: 975, width: 78, height: 226, radius: 120 };
 export const POST_OFFICE = { buildingId: "post-office", x: 1650, y: 1200, door: { x: 1650, y: 1240 }, radius: 130 };

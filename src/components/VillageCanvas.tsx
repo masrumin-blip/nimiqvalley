@@ -20,6 +20,7 @@ import barnSprite from "@/assets/village-barn.png";
 import houseWindmillSprite from "@/assets/village-house-windmill.png";
 import objectSprites from "@/assets/village-objects.png";
 import houseTierSprites from "@/assets/village-house-tiers.png";
+import monumentSprite from "@/assets/monument-hero.png";
 import {
   ANIMALS,
   BUILDINGS,
@@ -37,6 +38,11 @@ import {
   REST_SPOTS,
   TREE_SPRITES,
   WORLD_H,
+  MAIN_RX,
+  MAIN_RY,
+  MONUMENT,
+  insideMain,
+  mainShoreScale,
   WORLD_W,
   VILLAGE_NPCS,
   type Neighbor,
@@ -87,6 +93,7 @@ interface Props {
   onPostOfficeChange?: (near: boolean) => void;
   postBadgeRef?: MutableRefObject<number>;
   spawnAtPostOffice?: boolean;
+  onMonumentChange?: (near: boolean) => void;
 }
 
 interface NpcState extends VillageNpc {
@@ -151,22 +158,38 @@ function skyAmbience(hour: number): { color: string; alpha: number; lamp: number
   return { color: "#080e26", alpha: 0.7, lamp: 1 };
 }
 
-function islandPath(ctx: CanvasRenderingContext2D, inset: number) {
+function islandPath(ctx: CanvasRenderingContext2D, inset: number, dy = 0) {
   const cx = WORLD_W / 2;
-  const cy = WORLD_H / 2;
-  const rx = 1210 - inset;
-  const ry = 885 - inset;
+  const cy = WORLD_H / 2 + dy;
   ctx.beginPath();
-  for (let i = 0; i <= 96; i++) {
-    const angle = (i / 96) * Math.PI * 2;
+  for (let i = 0; i <= 240; i++) {
+    const angle = (i / 240) * Math.PI * 2;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    const x = cx + rx * Math.sign(cos) * Math.abs(cos) ** 0.5;
-    const y = cy + ry * Math.sign(sin) * Math.abs(sin) ** 0.5;
+    const ux = Math.sign(cos) * Math.abs(cos) ** 0.5;
+    const uy = Math.sign(sin) * Math.abs(sin) ** 0.5;
+    const sc = mainShoreScale(Math.atan2(uy, ux));
+    const x = cx + (MAIN_RX * sc - inset) * ux;
+    const y = cy + (MAIN_RY * sc - inset) * uy;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.closePath();
+}
+
+/** Points along the shoreline, used for rocks and foam. */
+function shorePoints(inset: number, n: number): Array<[number, number]> {
+  const pts: Array<[number, number]> = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const ux = Math.sign(cos) * Math.abs(cos) ** 0.5;
+    const uy = Math.sign(sin) * Math.abs(sin) ** 0.5;
+    const sc = mainShoreScale(Math.atan2(uy, ux));
+    pts.push([WORLD_W / 2 + (MAIN_RX * sc - inset) * ux, WORLD_H / 2 + (MAIN_RY * sc - inset) * uy]);
+  }
+  return pts;
 }
 
 function roundRect(
@@ -559,7 +582,9 @@ function drawRestSpot(ctx: CanvasRenderingContext2D, spot: RestSpot, t: number) 
   ctx.restore();
 }
 
-export default function VillageCanvas({ characterTier, houseTier, moveRef, onNearbyChange, onViewpointChange, paused = false, onPostOfficeChange, postBadgeRef, spawnAtPostOffice = false }: Props) {
+export default function VillageCanvas({ characterTier, houseTier, moveRef, onNearbyChange, onViewpointChange, paused = false, onPostOfficeChange, postBadgeRef, spawnAtPostOffice = false, onMonumentChange }: Props) {
+  const onMonumentChangeRef = useRef(onMonumentChange);
+  onMonumentChangeRef.current = onMonumentChange;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef({
     x: 1300,
@@ -652,6 +677,9 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
     const isletImages = { nw: new Image(), se: new Image() };
     isletImages.nw.src = isletNw;
     isletImages.se.src = isletSe;
+    const monumentImage = new Image();
+    monumentImage.src = monumentSprite;
+    let nearMonument = false;
     const houseImage = new Image();
     houseImage.src = houseTierSprites;
     let colliderTier = tiersRef.current.houseTier;
@@ -772,6 +800,11 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         onViewpointChange(foundViewpoint);
       }
 
+      const isNearMonument = Math.hypot(MONUMENT.x - s.x, MONUMENT.y + 30 - s.y) < MONUMENT.radius;
+      if (isNearMonument !== nearMonument) {
+        nearMonument = isNearMonument;
+        onMonumentChangeRef.current?.(isNearMonument);
+      }
       const isNearPost = Math.hypot(POST_OFFICE.door.x - s.x, POST_OFFICE.door.y - s.y) < POST_OFFICE.radius;
       if (isNearPost !== nearPost) {
         nearPost = isNearPost;
@@ -802,9 +835,33 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
           ctx.stroke();
         }
       }
+      // foam ring + stepped cliff underneath the island (2.5D depth)
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 10 + Math.sin(t / 700) * 3;
+      islandPath(ctx, -14, 10);
+      ctx.stroke();
+      islandPath(ctx, 0, 30);
+      ctx.fillStyle = "#5b4636";
+      ctx.fill();
+      islandPath(ctx, 0, 16);
+      ctx.fillStyle = "#7a5f48";
+      ctx.fill();
       islandPath(ctx, 0);
       ctx.fillStyle = PALETTE.wetSand;
       ctx.fill();
+      // shoreline boulders
+      shorePoints(-6, 70).forEach(([rx, ry], i) => {
+        if (hash01(i * 4.3) < 0.45) return;
+        const r = 7 + hash01(i * 9.1) * 9;
+        ctx.fillStyle = "#6f6a63";
+        ctx.beginPath();
+        ctx.ellipse(rx, ry + 10, r * 1.3, r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#9a948a";
+        ctx.beginPath();
+        ctx.ellipse(rx - 2, ry + 6, r * 0.8, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
       islandPath(ctx, 28);
       ctx.fillStyle = PALETTE.sand;
       ctx.fill();
@@ -846,8 +903,7 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
       islandPath(ctx, 72);
       ctx.fill();
       // organic grass: soft darker patches + small tufts (deterministic, no flicker)
-      const inIsland = (px: number, py: number) =>
-        (Math.abs(px - WORLD_W / 2) / 1138) ** 4 + (Math.abs(py - WORLD_H / 2) / 813) ** 4 <= 1;
+      const inIsland = (px: number, py: number) => insideMain(px, py, 72);
       ctx.fillStyle = "rgba(70,110,50,0.16)";
       for (let i = 0; i < 46; i++) {
         const px = hash01(i * 3.1) * WORLD_W;
@@ -1060,6 +1116,18 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
           }
         },
       });
+      drawables.push({ y: MONUMENT.y, draw: () => {
+        ctx.fillStyle = "rgba(30,50,30,0.28)";
+        ctx.beginPath();
+        ctx.ellipse(MONUMENT.x, MONUMENT.y, 46, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (monumentImage.complete && monumentImage.naturalWidth > 0) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(monumentImage, MONUMENT.x - MONUMENT.width / 2, MONUMENT.y - MONUMENT.height + 6, MONUMENT.width, MONUMENT.height);
+          ctx.restore();
+        }
+      } });
       drawables.sort((a, b) => a.y - b.y).forEach((d) => d.draw());
 
       // ---- day / night ambience (visual only) ----
