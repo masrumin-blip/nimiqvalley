@@ -37,13 +37,11 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
+function ErrorComponent({ error, reset }: import("@tanstack/react-router").ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
-  const err = error instanceof Error ? error : new Error(String(error));
   useEffect(() => {
-    reportLovableError(err, { boundary: "tanstack_root_error_component" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
   return (
@@ -94,9 +92,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: "/favicon.png?v=2" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=2" },
-      { rel: "manifest", href: "/manifest.json?v=2" },
+      { rel: "icon", type: "image/png", href: "/favicon-32x32.png", sizes: "32x32" },
+      { rel: "icon", type: "image/png", href: "/icon-192.png", sizes: "192x192" },
+      { rel: "icon", type: "image/png", href: "/favicon.png", sizes: "256x256" },
+      { rel: "icon", type: "image/png", href: "/icon-512.png", sizes: "512x512" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/manifest.json" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
