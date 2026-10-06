@@ -127,17 +127,30 @@ function seIslet(): Islet {
     bridge: { x1: 2130, y1: 1760, x2: X + 80 * k, y2: Y + 530 * k },
   };
 }
-export const ISLETS: Islet[] = [
-  {
-    // Fisherman's stilt house on a plank deck over the water.
+/** Fisherman's stilt house (sprite 789x690), drawn 30% larger; shapes authored in sprite pixels. */
+function nwIslet(): Islet {
+  const X = 40, Y = 22, W = 364, k = W / 789;
+  const b = (x: number, y: number, w: number, h: number): Box => ({ x: X + x * k, y: Y + y * k, w: w * k, h: h * k });
+  return {
     id: "nw",
-    img: { x: 40, y: 22, w: 280, h: 245 },
+    img: { x: X, y: Y, w: W, h: 690 * k },
     walk: null,
-    decks: [{ x: 48, y: 96, w: 264, h: 120 }],
-    solid: [{ x: 124, y: 60, w: 146, h: 108 }],
-    roof: { x: 120, y: 22, w: 154, h: 150 },
-    bridge: { x1: 380, y1: 330, x2: 290, y2: 205 },
-  },
+    // left deck, right deck, front boardwalk
+    decks: [b(15, 215, 255, 260), b(615, 225, 165, 250), b(15, 465, 760, 125)],
+    solid: [
+      b(270, 150, 350, 320), // house walls + interior
+      b(20, 185, 175, 95), // fish drying rack
+      b(205, 240, 65, 210), // left barrels
+      b(650, 215, 90, 120), // right barrels
+      b(625, 395, 60, 70), // front-right barrel
+      b(45, 490, 105, 70), // crates
+    ],
+    roof: b(240, 0, 410, 475),
+    bridge: { x1: 400, y1: 345, x2: X + 700 * k, y2: Y + 560 * k },
+  };
+}
+export const ISLETS: Islet[] = [
+  nwIslet(),
   seIslet(),
 ];
 const BRIDGE_HALF = 22;
