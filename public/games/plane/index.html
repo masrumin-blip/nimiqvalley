@@ -245,7 +245,7 @@ function update(dt){
     if(m.trail<=0){m.trail=0.025;
       S.parts.push({x:m.x-Math.cos(m.a)*9.8,y:m.y-Math.sin(m.a)*9.8,vx:rnd(-12,12),vy:rnd(-12,12),
         life:.7,max:.7,c:m.life<2?'#ffb3a7':'rgba(220,220,230,.85)',r:4});}
-    if(m.life<=0){boom(m.x,m.y,false);pop(m.x,m.y,'+10 coins','#ffe329');S.score+=5;S.stars+=10;S.mis.splice(i,1);continue;}
+    if(m.life<=0){boom(m.x,m.y,false);pop(m.x,m.y,'+5 coins','#ffe329');S.score+=5;S.stars+=5;S.mis.splice(i,1);continue;}
     if(NimiqCollision.missileHitsPlane(m,p)){
       if(p.shield>0){boom(m.x,m.y,false);p.shield=0;S.stars+=10;pop(p.x,p.y-30,'SHIELD!','#7fe7ff');S.mis.splice(i,1);continue;}
       die();return;
@@ -259,7 +259,7 @@ function update(dt){
       if(ex*ex+ey*ey<MM_R*MM_R){
         var cx=(a1.x+a2.x)/2,cy=(a1.y+a2.y)/2;
         boom(cx,cy,true);
-        S.combo++;S.comboT=3;S.kills+=2;S.stars+=20;
+        S.combo++;S.comboT=3;S.kills+=2;S.stars+=10;
         var bonus=50*S.combo;S.score+=bonus;
         pop(cx,cy,'+'+bonus,'#ffe14d');
         showCombo(S.combo>1?'COMBO x'+S.combo+'!':'BOOM!');

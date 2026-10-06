@@ -298,8 +298,8 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
         ? // Ships and forts each drop exactly 5 coins; no wave bonus anymore.
           ((data.kills["ship"] ?? 0) + (data.kills["fort"] ?? 0)) * 5
         : data.slug === "plane"
-        ? // Coins come from destroyed missiles (+10 each) and star pickups (+1).
-          Math.ceil(10 * (data.durationSec / 1 + 3) + data.durationSec / 1.6 + 10)
+        ? // Coins come from destroyed missiles (+5 each) and star pickups (+1).
+          Math.ceil(5 * (data.durationSec / 1 + 3) + data.durationSec / 1.6 + 10)
         : data.slug === "blocks"
         ? (data.kills["line"] ?? 0) * 5
         : data.slug === "slide"
