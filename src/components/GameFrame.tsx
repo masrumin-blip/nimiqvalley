@@ -30,6 +30,9 @@ const FIT_SLUGS = new Set([
   "pet",
   "rooftop",
   "race",
+  "pirate",
+  "plane",
+  "blocks",
 ]);
 
 export function GameFrame({ slug, name, children }: { slug: string; name: string; children: ReactNode }) {
