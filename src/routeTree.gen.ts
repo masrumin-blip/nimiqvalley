@@ -19,6 +19,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as ChatCharacterIdRouteImport } from './routes/chat.$characterId'
 import { Route as GamesIndexRouteImport } from './routes/games.index'
+import { Route as GamesBlocksRouteImport } from './routes/games.blocks'
 import { Route as GamesBomberRouteImport } from './routes/games.bomber'
 import { Route as GamesCarromRouteImport } from './routes/games.carrom'
 import { Route as GamesCheckersRouteImport } from './routes/games.checkers'
@@ -27,6 +28,8 @@ import { Route as GamesHexamanRouteImport } from './routes/games.hexaman'
 import { Route as GamesJumpRouteImport } from './routes/games.jump'
 import { Route as GamesMininjaRouteImport } from './routes/games.mininja'
 import { Route as GamesPetRouteImport } from './routes/games.pet'
+import { Route as GamesPirateRouteImport } from './routes/games.pirate'
+import { Route as GamesPlaneRouteImport } from './routes/games.plane'
 import { Route as GamesRaceRouteImport } from './routes/games.race'
 import { Route as GamesRooftopRouteImport } from './routes/games.rooftop'
 import { Route as GamesShipRouteImport } from './routes/games.ship'
@@ -89,6 +92,11 @@ const GamesIndexRoute = GamesIndexRouteImport.update({
   path: '/games/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GamesBlocksRoute = GamesBlocksRouteImport.update({
+  id: '/games/blocks',
+  path: '/games/blocks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesBomberRoute = GamesBomberRouteImport.update({
   id: '/games/bomber',
   path: '/games/bomber',
@@ -127,6 +135,16 @@ const GamesMininjaRoute = GamesMininjaRouteImport.update({
 const GamesPetRoute = GamesPetRouteImport.update({
   id: '/games/pet',
   path: '/games/pet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesPirateRoute = GamesPirateRouteImport.update({
+  id: '/games/pirate',
+  path: '/games/pirate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamesPlaneRoute = GamesPlaneRouteImport.update({
+  id: '/games/plane',
+  path: '/games/plane',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GamesRaceRoute = GamesRaceRouteImport.update({
@@ -195,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/blocks': typeof GamesBlocksRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
   '/games/checkers': typeof GamesCheckersRoute
@@ -203,6 +222,8 @@ export interface FileRoutesByFullPath {
   '/games/jump': typeof GamesJumpRoute
   '/games/mininja': typeof GamesMininjaRoute
   '/games/pet': typeof GamesPetRoute
+  '/games/pirate': typeof GamesPirateRoute
+  '/games/plane': typeof GamesPlaneRoute
   '/games/race': typeof GamesRaceRoute
   '/games/rooftop': typeof GamesRooftopRoute
   '/games/ship': typeof GamesShipRoute
@@ -226,6 +247,7 @@ export interface FileRoutesByTo {
   '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/blocks': typeof GamesBlocksRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
   '/games/checkers': typeof GamesCheckersRoute
@@ -234,6 +256,8 @@ export interface FileRoutesByTo {
   '/games/jump': typeof GamesJumpRoute
   '/games/mininja': typeof GamesMininjaRoute
   '/games/pet': typeof GamesPetRoute
+  '/games/pirate': typeof GamesPirateRoute
+  '/games/plane': typeof GamesPlaneRoute
   '/games/race': typeof GamesRaceRoute
   '/games/rooftop': typeof GamesRooftopRoute
   '/games/ship': typeof GamesShipRoute
@@ -258,6 +282,7 @@ export interface FileRoutesById {
   '/admin/leagues': typeof AdminLeaguesRoute
   '/api/chat': typeof ApiChatRoute
   '/chat/$characterId': typeof ChatCharacterIdRoute
+  '/games/blocks': typeof GamesBlocksRoute
   '/games/bomber': typeof GamesBomberRoute
   '/games/carrom': typeof GamesCarromRoute
   '/games/checkers': typeof GamesCheckersRoute
@@ -266,6 +291,8 @@ export interface FileRoutesById {
   '/games/jump': typeof GamesJumpRoute
   '/games/mininja': typeof GamesMininjaRoute
   '/games/pet': typeof GamesPetRoute
+  '/games/pirate': typeof GamesPirateRoute
+  '/games/plane': typeof GamesPlaneRoute
   '/games/race': typeof GamesRaceRoute
   '/games/rooftop': typeof GamesRooftopRoute
   '/games/ship': typeof GamesShipRoute
@@ -291,6 +318,7 @@ export interface FileRouteTypes {
     | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
+    | '/games/blocks'
     | '/games/bomber'
     | '/games/carrom'
     | '/games/checkers'
@@ -299,6 +327,8 @@ export interface FileRouteTypes {
     | '/games/jump'
     | '/games/mininja'
     | '/games/pet'
+    | '/games/pirate'
+    | '/games/plane'
     | '/games/race'
     | '/games/rooftop'
     | '/games/ship'
@@ -322,6 +352,7 @@ export interface FileRouteTypes {
     | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
+    | '/games/blocks'
     | '/games/bomber'
     | '/games/carrom'
     | '/games/checkers'
@@ -330,6 +361,8 @@ export interface FileRouteTypes {
     | '/games/jump'
     | '/games/mininja'
     | '/games/pet'
+    | '/games/pirate'
+    | '/games/plane'
     | '/games/race'
     | '/games/rooftop'
     | '/games/ship'
@@ -353,6 +386,7 @@ export interface FileRouteTypes {
     | '/admin/leagues'
     | '/api/chat'
     | '/chat/$characterId'
+    | '/games/blocks'
     | '/games/bomber'
     | '/games/carrom'
     | '/games/checkers'
@@ -361,6 +395,8 @@ export interface FileRouteTypes {
     | '/games/jump'
     | '/games/mininja'
     | '/games/pet'
+    | '/games/pirate'
+    | '/games/plane'
     | '/games/race'
     | '/games/rooftop'
     | '/games/ship'
@@ -385,6 +421,7 @@ export interface RootRouteChildren {
   AdminLeaguesRoute: typeof AdminLeaguesRoute
   ApiChatRoute: typeof ApiChatRoute
   ChatCharacterIdRoute: typeof ChatCharacterIdRoute
+  GamesBlocksRoute: typeof GamesBlocksRoute
   GamesBomberRoute: typeof GamesBomberRoute
   GamesCarromRoute: typeof GamesCarromRoute
   GamesCheckersRoute: typeof GamesCheckersRoute
@@ -393,6 +430,8 @@ export interface RootRouteChildren {
   GamesJumpRoute: typeof GamesJumpRoute
   GamesMininjaRoute: typeof GamesMininjaRoute
   GamesPetRoute: typeof GamesPetRoute
+  GamesPirateRoute: typeof GamesPirateRoute
+  GamesPlaneRoute: typeof GamesPlaneRoute
   GamesRaceRoute: typeof GamesRaceRoute
   GamesRooftopRoute: typeof GamesRooftopRoute
   GamesShipRoute: typeof GamesShipRoute
@@ -480,6 +519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/games/blocks': {
+      id: '/games/blocks'
+      path: '/games/blocks'
+      fullPath: '/games/blocks'
+      preLoaderRoute: typeof GamesBlocksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/bomber': {
       id: '/games/bomber'
       path: '/games/bomber'
@@ -534,6 +580,20 @@ declare module '@tanstack/react-router' {
       path: '/games/pet'
       fullPath: '/games/pet'
       preLoaderRoute: typeof GamesPetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/pirate': {
+      id: '/games/pirate'
+      path: '/games/pirate'
+      fullPath: '/games/pirate'
+      preLoaderRoute: typeof GamesPirateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/plane': {
+      id: '/games/plane'
+      path: '/games/plane'
+      fullPath: '/games/plane'
+      preLoaderRoute: typeof GamesPlaneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/games/race': {
@@ -625,6 +685,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLeaguesRoute: AdminLeaguesRoute,
   ApiChatRoute: ApiChatRoute,
   ChatCharacterIdRoute: ChatCharacterIdRoute,
+  GamesBlocksRoute: GamesBlocksRoute,
   GamesBomberRoute: GamesBomberRoute,
   GamesCarromRoute: GamesCarromRoute,
   GamesCheckersRoute: GamesCheckersRoute,
@@ -633,6 +694,8 @@ const rootRouteChildren: RootRouteChildren = {
   GamesJumpRoute: GamesJumpRoute,
   GamesMininjaRoute: GamesMininjaRoute,
   GamesPetRoute: GamesPetRoute,
+  GamesPirateRoute: GamesPirateRoute,
+  GamesPlaneRoute: GamesPlaneRoute,
   GamesRaceRoute: GamesRaceRoute,
   GamesRooftopRoute: GamesRooftopRoute,
   GamesShipRoute: GamesShipRoute,

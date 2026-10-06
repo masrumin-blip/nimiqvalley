@@ -54,7 +54,7 @@ export function TelemetryIframeGame({ slug, name, src }: { slug: TelemetrySlug; 
 
   return (
     <GameFrame slug={slug} name={name}>
-      <iframe src={src} title={name} className="h-full w-full border-0" allow="fullscreen" />
+      <iframe src={src} title={name} className="absolute inset-0 h-full w-full border-0" allow="fullscreen" />
     </GameFrame>
   );
 }
