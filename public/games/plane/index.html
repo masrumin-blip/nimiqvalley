@@ -438,7 +438,7 @@ function die(){
   burst(p.x,p.y,['#d9342b','#ffffff','#555'],22,1.3);
   S.shake=1.2;
   var sc=Math.floor(S.score);
-  try{parent.postMessage({type:'nimiq-run',slug:'plane',score:sc,durationSec:Math.min(S.t,(Date.now()-(S.wall0||Date.now()))/1000),wave:0,kills:{missile:S.kills},coins:S.picks||0},location.origin);}catch(e){}
+  try{parent.postMessage({type:'nimiq-run',slug:'plane',score:sc,durationSec:Math.min(S.t,(Date.now()-(S.wall0||Date.now()))/1000),wave:0,kills:{missile:S.kills},coins:S.stars||0},location.origin);}catch(e){}
   if(sc>S.best){S.best=sc;sSet('nimiqplane_best',String(sc));oSub.textContent='NEW RECORD!';}
   else oSub.textContent='SHOT DOWN!';
   hB.textContent=S.best;

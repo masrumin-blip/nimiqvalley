@@ -131,16 +131,15 @@ function checkPirate(run: TelemetryRun): string | null {
   // Every wave queues several ships spawned at least 1.2s apart.
   if (wave > durationSec / 4 + 1) return "wave-rate";
   let shipCap = 0;
-  let waveBonus = 0;
   for (let n = 1; n <= wave; n++) {
     shipCap += 2 + Math.floor(n * 1.2) + (n >= 2 ? Math.floor((n - 1) * 0.8) : 0) + 1 + Math.floor(n / 2) + (n % 4 === 0 ? 1 : 0);
-    waveBonus += 20 + n * 10;
   }
   if (ships > shipCap) return "kill-count";
   if (ships / durationSec > 3) return "kill-rate";
   // At most 8 forts exist and they are rebuilt once per wave.
   if (raids > wave * 8) return "raid-count";
-  const lootMax = ships * 5 + raids * (50 + wave * 15 + 6) + waveBonus;
+  // Ships and forts each drop exactly 5 coins; the wave shop bonus is gone.
+  const lootMax = ships * 5 + raids * 5;
   if (score > lootMax + wave * 100 + ships * 10 + 10) return "score-too-high";
   return null;
 }

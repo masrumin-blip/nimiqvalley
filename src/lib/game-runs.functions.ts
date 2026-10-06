@@ -295,9 +295,11 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
     // Slide has no kills: its coins are paced by slope speed, not by enemies.
     const coinCeiling =
       data.slug === "pirate"
-        ? maxPlausibleCoins((data.kills["ship"] ?? 0) + (data.kills["fort"] ?? 0) * 6, data.durationSec)
+        ? // Ships and forts each drop exactly 5 coins; no wave bonus anymore.
+          ((data.kills["ship"] ?? 0) + (data.kills["fort"] ?? 0)) * 5
         : data.slug === "plane"
-        ? Math.ceil(data.durationSec / 1.6 + 5)
+        ? // Coins come from destroyed missiles (+10 each) and star pickups (+1).
+          Math.ceil(10 * (data.durationSec / 1 + 3) + data.durationSec / 1.6 + 10)
         : data.slug === "blocks"
         ? (data.kills["line"] ?? 0) * 5
         : data.slug === "slide"

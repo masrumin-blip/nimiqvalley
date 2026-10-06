@@ -328,8 +328,7 @@ function razeFort(f){
   f.alive=false;S.raids++;
   burst(f.x,f.y,['#ff9f1a','#ffd75e','#7a7a7a','#ffffff'],34,1.4,40);
   S.shake=Math.max(S.shake,.9);
-  var g=Math.round((50+S.wave*15));
-  for(var k=0;k<6;k++)S.loot.push({x:f.x+rnd(-40,40),y:f.y+rnd(-40,40),v:Math.ceil(g/6),life:20,bob:Math.random()*6,onLand:true});
+  for(var k=0;k<5;k++)S.loot.push({x:f.x+rnd(-40,40),y:f.y+rnd(-40,40),v:1,life:20,bob:Math.random()*6,onLand:true});
   pop(f.x,f.y-40,'FORT RAIDED!','#ffd75e');
 }
 function updateBalls(dt){
@@ -388,7 +387,7 @@ function update(dt){
   /* gelombang selesai jika semua kapal musuh habis (pedagang kabur dihitung selesai) */
   if(!S.queue.length&&!S.ships.length){
     S.clearT+=dt;
-    if(S.clearT>2.2&&(!S.loot.length||S.clearT>5))openShop();          /* tunggu koin terkumpul */
+    if(S.clearT>2.2&&(!S.loot.length||S.clearT>5)){S.p.hp=Math.min(S.p.max,S.p.hp+S.p.max*0.15);startWave();} /* lanjut otomatis tanpa toko */
   }
 }
 
@@ -443,7 +442,7 @@ function gameOver(){
   S.mode='over';S.run=false;
   var p=S.p;burst(p.x,p.y,['#ff9f1a','#ffd75e','#5a3a1e','#ffffff'],40,1.5);S.shake=1.2;
   var score=S.earned+S.wave*100+S.kills*10;
-  try{parent.postMessage({type:'nimiq-run',slug:'pirate',score:score,durationSec:(Date.now()-(S.wall0||Date.now()))/1000,wave:S.wave,kills:{ship:S.kills,fort:S.raids},coins:Math.floor(S.earned/10)},location.origin);}catch(e){}
+  try{parent.postMessage({type:'nimiq-run',slug:'pirate',score:score,durationSec:(Date.now()-(S.wall0||Date.now()))/1000,wave:S.wave,kills:{ship:S.kills,fort:S.raids},coins:S.earned},location.origin);}catch(e){}
   var rec=score>S.best;
   if(rec){S.best=score;sSet('nimiqpirate_best',String(score));}
   $('oSub').textContent=rec?'🏆 NEW RECORD!':'YOUR SHIP SANK';
