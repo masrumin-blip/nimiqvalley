@@ -96,9 +96,10 @@ export const submitScore = createServerFn({ method: "POST" })
     const wallet = await currentWallet();
     if (!wallet) return { saved: false as const, reason: "not-signed-in" as const };
 
-    // These games are verified by server-side replay (see game-runs.functions.ts);
-    // a raw claimed score is never accepted for them.
-    if (["tappy", "crossing", "mininja", "jump", "ship", "shooter", "rooftop", "slide"].includes(data.slug)) {
+    // These games are verified server-side (replay or telemetry, see
+    // game-runs.functions.ts); a raw claimed score is never accepted for them.
+    const VERIFIED_GAMES = ["tappy", "crossing", "mininja", "jump", "ship", "shooter", "rooftop", "slide", "pirate", "plane", "blocks"];
+    if (VERIFIED_GAMES.includes(data.slug)) {
       return { saved: false as const, reason: "verified-only" as const };
     }
 

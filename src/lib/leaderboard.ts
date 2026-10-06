@@ -33,6 +33,9 @@ export const LEADERBOARD_GAMES: LeaderboardGame[] = [
   { slug: "shooter", name: "CosNimiq Shooter", metric: "Score", order: "desc", format: plain },
   { slug: "ship", name: "Nimiq Spaceship", metric: "Score", order: "desc", format: plain },
   { slug: "crossing", name: "Crossing for Nimiq", metric: "Coins", order: "desc", format: plain },
+  { slug: "pirate", name: "Nimiq Pirate", metric: "Score", order: "desc", format: plain },
+  { slug: "plane", name: "Nimiq Plane", metric: "Score", order: "desc", format: plain },
+  { slug: "blocks", name: "Nimiq Blocks Drop", metric: "Score", order: "desc", format: plain },
 ];
 
 export const LEADERBOARD_SLUGS = LEADERBOARD_GAMES.map((g) => g.slug);

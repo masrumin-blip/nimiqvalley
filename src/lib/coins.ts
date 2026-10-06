@@ -4,7 +4,8 @@
 export const COINS_PER_NIM = 100;
 
 /** Hard ceiling per wallet per UTC day so the treasury cannot be drained. */
-export const COIN_DAILY_CAP = 600;
+// No daily limit: effectively unlimited cap passed to the database.
+export const COIN_DAILY_CAP = 2_000_000_000;
 
 /** Minimum purse before a redemption is allowed. */
 export const MIN_REDEEM_COINS = COINS_PER_NIM;

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { getAdminStatus } from "@/lib/admin.functions";
 import { GAMES } from "@/lib/games";
 
-const title = "Game Hub — 15 NimiqValley Games";
+const title = "Game Hub — 18 NimiqValley Games";
 const description =
-  "Fifteen Nimiq arcade games: 3D racing, endless runners, neon mazes, table soccer, a virtual pet, and more.";
+  "Eighteen Nimiq arcade games: 3D racing, pirate battles, missile dodging, hex block puzzles, endless runners, table soccer, and more.";
 
 export const Route = createFileRoute("/games/")({
   head: () => ({

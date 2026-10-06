@@ -8,3 +8,4 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+- Standalone HTML games live in public/games/<slug>/ and report runs via postMessage (nimiq-start / nimiq-run) to TelemetryIframeGame, so every new game uses the same server-ticket + telemetry check path.

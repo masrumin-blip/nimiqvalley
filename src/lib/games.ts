@@ -13,6 +13,9 @@ import shooterCover from "@/assets/game-covers/shooter.jpg";
 import slideCover from "@/assets/game-covers/slide.jpg";
 import soccerCover from "@/assets/game-covers/soccer.jpg";
 import tappyCover from "@/assets/game-covers/tappy.jpg";
+import pirateCover from "@/assets/game-covers/pirate.jpg";
+import planeCover from "@/assets/game-covers/plane.jpg";
+import blocksCover from "@/assets/game-covers/blocks.jpg";
 
 export type GameEntry = {
   slug: string;
@@ -26,6 +29,36 @@ export type GameEntry = {
 };
 
 export const GAMES: GameEntry[] = [
+  {
+    slug: "pirate",
+    path: "/games/pirate",
+    name: "Nimiq Pirate",
+    tagline: "Sink skull-flag pirates, raid island forts, and upgrade your ship.",
+    emoji: "🏴‍☠️",
+    accent: "oklch(0.7 0.13 230)",
+    cover: pirateCover,
+    category: "arcade",
+  },
+  {
+    slug: "plane",
+    path: "/games/plane",
+    name: "Nimiq Plane",
+    tagline: "Dodge homing missiles in a sunset sky and make them collide.",
+    emoji: "✈️",
+    accent: "oklch(0.78 0.15 40)",
+    cover: planeCover,
+    category: "arcade",
+  },
+  {
+    slug: "blocks",
+    path: "/games/blocks",
+    name: "Nimiq Blocks Drop",
+    tagline: "Stack neon hex blocks and clear lines to level up.",
+    emoji: "⬢",
+    accent: "oklch(0.88 0.2 160)",
+    cover: blocksCover,
+    category: "arcade",
+  },
   {
     slug: "jump",
     path: "/games/jump",

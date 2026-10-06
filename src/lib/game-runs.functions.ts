@@ -294,7 +294,13 @@ export const submitTelemetryRun = createServerFn({ method: "POST" })
     const { awardCoins } = await import("./coins.server");
     // Slide has no kills: its coins are paced by slope speed, not by enemies.
     const coinCeiling =
-      data.slug === "slide"
+      data.slug === "pirate"
+        ? maxPlausibleCoins((data.kills["ship"] ?? 0) + (data.kills["fort"] ?? 0) * 6, data.durationSec)
+        : data.slug === "plane"
+        ? Math.ceil(data.durationSec / 1.6 + 5)
+        : data.slug === "blocks"
+        ? (data.kills["line"] ?? 0) * 5
+        : data.slug === "slide"
         ? Math.ceil(data.durationSec * 2 + 20)
         : maxPlausibleCoins(totalKills, data.durationSec);
     const coinsEarned = await awardCoins(wallet, Math.min(data.coins ?? 0, coinCeiling));

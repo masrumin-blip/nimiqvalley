@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Nimiq Pirate</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#0b4f6c;font-family:Georgia,"Times New Roman",serif}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:absolute;left:0;top:0;width:100%;padding:10px 12px;pointer-events:none;color:#fff3d6;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.hp{height:14px;border-radius:8px;background:rgba(0,0,0,.45);border:2px solid #f3d27a;overflow:hidden;max-width:320px}
+#hpf{height:100%;width:100%;background:linear-gradient(90deg,#e8412c,#f6a623);transition:width .15s}
+.row{display:flex;gap:16px;margin-top:6px;font-size:15px;font-weight:bold}
+#msg{position:absolute;left:0;right:0;top:34%;text-align:center;color:#ffd75e;font-size:34px;font-weight:bold;
+ text-shadow:0 3px 0 #6b2b06,0 0 18px rgba(0,0,0,.6);pointer-events:none;opacity:0;transition:opacity .3s;letter-spacing:2px}
+.ovl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+ color:#fff3d6;background:radial-gradient(circle,rgba(20,60,80,.75),rgba(5,15,25,.93));padding:20px;overflow:auto}
+.hidden{display:none!important}
+.ovl h1{font-size:42px;color:#ffd75e;text-shadow:0 4px 0 #6b2b06,0 8px 22px rgba(0,0,0,.6);line-height:1.05}
+.ovl h2{font-size:15px;letter-spacing:5px;color:#9fe3f5;margin-bottom:8px}
+.ovl p{margin-top:12px;font-size:14px;line-height:1.7;color:#e9dcc0}
+.big{font-size:26px;color:#ffd75e;margin-top:8px}
+.btn{margin-top:18px;padding:14px 34px;font-size:17px;font-weight:bold;letter-spacing:2px;color:#3b1d05;font-family:inherit;
+ background:linear-gradient(#ffe08a,#e9a93a);border:3px solid #6b3a0e;border-radius:14px;box-shadow:0 5px 0 #6b3a0e}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #6b3a0e}
+#ups{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;width:100%;max-width:440px}
+.up{background:rgba(255,240,200,.1);border:2px solid #c99a45;border-radius:12px;padding:10px 6px;color:#fff3d6;font-family:inherit}
+.up b{display:block;font-size:15px;color:#ffd75e}
+.up small{display:block;font-size:12px;color:#d9c9a5;margin:3px 0}
+.up i{font-style:normal;font-size:14px;font-weight:bold}
+.up.off{opacity:.4}
+
+:root{--sea: oklch(0.53 0.11 230);--gold:oklch(0.83 0.16 88);--ink:oklch(0.24 0.04 55);--paper:oklch(0.95 0.04 90);--overlay:oklch(0.2 0.05 220 / .9);--button:oklch(0.81 0.14 85);}
+.coin-icon{display:inline-block;width:18px;height:16px;background:var(--gold);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);vertical-align:middle;margin-right:4px;}
+.ovl{background:var(--overlay)}
+.ovl h1{letter-spacing:0}.btn{background:var(--button);color:var(--ink);border-radius:8px;letter-spacing:0}.up{border-radius:8px}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud">
+ <div class="hp"><div id="hpf"></div></div>
+ <div class="row"><span><span class="coin-icon" aria-label="Coins"></span> <b id="hG">0</b></span><span>🌊 Wave <b id="hW">1</b></span><span>☠ <b id="hE">0</b></span></div>
+</div>
+<div id="msg"></div>
+<div id="ov" class="ovl">
+ <h2 id="oSub">CARIBBEAN BATTLE</h2>
+ <h1 id="oTitle">NIMIQ<br>PIRATE</h1>
+ <div class="big" id="oScore"></div>
+ <p id="oText">Drag your finger on the screen to steer<br>(Keyboard: ← → turn, ↓ slow down)<br>Side cannons fire automatically<br>Sink ships, raid island forts,<br>collect coins &amp; upgrade your ship!</p>
+ <button class="btn" id="go">⚓ SET SAIL</button>
+</div>
+<div id="shop" class="ovl hidden">
+ <h2>PIRATE HARBOR</h2>
+ <h1 style="font-size:30px" id="shopT">Wave 1 complete!</h1>
+ <div class="big"><span class="coin-icon" aria-label="Coins"></span> <span id="shopG">0</span></div>
+ <div id="ups"></div>
+ <button class="btn" id="next">⚔ NEXT WAVE</button>
+</div>
+<script>
+(function(){
+'use strict';
+/* ===== UTIL ===== */
+function sGet(k,d){try{var v=localStorage.getItem(k);return v===null?d:v;}catch(e){return d;}}
+function sSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function rnd(a,b){return a+Math.random()*(b-a);}
+function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function angDiff(a,b){var d=b-a;while(d>Math.PI)d-=6.2832;while(d<-Math.PI)d+=6.2832;return d;}
+function dist2(a,b){var dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy;}
+
+/* ===== CONFIG ===== */
+var WORLD=3000, BALL_SPD=430;
+var UPG=[
+ {id:'hull',  name:'Steel Hull', desc:'+25 max HP',     base:60, max:8},
+ {id:'guns',  name:'Cannons',      desc:'+1 cannon per side', base:120,max:3},
+ {id:'dmg',   name:'Iron Shot',    desc:'+20% damage',      base:80, max:8},
+ {id:'reload',name:'Fast Crew',    desc:'-12% reload time',base:90, max:6},
+ {id:'speed', name:'Silk Sails',   desc:'+10% speed',      base:70, max:5},
+ {id:'repair',name:'Repair',       desc:'Restore all HP',   base:30, max:999}
+];
+/* tipe musuh: hp, kecepatan, meriam/sisi, reload, dmg, koin, radius */
+var ETYPE={
+ merchant:{hp:30, spd:86,guns:0,reload:9,  dmg:0, gold:35, r:20,sail:'#efe2c0',hull:'#8a5a2b'},
+ sloop:   {hp:40, spd:113,guns:1,reload:2.8,dmg:4, gold:30, r:19,sail:'#ffffff',hull:'#2f5f8f'},
+ frigate: {hp:95, spd:89,guns:2,reload:2.6,dmg:6, gold:65, r:25,sail:'#f4f4f4',hull:'#7d2a2a'},
+ galleon: {hp:320,spd:71, guns:4,reload:2.9,dmg:8, gold:220,r:34,sail:'#ffd9a0',hull:'#4b2a12'}
+};
+
+/* ===== DOM ===== */
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var $=function(id){return document.getElementById(id);};
+var hpf=$('hpf'),hG=$('hG'),hW=$('hW'),hE=$('hE'),msgEl=$('msg');
+var ov=$('ov'),shop=$('shop'),ups=$('ups');
+var W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,1.5);
+  W=window.innerWidth;H=window.innerHeight;
+  cv.width=Math.floor(W*DPR);cv.height=Math.floor(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resize);resize();
+
+/* ===== STATE ===== */
+var S={};
+function newPlayer(){
+  return {x:WORLD/2,y:WORLD/2,a:-Math.PI/2,v:0,r:22,hp:120,max:120,guns:2,dmg:10,
+    reload:1.6,spd:131,range:340,cdL:0,cdR:0,hitT:0,wake:0,
+    lv:{hull:0,guns:0,dmg:0,reload:0,speed:0,repair:0}};
+}
+function genIslands(){
+  S.islands=[];S.forts=[];
+  var tries=0;
+  while(S.islands.length<16&&tries<600){
+    tries++;
+    var r=rnd(70,165),x=rnd(r+120,WORLD-r-120),y=rnd(r+120,WORLD-r-120);
+    if(Math.sqrt((x-WORLD/2)*(x-WORLD/2)+(y-WORLD/2)*(y-WORLD/2))<r+320)continue;
+    var ok=true;
+    for(var i=0;i<S.islands.length;i++){var o=S.islands[i];
+      var dx=o.x-x,dy=o.y-y;if(Math.sqrt(dx*dx+dy*dy)<o.r+r+170){ok=false;break;}}
+    if(!ok)continue;
+    var palms=[],n=2+Math.floor(r/45);
+    for(var k=0;k<n;k++){var pa=rnd(0,6.28),pr=rnd(r*0.15,r*0.6);palms.push({x:Math.cos(pa)*pr,y:Math.sin(pa)*pr,s:rnd(.8,1.2)});}
+    var shape=[],np=10+Math.floor(Math.random()*5);
+    for(var q=0;q<np;q++)shape.push(rnd(0.72,1.12));
+    for(var sm=0;sm<2;sm++){var cp=shape.slice();for(q=0;q<np;q++)shape[q]=(cp[(q+np-1)%np]+cp[q]*2+cp[(q+1)%np])/4;}
+    var isl={x:x,y:y,r:r,palms:palms,seed:Math.random()*6,shape:shape};
+    S.islands.push(isl);
+    if(S.islands.length%2===0)S.forts.push({x:x,y:y,isl:isl,hp:0,max:60,alive:false,cd:2,a:0,r:26});
+  }
+}
+function reset(){
+  S.run=false;S.mode='title';S.t=0;S.wave=0;S.gold=0;S.earned=0;S.kills=0;S.raids=0;
+  S.p=newPlayer();S.ships=[];S.balls=[];S.parts=[];S.loot=[];S.pops=[];
+  S.queue=[];S.spawnT=0;S.clearT=0;S.shake=0;
+  S.best=parseInt(sGet('nimiqpirate_best','0'),10)||0;
+  genIslands();
+}
+function msg(t){msgEl.textContent=t;msgEl.style.opacity=1;clearTimeout(msg.h);
+  msg.h=setTimeout(function(){msgEl.style.opacity=0;},1800);}
+
+/* ===== INPUT: seluruh layar = joystick ===== */
+var keys={},joy={id:null,sx:0,sy:0,x:0,y:0};
+function jStart(id,x,y){if(joy.id!==null)return;joy.id=id;joy.sx=joy.x=x;joy.sy=joy.y=y;}
+function jMove(id,x,y){if(joy.id===id){joy.x=x;joy.y=y;}}
+function jEnd(id){if(joy.id===id)joy.id=null;}
+cv.addEventListener('touchstart',function(e){e.preventDefault();
+  for(var i=0;i<e.changedTouches.length;i++){var t=e.changedTouches[i];jStart(t.identifier,t.clientX,t.clientY);}},{passive:false});
+cv.addEventListener('touchmove',function(e){e.preventDefault();
+  for(var i=0;i<e.changedTouches.length;i++){var t=e.changedTouches[i];jMove(t.identifier,t.clientX,t.clientY);}},{passive:false});
+function tEnd(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++)jEnd(e.changedTouches[i].identifier);}
+cv.addEventListener('touchend',tEnd,{passive:false});
+cv.addEventListener('touchcancel',tEnd,{passive:false});
+cv.addEventListener('mousedown',function(e){jStart('m',e.clientX,e.clientY);});
+window.addEventListener('mousemove',function(e){jMove('m',e.clientX,e.clientY);});
+window.addEventListener('mouseup',function(){jEnd('m');});
+var KMAP={ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R',ArrowUp:'U',KeyW:'U',ArrowDown:'D',KeyS:'D'};
+window.addEventListener('keydown',function(e){var k=KMAP[e.code];if(k){keys[k]=true;e.preventDefault();}},{passive:false});
+window.addEventListener('keyup',function(e){var k=KMAP[e.code];if(k)keys[k]=false;});
+/* ===== EFEK ===== */
+function burst(x,y,cols,n,pw,up){
+  for(var i=0;i<n;i++){var a=Math.random()*6.283,s=rnd(30,170)*pw;
+    S.parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-(up||0),life:rnd(.35,.85),max:.85,c:cols[i%cols.length],r:rnd(2,5.5)});}
+}
+function splash(x,y){burst(x,y,['#dff6ff','#9fd9ee','#ffffff'],7,.55);}
+function pop(x,y,t,c){S.pops.push({x:x,y:y,t:t,c:c,life:1.1});}
+
+/* ===== GELOMBANG (semakin lama semakin sulit) ===== */
+function buildWave(n){
+  var q=[],i;
+  var sloops=2+Math.floor(n*1.2),frig=n>=2?Math.floor((n-1)*0.8):0,merch=1+Math.floor(n/2);
+  for(i=0;i<merch;i++)q.push('merchant');
+  for(i=0;i<sloops;i++)q.push('sloop');
+  for(i=0;i<frig;i++)q.push('frigate');
+  if(n%4===0)q.push('galleon');                  /* bos tiap 4 gelombang */
+  for(i=q.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=q[i];q[i]=q[j];q[j]=t;}
+  return q;
+}
+function startWave(){
+  S.wave++;S.queue=buildWave(S.wave);S.spawnT=1;S.clearT=0;
+  S.mode='play';S.run=true;
+  /* benteng bangkit lagi dan makin kuat */
+  for(var i=0;i<S.forts.length;i++){var f=S.forts[i];
+    f.max=60+S.wave*18;f.hp=f.max;f.alive=true;f.cd=rnd(1,3);}
+  msg(S.wave%4===0?'⚠ BOSS GALLEON! Wave '+S.wave:'Wave '+S.wave);
+}
+function scale(){return 1+(S.wave-1)*0.13;}           /* hp & dmg musuh naik tiap gelombang */
+function spawnShip(kind){
+  var T=ETYPE[kind],p=S.p,a=Math.random()*6.283,d=Math.max(W,H)*0.7+180;
+  var x=clamp(p.x+Math.cos(a)*d,60,WORLD-60),y=clamp(p.y+Math.sin(a)*d,60,WORLD-60);
+  if(onIsland(x,y,T.r+10)){x=clamp(p.x-Math.cos(a)*d,60,WORLD-60);y=clamp(p.y-Math.sin(a)*d,60,WORLD-60);}
+  var sc=scale();
+  S.ships.push({kind:kind,x:x,y:y,a:Math.atan2(p.y-y,p.x-x),v:T.spd*0.6,
+    hp:T.hp*sc,max:T.hp*sc,dmg:T.dmg*(1+(S.wave-1)*0.08),spd:T.spd*(1+Math.min(.25,(S.wave-1)*0.025)),
+    r:T.r,cdL:rnd(1,T.reload),cdR:rnd(1,T.reload),T:T,hitT:0,wake:0,side:Math.random()<.5?1:-1,flee:kind==='merchant'});
+}
+
+/* ===== TABRAKAN PULAU ===== */
+function onIsland(x,y,r){
+  for(var i=0;i<S.islands.length;i++){var o=S.islands[i],dx=x-o.x,dy=y-o.y,rr=o.r+r;
+    if(dx*dx+dy*dy<rr*rr)return o;}
+  return null;
+}
+function pushOut(s){
+  for(var i=0;i<S.islands.length;i++){var o=S.islands[i],dx=s.x-o.x,dy=s.y-o.y,d=Math.sqrt(dx*dx+dy*dy)||1,rr=o.r+s.r*0.8;
+    if(d<rr){s.x=o.x+dx/d*rr;s.y=o.y+dy/d*rr;s.v*=0.6;}}
+  s.x=clamp(s.x,s.r,WORLD-s.r);s.y=clamp(s.y,s.r,WORLD-s.r);
+}
+
+/* ===== MERIAM ===== */
+function fireSide(s,side,n,dmg,enemy,range,tgt){
+  var perp=s.a+side*Math.PI/2,spread=s.r*1.1;
+  if(tgt){ /* bantuan bidik pemain: arahkan ke posisi target berikutnya (lead) */
+    var tv=tgt.v||0,ta=tgt.a||0,dd=Math.sqrt(dist2(s,tgt)),lt=dd/BALL_SPD;
+    var px=tgt.x+Math.cos(ta)*tv*lt-Math.cos(s.a)*s.v*lt,py=tgt.y+Math.sin(ta)*tv*lt-Math.sin(s.a)*s.v*lt;
+    perp+=clamp(angDiff(perp,Math.atan2(py-s.y,px-s.x)),-0.55,0.55);
+  }
+  for(var i=0;i<n;i++){
+    var off=n===1?0:(i/(n-1)-0.5)*spread*1.4;
+    var bx=s.x+Math.cos(s.a)*off+Math.cos(perp)*s.r*0.7,by=s.y+Math.sin(s.a)*off+Math.sin(perp)*s.r*0.7;
+    var aa=perp+(enemy?rnd(-0.16,0.16):rnd(-0.06,0.06));
+    S.balls.push({x:bx,y:by,vx:Math.cos(aa)*BALL_SPD+Math.cos(s.a)*s.v,vy:Math.sin(aa)*BALL_SPD+Math.sin(s.a)*s.v,
+      life:range/BALL_SPD,dmg:dmg,enemy:enemy});
+    burst(bx,by,['#e8e8e8','#bdbdbd','#ffcf6b'],4,.35);
+  }
+}
+/* target ada di sisi mana? -1 kiri, 1 kanan, 0 tidak */
+function sideOf(s,tx,ty,range,arc){
+  var dx=tx-s.x,dy=ty-s.y,d=Math.sqrt(dx*dx+dy*dy);
+  if(d>range)return 0;
+  var rel=angDiff(s.a,Math.atan2(dy,dx));
+  if(Math.abs(Math.abs(rel)-Math.PI/2)<(arc||0.6))return rel>0?1:-1;
+  return 0;
+}
+/* ===== UPDATE ===== */
+function updatePlayer(dt){
+  var p=S.p,turnRate=1.9;
+  /* arah: joystick (seret dari titik sentuh) atau keyboard */
+  if(joy.id!==null){
+    var jx=joy.x-joy.sx,jy=joy.y-joy.sy;
+    if(jx*jx+jy*jy>14*14){
+      var want=Math.atan2(jy,jx),dd=angDiff(p.a,want),mt=turnRate*dt;
+      p.a+=clamp(dd,-mt,mt);
+    }
+  }
+  if(keys.L)p.a-=turnRate*dt;
+  if(keys.R)p.a+=turnRate*dt;
+  var target=keys.D?p.spd*0.35:p.spd;               /* kapal selalu berlayar */
+  p.v+=(target-p.v)*Math.min(1,dt*1.6);
+  p.x+=Math.cos(p.a)*p.v*dt;p.y+=Math.sin(p.a)*p.v*dt;
+  pushOut(p);
+  if(p.hitT>0)p.hitT-=dt;
+  p.cdL-=dt;p.cdR-=dt;
+  /* tembak otomatis ke target terdekat di tiap sisi */
+  var bestL=null,bestR=null,dL=1e9,dR=1e9,i,t,sd,d;
+  var targets=[];
+  for(i=0;i<S.ships.length;i++)targets.push(S.ships[i]);
+  for(i=0;i<S.forts.length;i++)if(S.forts[i].alive)targets.push(S.forts[i]);
+  for(i=0;i<targets.length;i++){t=targets[i];sd=sideOf(p,t.x,t.y,p.range,0.95);if(!sd)continue;
+    d=dist2(p,t);if(sd<0&&d<dL){dL=d;bestL=t;}if(sd>0&&d<dR){dR=d;bestR=t;}}
+  if(bestL&&p.cdL<=0){fireSide(p,-1,p.guns,p.dmg,false,p.range+40,bestL);p.cdL=p.reload;}
+  if(bestR&&p.cdR<=0){fireSide(p,1,p.guns,p.dmg,false,p.range+40,bestR);p.cdR=p.reload;}
+  p.wake-=dt;if(p.wake<=0){p.wake=.05;S.parts.push({x:p.x-Math.cos(p.a)*p.r,y:p.y-Math.sin(p.a)*p.r,vx:0,vy:0,life:1.2,max:1.2,c:'rgba(255,255,255,.55)',r:4,wake:1});}
+}
+function updateShips(dt){
+  var p=S.p;
+  for(var i=S.ships.length-1;i>=0;i--){
+    var s=S.ships[i],T=s.T,dx=p.x-s.x,dy=p.y-s.y,d=Math.sqrt(dx*dx+dy*dy),want;
+    if(s.flee){want=Math.atan2(-dy,-dx);}                        /* pedagang kabur */
+    else if(d>T.r+170){want=Math.atan2(dy,dx)+s.side*0.35;}     /* mendekat */
+    else {want=Math.atan2(dy,dx)+s.side*Math.PI/2;}              /* sejajar, buka lambung meriam */
+    /* hindari pulau di depan */
+    var lx=s.x+Math.cos(s.a)*90,ly=s.y+Math.sin(s.a)*90,isl=onIsland(lx,ly,s.r);
+    if(isl)want=Math.atan2(s.y-isl.y,s.x-isl.x)+s.side*1.2;
+    var mt=1.15*dt;s.a+=clamp(angDiff(s.a,want),-mt,mt);
+    s.v+=(s.spd-s.v)*Math.min(1,dt);
+    s.x+=Math.cos(s.a)*s.v*dt;s.y+=Math.sin(s.a)*s.v*dt;
+    pushOut(s);
+    if(s.hitT>0)s.hitT-=dt;
+    if(T.guns>0){
+      s.cdL-=dt;s.cdR-=dt;
+      var sd=sideOf(s,p.x,p.y,300);
+      if(sd<0&&s.cdL<=0){fireSide(s,-1,T.guns,s.dmg,true,330);s.cdL=T.reload*rnd(1.05,1.4);}
+      if(sd>0&&s.cdR<=0){fireSide(s,1,T.guns,s.dmg,true,330);s.cdR=T.reload*rnd(1.05,1.4);}
+    }
+    /* tabrakan badan kapal */
+    var rr=s.r+p.r;
+    if(d<rr&&d>0){var push=(rr-d)/2,nx=dx/d,ny=dy/d;p.x+=nx*push;p.y+=ny*push;s.x-=nx*push;s.y-=ny*push;
+      hurtPlayer(10*dt);s.hp-=14*dt;}
+    s.wake-=dt;if(s.wake<=0){s.wake=.07;S.parts.push({x:s.x-Math.cos(s.a)*s.r,y:s.y-Math.sin(s.a)*s.r,vx:0,vy:0,life:1,max:1,c:'rgba(255,255,255,.45)',r:3.5,wake:1});}
+    /* pedagang yang terlalu jauh / terlalu lama lolos (gelombang tidak macet) */
+    s.age=(s.age||0)+dt;
+    if(s.flee&&(d>1500||s.age>35)){S.ships.splice(i,1);continue;}
+    if(s.hp<=0)sinkShip(i);
+  }
+}
+function updateForts(dt){
+  var p=S.p;
+  for(var i=0;i<S.forts.length;i++){var f=S.forts[i];if(!f.alive)continue;
+    var dx=p.x-f.x,dy=p.y-f.y,d=Math.sqrt(dx*dx+dy*dy);
+    f.a=Math.atan2(dy,dx);
+    if(f.hitT>0)f.hitT-=dt;
+    f.cd-=dt;
+    if(d<f.isl.r+330&&f.cd<=0){
+      var lead=d/BALL_SPD,tx=p.x+Math.cos(p.a)*p.v*lead*0.7,ty=p.y+Math.sin(p.a)*p.v*lead*0.7;
+      var aa=Math.atan2(ty-f.y,tx-f.x)+rnd(-.08,.08);
+      S.balls.push({x:f.x,y:f.y,vx:Math.cos(aa)*BALL_SPD,vy:Math.sin(aa)*BALL_SPD,life:(f.isl.r+380)/BALL_SPD,
+        dmg:8*(1+(S.wave-1)*0.08),enemy:true,fort:true});
+      burst(f.x,f.y,['#e8e8e8','#ffcf6b'],5,.4);
+      f.cd=Math.max(1.3,2.6-S.wave*0.08)*rnd(.9,1.2);
+    }
+  }
+}
+function hurtPlayer(dmg){
+  var p=S.p;if(dmg<=0)return;
+  p.hp-=dmg;p.hitT=.15;S.shake=Math.max(S.shake,Math.min(.8,dmg/18));
+  if(p.hp<=0){p.hp=0;gameOver();}
+}
+function sinkShip(i){
+  var s=S.ships[i];S.ships.splice(i,1);S.kills++;
+  burst(s.x,s.y,['#ff9f1a','#ffd75e','#5a3a1e','#cfcfcf'],26,1.2);
+  S.shake=Math.max(S.shake,.5);
+  var n=5;
+  for(var k=0;k<n;k++)S.loot.push({x:s.x+rnd(-25,25),y:s.y+rnd(-25,25),v:1,life:35,bob:Math.random()*6});
+  for(var w=0;w<6;w++)S.parts.push({x:s.x+rnd(-s.r,s.r),y:s.y+rnd(-s.r,s.r),vx:rnd(-10,10),vy:rnd(-10,10),life:1.6,max:1.6,c:'#6b4423',r:rnd(3,6)});
+}
+function razeFort(f){
+  f.alive=false;S.raids++;
+  burst(f.x,f.y,['#ff9f1a','#ffd75e','#7a7a7a','#ffffff'],34,1.4,40);
+  S.shake=Math.max(S.shake,.9);
+  var g=Math.round((50+S.wave*15));
+  for(var k=0;k<6;k++)S.loot.push({x:f.x+rnd(-40,40),y:f.y+rnd(-40,40),v:Math.ceil(g/6),life:20,bob:Math.random()*6,onLand:true});
+  pop(f.x,f.y-40,'FORT RAIDED!','#ffd75e');
+}
+function updateBalls(dt){
+  var p=S.p;
+  for(var i=S.balls.length-1;i>=0;i--){var b=S.balls[i];
+    b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+    var hit=false,k;
+    if(b.enemy){
+      if(dist2(b,p)<p.r*p.r){hurtPlayer(b.dmg);burst(b.x,b.y,['#ff9f1a','#5a3a1e'],8,.6);hit=true;}
+    }else{
+      for(k=0;k<S.ships.length&&!hit;k++){var s=S.ships[k];
+        if(dist2(b,s)<s.r*s.r){s.hp-=b.dmg;s.hitT=.12;burst(b.x,b.y,['#ff9f1a','#5a3a1e'],7,.6);
+          pop(b.x,b.y-10,'-'+Math.round(b.dmg),'#ffe2a0');hit=true;}}
+      for(k=0;k<S.forts.length&&!hit;k++){var f=S.forts[k];
+        if(f.alive&&dist2(b,f)<(f.r+6)*(f.r+6)){f.hp-=b.dmg;f.hitT=.12;burst(b.x,b.y,['#ff9f1a','#999'],7,.6);
+          hit=true;if(f.hp<=0)razeFort(f);}}
+    }
+    /* peluru jatuh ke pulau (tanpa benteng) */
+    if(!hit&&!b.fort&&onIsland(b.x,b.y,0)){
+      var isl=onIsland(b.x,b.y,0),fo=null;
+      for(k=0;k<S.forts.length;k++)if(S.forts[k].isl===isl&&S.forts[k].alive)fo=S.forts[k];
+      if(!fo||b.enemy){burst(b.x,b.y,['#d8c08a','#8a6a3a'],5,.4);hit=true;}
+    }
+    if(hit){S.balls.splice(i,1);continue;}
+    if(b.life<=0){splash(b.x,b.y);S.balls.splice(i,1);}
+  }
+}
+function updateLoot(dt){
+  var p=S.p;
+  for(var i=S.loot.length-1;i>=0;i--){var l=S.loot[i];l.life-=dt;l.bob+=dt*3;
+    var dx=p.x-l.x,dy=p.y-l.y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<420&&d>0){var pull=Math.min(d,(320+(420-d))*dt);l.x+=dx/d*pull;l.y+=dy/d*pull;}  /* magnet */
+    if(d<p.r+18){S.gold+=l.v;S.earned+=l.v;pop(l.x,l.y,'+'+l.v,'#ffd75e');S.loot.splice(i,1);continue;}
+    if(d<p.r+10){S.gold+=l.v;S.earned+=l.v;pop(l.x,l.y,'+'+l.v,'#ffd75e');S.loot.splice(i,1);continue;}
+    if(l.life<=0)S.loot.splice(i,1);
+  }
+}
+function update(dt){
+  S.t+=dt;
+  if(S.shake>0)S.shake=Math.max(0,S.shake-dt*2.5);
+  var i;
+  for(i=S.parts.length-1;i>=0;i--){var q=S.parts[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;
+    if(q.life<=0)S.parts.splice(i,1);}
+  for(i=S.pops.length-1;i>=0;i--){S.pops[i].y-=35*dt;S.pops[i].life-=dt;if(S.pops[i].life<=0)S.pops.splice(i,1);}
+  if(S.mode!=='play'){
+    if(S.mode==='title'){var p=S.p;p.a+=dt*0.25;p.x+=Math.cos(p.a)*45*dt;p.y+=Math.sin(p.a)*45*dt;pushOut(p);}
+    return;
+  }
+  /* munculkan musuh bertahap; jumlah aktif dibatasi naik per gelombang */
+  var cap=2+Math.floor((S.wave+1)/2);
+  S.spawnT-=dt;
+  if(S.spawnT<=0&&S.queue.length&&S.ships.length<cap){spawnShip(S.queue.shift());S.spawnT=Math.max(1.2,3.2-S.wave*0.15);}
+  updatePlayer(dt);if(S.mode!=='play')return;
+  updateShips(dt);updateForts(dt);updateBalls(dt);if(S.mode!=='play')return;
+  updateLoot(dt);
+  /* gelombang selesai jika semua kapal musuh habis (pedagang kabur dihitung selesai) */
+  if(!S.queue.length&&!S.ships.length){
+    S.clearT+=dt;
+    if(S.clearT>2.2&&(!S.loot.length||S.clearT>5))openShop();          /* tunggu koin terkumpul */
+  }
+}
+
+/* ===== TOKO UPGRADE ===== */
+function cost(u){var l=S.p.lv[u.id];return u.id==='repair'?Math.round(u.base+S.wave*6):Math.round(u.base*Math.pow(1.55,l));}
+function applyUp(id){
+  var p=S.p;p.lv[id]++;
+  if(id==='hull'){p.max+=25;p.hp+=25;}
+  else if(id==='guns')p.guns++;
+  else if(id==='dmg')p.dmg*=1.2;
+  else if(id==='reload')p.reload*=0.88;
+  else if(id==='speed')p.spd*=1.1;
+  else if(id==='repair')p.hp=p.max;
+}
+function renderShop(){
+  $('shopG').textContent=S.gold;
+  var h='';
+  for(var i=0;i<UPG.length;i++){var u=UPG[i],c=cost(u),l=S.p.lv[u.id];
+    var maxed=l>=u.max||(u.id==='repair'&&S.p.hp>=S.p.max);
+    var off=maxed||S.gold<c;
+    h+='<button class="up'+(off?' off':'')+'" data-id="'+u.id+'"><b>'+u.name+'</b><small>'+u.desc+
+      (u.id!=='repair'?' (Lv '+l+'/'+u.max+')':' ('+Math.round(S.p.hp)+'/'+S.p.max+')')+'</small><i>'+
+      (maxed?'MAX':'<span class="coin-icon" aria-label="Coins"></span> '+c)+'</i></button>';}
+  ups.innerHTML=h;
+}
+ups.addEventListener('click',function(e){
+  var el=e.target;while(el&&el!==ups&&!el.getAttribute('data-id'))el=el.parentNode;
+  if(!el||el===ups)return;
+  var id=el.getAttribute('data-id'),u=null;
+  for(var i=0;i<UPG.length;i++)if(UPG[i].id===id)u=UPG[i];
+  var c=cost(u);
+  if(S.p.lv[id]>=u.max||S.gold<c)return;
+  if(id==='repair'&&S.p.hp>=S.p.max)return;
+  S.gold-=c;applyUp(id);renderShop();
+});
+function openShop(){
+  S.mode='shop';S.balls=[];
+  /* bonus akhir gelombang + perbaikan kecil gratis */
+  var bonus=20+S.wave*10;S.gold+=bonus;S.earned+=bonus;
+  S.p.hp=Math.min(S.p.max,S.p.hp+S.p.max*0.15);
+  $('shopT').textContent='Wave '+S.wave+' complete! (+'+bonus+' coins)';
+  renderShop();shop.classList.remove('hidden');
+}
+
+/* ===== FLOW ===== */
+function startGame(){
+  reset();ov.classList.add('hidden');shop.classList.add('hidden');startWave();
+  S.wall0=Date.now();try{parent.postMessage({type:'nimiq-start',slug:'pirate'},location.origin);}catch(e){}
+}
+function gameOver(){
+  if(S.mode==='over')return;
+  S.mode='over';S.run=false;
+  var p=S.p;burst(p.x,p.y,['#ff9f1a','#ffd75e','#5a3a1e','#ffffff'],40,1.5);S.shake=1.2;
+  var score=S.earned+S.wave*100+S.kills*10;
+  try{parent.postMessage({type:'nimiq-run',slug:'pirate',score:score,durationSec:(Date.now()-(S.wall0||Date.now()))/1000,wave:S.wave,kills:{ship:S.kills,fort:S.raids},coins:Math.floor(S.earned/10)},location.origin);}catch(e){}
+  var rec=score>S.best;
+  if(rec){S.best=score;sSet('nimiqpirate_best',String(score));}
+  $('oSub').textContent=rec?'🏆 NEW RECORD!':'YOUR SHIP SANK';
+  $('oTitle').innerHTML='GAME<br>OVER';
+  $('oScore').textContent='Score '+score;
+  $('oText').innerHTML='Wave reached: '+S.wave+'<br>Ships sunk: '+S.kills+
+    '<br>Forts raided: '+S.raids+'<br>Total coins: '+S.earned+'<br>Best: '+S.best;
+  $('go').textContent='⚓ SAIL AGAIN';
+  setTimeout(function(){ov.classList.remove('hidden');},900);
+}
+$('go').addEventListener('click',function(e){e.preventDefault();startGame();});
+$('next').addEventListener('click',function(e){e.preventDefault();shop.classList.add('hidden');startWave();});
+/* ===== RENDER ===== */
+var camX=0,camY=0;
+function sx(x){return x-camX;}function sy(y){return y-camY;}
+function drawSea(){
+  ctx.fillStyle='#1578a0';ctx.fillRect(0,0,W,H);
+  /* pola ombak bergeser */
+  ctx.strokeStyle='rgba(255,255,255,.10)';ctx.lineWidth=2;
+  var g=70,ox=-((camX%g)+g)%g,oy=-((camY%g)+g)%g,t=S.t;
+  ctx.beginPath();
+  for(var y=oy-g;y<H+g;y+=g)for(var x=ox-g;x<W+g;x+=g){
+    var wx=x+camX,wy=y+camY,ph=Math.sin(wx*0.013+wy*0.017+t*1.4)*6;
+    ctx.moveTo(x+ph,y+20);ctx.quadraticCurveTo(x+12+ph,y+13,x+24+ph,y+20);}
+  ctx.stroke();
+  /* batas dunia */
+  ctx.strokeStyle='rgba(10,30,50,.5)';ctx.lineWidth=40;ctx.strokeRect(sx(-20),sy(-20),WORLD+40,WORLD+40);
+}
+function islandPath(x,y,o,scale,wob){
+  var n=o.shape.length,pts=[],i,a,rr;
+  for(i=0;i<n;i++){a=i/n*6.283;rr=o.r*o.shape[i]*scale+(wob?Math.sin(S.t*1.5+o.seed+i)*2:0);
+    pts.push([x+Math.cos(a)*rr,y+Math.sin(a)*rr]);}
+  ctx.beginPath();
+  var mx=(pts[0][0]+pts[n-1][0])/2,my=(pts[0][1]+pts[n-1][1])/2;ctx.moveTo(mx,my);
+  for(i=0;i<n;i++){var p=pts[i],q=pts[(i+1)%n];ctx.quadraticCurveTo(p[0],p[1],(p[0]+q[0])/2,(p[1]+q[1])/2);}
+  ctx.closePath();
+}
+function drawIsland(o){
+  var x=sx(o.x),y=sy(o.y);
+  if(x<-o.r-80||x>W+o.r+80||y<-o.r-80||y>H+o.r+80)return;
+  ctx.fillStyle='rgba(120,225,225,.55)';islandPath(x,y,o,1.18,true);ctx.fill();
+  ctx.fillStyle='#f2dc9b';islandPath(x,y,o,1,false);ctx.fill();
+  ctx.fillStyle='#5aa341';islandPath(x+o.r*0.05,y-o.r*0.05,o,0.74,false);ctx.fill();
+  ctx.fillStyle='#4a8f35';islandPath(x-o.r*0.2,y+o.r*0.15,o,0.4,false);ctx.fill();
+  for(var i=0;i<o.palms.length;i++){var pm=o.palms[i],px=x+pm.x,py=y+pm.y,s=pm.s*13;
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.arc(px+5,py+5,s,0,6.283);ctx.fill();
+    ctx.fillStyle='#2f7d2a';
+    for(var k=0;k<5;k++){var a=k*1.257+o.seed;ctx.beginPath();
+      ctx.ellipse(px+Math.cos(a)*s*0.6,py+Math.sin(a)*s*0.6,s*0.75,s*0.3,a,0,6.283);ctx.fill();}
+    ctx.fillStyle='#7a4e22';ctx.beginPath();ctx.arc(px,py,3,0,6.283);ctx.fill();}
+}
+function drawFort(f){
+  var x=sx(f.x),y=sy(f.y);
+  if(x<-80||x>W+80||y<-80||y>H+80)return;
+  if(!f.alive){ctx.fillStyle='#6d6d6d';ctx.fillRect(x-20,y-14,40,28);ctx.fillStyle='#3c3c3c';
+    ctx.fillRect(x-14,y-8,10,10);ctx.fillRect(x+4,y-2,10,8);return;}
+  ctx.fillStyle=f.hitT>0?'#ffffff':'#9b9b9b';ctx.fillRect(x-24,y-24,48,48);
+  ctx.fillStyle='#7b7b7b';
+  for(var i=0;i<4;i++){ctx.fillRect(x-24+i*13,y-30,8,8);}
+  ctx.fillStyle='#c0392b';ctx.fillRect(x-1,y-48,2,20);ctx.beginPath();ctx.moveTo(x+1,y-48);ctx.lineTo(x+16,y-43);ctx.lineTo(x+1,y-38);ctx.fill();
+  ctx.save();ctx.translate(x,y);ctx.rotate(f.a);ctx.fillStyle='#222';ctx.fillRect(0,-5,30,10);ctx.restore();
+  bar(x,y-58,52,f.hp/f.max,'#ff5a3c');
+}
+function bar(x,y,w,f,c){ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(x-w/2-1,y-1,w+2,7);ctx.fillStyle=c;ctx.fillRect(x-w/2,y,w*clamp(f,0,1),5);}
+var playerImage=new Image(),enemyImage=new Image();
+playerImage.src='player.png';enemyImage.src='enemy.png';
+function hexagon(x,y,r,color){
+  ctx.fillStyle=color;ctx.beginPath();
+  for(var h=0;h<6;h++){var a=h*Math.PI/3;var px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;if(h===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+  ctx.closePath();ctx.fill();
+}
+function drawShip(s,hull,sail,flag,isP){
+  var x=sx(s.x),y=sy(s.y),length=s.r*4.2,width=length*565/985;
+  if(x<-length||x>W+length||y<-length||y>H+length)return;
+  var image=isP?playerImage:enemyImage;
+  if(image.complete&&image.naturalWidth){
+    ctx.save();ctx.translate(x+6,y+8);ctx.rotate(s.a);ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath();ctx.ellipse(0,0,length*0.42,width*0.36,0,0,6.283);ctx.fill();ctx.restore();
+    ctx.save();ctx.translate(x,y);ctx.rotate(s.a-Math.PI/2);
+    if(s.hitT>0)ctx.globalAlpha=.65;
+    ctx.drawImage(image,-width/2,-length/2,width,length);ctx.restore();
+  }else{
+    ctx.save();ctx.translate(x,y);ctx.rotate(s.a);
+    ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(6,8,length*0.42,width*0.36,0,0,6.283);ctx.fill();
+    if(s.hitT>0)ctx.globalAlpha=.65;
+    ctx.fillStyle='#7a4f2a';ctx.beginPath();ctx.moveTo(length*0.5,0);ctx.quadraticCurveTo(length*0.15,width*0.42,-length*0.45,width*0.3);
+    ctx.lineTo(-length*0.45,-width*0.3);ctx.quadraticCurveTo(length*0.15,-width*0.42,length*0.5,0);ctx.fill();
+    ctx.fillStyle='#4a3020';ctx.fillRect(-length*0.3,-width*0.08,length*0.6,width*0.16);
+    ctx.fillStyle=isP?'#efe4cf':'#3a3a3a';ctx.fillRect(-length*0.08,-width*0.45,length*0.16,width*0.9);
+    if(isP)hexagon(0,0,width*0.18,'#f6c244');else{ctx.fillStyle='#eee';ctx.beginPath();ctx.arc(0,0,width*0.13,0,6.283);ctx.fill();}
+    ctx.restore();
+  }
+  if(!isP&&s.hp<s.max)bar(x,y-length/2-12,s.r*1.8,s.hp/s.max,'#ff5a3c');
+}
+var mmCache=null,mmKey='';
+function drawMinimap(){
+  var m=Math.min(110,W*0.26),x0=W-m-10,y0=H-m-10,k=m/WORLD,i;
+  var key=m+'|'+S.islands.length+'|'+(S.islands[0]&&S.islands[0].seed);
+  if(!mmCache||mmKey!==key){
+    mmKey=key;mmCache=document.createElement('canvas');
+    mmCache.width=Math.ceil(m*DPR);mmCache.height=Math.ceil(m*DPR);
+    var c=mmCache.getContext('2d');c.setTransform(DPR,0,0,DPR,0,0);
+    c.fillStyle='rgba(5,30,50,.55)';c.fillRect(0,0,m,m);
+    c.strokeStyle='#f3d27a';c.lineWidth=2;c.strokeRect(1,1,m-2,m-2);
+    c.fillStyle='#e8d38f';
+    for(i=0;i<S.islands.length;i++){var o=S.islands[i],nn=o.shape.length;c.beginPath();
+      for(var j=0;j<nn;j++){var aa=j/nn*6.283,prr=Math.max(2,o.r*o.shape[j]*k),ppx=o.x*k+Math.cos(aa)*prr,ppy=o.y*k+Math.sin(aa)*prr;
+        if(j===0)c.moveTo(ppx,ppy);else c.lineTo(ppx,ppy);}
+      c.closePath();c.fill();}
+  }
+  ctx.drawImage(mmCache,x0,y0,m,m);
+  for(i=0;i<S.forts.length;i++){var f=S.forts[i];if(!f.alive)continue;ctx.fillStyle='#ff5a3c';ctx.fillRect(x0+f.x*k-2,y0+f.y*k-2,4,4);}
+  for(i=0;i<S.ships.length;i++){var s=S.ships[i];ctx.fillStyle=s.flee?'#7fe07f':'#ff2d2d';ctx.fillRect(x0+s.x*k-1.5,y0+s.y*k-1.5,3,3);}
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(x0+S.p.x*k,y0+S.p.y*k,3,0,6.283);ctx.fill();
+}
+function drawJoy(){
+  if(joy.id===null||S.mode!=='play')return;
+  ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(joy.sx,joy.sy,46,0,6.283);ctx.stroke();
+  var dx=joy.x-joy.sx,dy=joy.y-joy.sy,d=Math.sqrt(dx*dx+dy*dy),mm=Math.min(d,46);
+  var kx=d?joy.sx+dx/d*mm:joy.sx,ky=d?joy.sy+dy/d*mm:joy.sy;
+  ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.arc(kx,ky,20,0,6.283);ctx.fill();
+}
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  var p=S.p;camX=p.x-W/2;camY=p.y-H/2;
+  if(S.shake>0){camX+=rnd(-1,1)*S.shake*9;camY+=rnd(-1,1)*S.shake*9;}
+  drawSea();
+  var i;
+  for(i=0;i<S.parts.length;i++){var q=S.parts[i];if(!q.wake)continue;
+    ctx.globalAlpha=q.life/q.max*0.8;ctx.fillStyle=q.c;ctx.beginPath();ctx.arc(sx(q.x),sy(q.y),q.r*(2-q.life/q.max),0,6.283);ctx.fill();}
+  ctx.globalAlpha=1;
+  for(i=0;i<S.islands.length;i++)drawIsland(S.islands[i]);
+  for(i=0;i<S.forts.length;i++)drawFort(S.forts[i]);
+  for(i=0;i<S.loot.length;i++){var l=S.loot[i],lx=sx(l.x),ly=sy(l.y)+Math.sin(l.bob)*3;
+    if(l.life<3&&Math.floor(l.life*6)%2)continue;
+    hexagon(lx,ly,9,'#b8860b');
+    hexagon(lx,ly-1,7.5,'#f6c329');}
+  for(i=0;i<S.ships.length;i++){var s=S.ships[i];drawShip(s,s.T.hull,s.T.sail,s.flee?'#2e8b57':'#1f3a93',false);}
+  if(S.mode!=='over')drawShip(p,'#3b2412','#2b2b2b','#111',true);
+  ctx.fillStyle='#1d1d1d';
+  for(i=0;i<S.balls.length;i++){var b=S.balls[i];ctx.beginPath();ctx.arc(sx(b.x),sy(b.y),b.enemy?4:4.5,0,6.283);ctx.fill();}
+  for(i=0;i<S.parts.length;i++){var q2=S.parts[i];if(q2.wake)continue;
+    ctx.globalAlpha=Math.max(0,q2.life/q2.max);ctx.fillStyle=q2.c;ctx.beginPath();ctx.arc(sx(q2.x),sy(q2.y),q2.r,0,6.283);ctx.fill();}
+  ctx.globalAlpha=1;
+  ctx.font='bold 15px Georgia';ctx.textAlign='center';
+  for(i=0;i<S.pops.length;i++){var o=S.pops[i];ctx.globalAlpha=Math.min(1,o.life*1.4);
+    ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillText(o.t,sx(o.x)+1,sy(o.y)+2);ctx.fillStyle=o.c;ctx.fillText(o.t,sx(o.x),sy(o.y));}
+  ctx.globalAlpha=1;
+  if(S.mode==='play'){
+    /* panah musuh di luar layar */
+    for(i=0;i<S.ships.length;i++){var e=S.ships[i],ex=sx(e.x),ey=sy(e.y);
+      if(ex>0&&ex<W&&ey>0&&ey<H)continue;
+      var ang=Math.atan2(ey-H/2,ex-W/2),ax=clamp(W/2+Math.cos(ang)*W,22,W-22),ay=clamp(H/2+Math.sin(ang)*H,70,H-22);
+      ctx.save();ctx.translate(ax,ay);ctx.rotate(ang);ctx.fillStyle=e.flee?'#7fe07f':'#ff4b2b';
+      ctx.beginPath();ctx.moveTo(11,0);ctx.lineTo(-7,-8);ctx.lineTo(-7,8);ctx.closePath();ctx.fill();ctx.restore();}
+    if(p.hitT>0){ctx.fillStyle='rgba(255,40,20,'+(p.hitT*1.6)+')';ctx.fillRect(0,0,W,H);}
+    drawMinimap();drawJoy();
+  }
+}
+function hud(){
+  var p=S.p;hpf.style.width=(p.hp/p.max*100)+'%';
+  hG.textContent=S.gold;hW.textContent=S.wave||1;hE.textContent=S.ships.length+S.queue.length;
+}
+var last=0;
+function loop(ts){
+  if(!last)last=ts;var dt=Math.min((ts-last)/1000,0.033);last=ts;
+  update(dt);render();hud();requestAnimationFrame(loop);
+}
+reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

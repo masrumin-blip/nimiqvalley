@@ -34,6 +34,9 @@ export const LEAGUE_GAMES = [
   { slug: "shooter", name: "CosNimiq Shooter", path: "/games/shooter", method: "telemetry" },
   { slug: "rooftop", name: "Nimiq Rooftop", path: "/games/rooftop", method: "telemetry" },
   { slug: "slide", name: "Nimiq Slide", path: "/games/slide", method: "telemetry" },
+  { slug: "pirate", name: "Nimiq Pirate", path: "/games/pirate", method: "telemetry" },
+  { slug: "plane", name: "Nimiq Plane", path: "/games/plane", method: "telemetry" },
+  { slug: "blocks", name: "Nimiq Blocks Drop", path: "/games/blocks", method: "telemetry" },
 
 
 ] as const satisfies ReadonlyArray<{ slug: string; name: string; path: string; method: VerifyMethod }>;

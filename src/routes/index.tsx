@@ -5,7 +5,7 @@ import { DailyRewardDialog } from "@/components/DailyRewardDialog";
 
 const title = "NimiqValley — Village, Games & AI Chat";
 const description =
-  "Enter Nimiq Village, play fifteen arcade games, or meet the NimiqValley AI chat characters.";
+  "Enter Nimiq Village, play eighteen arcade games, or meet the NimiqValley AI chat characters.";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,9 +15,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: title },
       { property: "og:description", content: description },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://nimiqvalley.lovable.app/icon-512.png?v=2" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:image", content: "https://nimiqvalley.lovable.app/icon-512.png?v=2" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: MainMenu,
@@ -36,7 +34,7 @@ const menuItems = [
     to: "/games",
     icon: Gamepad2,
     title: "Game Hub",
-    copy: "Fifteen Nimiq arcade games, from racing and runners to puzzles and shooters.",
+    copy: "Eighteen Nimiq arcade games, from racing and runners to puzzles and shooters.",
     action: "Open hub",
     label: "Play",
   },
