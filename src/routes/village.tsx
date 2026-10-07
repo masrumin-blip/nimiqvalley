@@ -278,8 +278,8 @@ function VillagePage() {
 
 
       {/* Status panel, enlarged by 15% while keeping the menu in its own corner. */}
-      <div className="pointer-events-none absolute left-0 top-0 z-30 origin-top-left scale-[0.69] p-3">
-        <div className="pointer-events-auto w-[430px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
+      <div className="pointer-events-none absolute left-0 top-0 z-30 p-2.5">
+        <div className="pointer-events-auto w-[300px] max-w-[90vw] rounded-2xl border border-border/60 bg-card/85 p-3 shadow-lg backdrop-blur">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
