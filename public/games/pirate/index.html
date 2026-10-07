@@ -519,8 +519,8 @@ function drawShip(s,hull,sail,flag,isP){
   if(x<-length||x>W+length||y<-length||y>H+length)return;
   var image=isP?playerImage:enemyImage;
   if(image.complete&&image.naturalWidth){
-    ctx.save();ctx.translate(x+6,y+8);ctx.rotate(s.a);ctx.fillStyle='rgba(0,0,0,.25)';
-    ctx.beginPath();ctx.ellipse(0,0,length*0.42,width*0.36,0,0,6.283);ctx.fill();ctx.restore();
+    var so=isP?2:6,sl=isP?length*0.30:length*0.42,sw=isP?width*0.24:width*0.36;ctx.save();ctx.translate(x+so,y+so+(isP?1:2));ctx.rotate(s.a);ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath();ctx.ellipse(0,0,sl,sw,0,0,6.283);ctx.fill();ctx.restore();
     ctx.save();ctx.translate(x,y);ctx.rotate(s.a-Math.PI/2);
     if(s.hitT>0)ctx.globalAlpha=.65;
     ctx.drawImage(image,-width/2,-length/2,width,length);ctx.restore();
