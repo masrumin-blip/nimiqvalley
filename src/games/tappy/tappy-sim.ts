@@ -213,5 +213,5 @@ export function simulateRun(
     const stepped = stepSim(state, rng, flapSet.has(tick));
     state = stepped.state;
   }
-  return { score: state.score, ticks: state.tick, died: state.dead };
+  return { score: state.score, ticks: state.tick, died: state.dead, coins: state.score };
 }
