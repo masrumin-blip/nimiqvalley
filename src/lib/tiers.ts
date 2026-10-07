@@ -115,5 +115,5 @@ export function formatUsd(value: number): string {
 }
 
 export function formatNim(value: number): string {
-  return ;
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} NIM`;
 }
