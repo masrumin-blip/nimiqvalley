@@ -378,9 +378,9 @@ function VillagePage() {
 
 
       {/* Controls */}
-      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
-        <Joystick moveRef={moveRef} disabled={Boolean(activeViewpoint)} />
-        <div className="flex flex-col items-end gap-2">
+      <Joystick moveRef={moveRef} disabled={Boolean(activeViewpoint)} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-end p-4">
+        <div className="pointer-events-auto flex flex-col items-end gap-2">
           {nearbyViewpoint && !activeViewpoint && (
             <Button
               onClick={() => {
