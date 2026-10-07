@@ -1123,6 +1123,15 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
         ctx.fill();
         if (monumentImage.complete && monumentImage.naturalWidth > 0) {
           ctx.save();
+          // soft pulsing glow around the Nimiq hexagon at the top only
+          const gx = MONUMENT.x, gy = MONUMENT.y - MONUMENT.height + 6 + MONUMENT.height * 0.14;
+          const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 700);
+          const gr = MONUMENT.width * (0.42 + 0.06 * pulse);
+          const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+          glow.addColorStop(0, `rgba(246,178,35,${0.32 + 0.12 * pulse})`);
+          glow.addColorStop(1, "rgba(246,178,35,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(monumentImage, MONUMENT.x - MONUMENT.width / 2, MONUMENT.y - MONUMENT.height + 6, MONUMENT.width, MONUMENT.height);
           ctx.restore();

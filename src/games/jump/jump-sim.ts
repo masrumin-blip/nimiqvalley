@@ -12,7 +12,7 @@ export const W = 400;
 export const H = 720;
 const GRAVITY = 0.35;
 export const JUMP_V = -11.5;
-const SPRING_V = -25;
+const SPRING_V = -17.7;
 export const MOVE_SPEED = 4.7;
 const PLAYER_Y = H * 0.66;
 
@@ -183,7 +183,7 @@ export function stepJump(w: JumpSim, rng: Rng, dir: number): JumpEvents {
     else sfx("powerup");
     if (item.type === "shield") w.buffs.shield = 1;
     if (item.type === "magnet") w.buffs.magnet = 600;
-    if (item.type === "jetpack") { w.buffs.jetpack = 120; w.vy = -16; }
+    if (item.type === "jetpack") { w.buffs.jetpack = 60; w.vy = -6.4; }
     if (item.type === "slow") w.buffs.slow = 520;
     if (item.type === "multiplier") w.buffs.multiplier = 600;
     if (item.type === "life") w.buffs.lives = Math.min(2, w.buffs.lives + 1);
@@ -193,7 +193,7 @@ export function stepJump(w: JumpSim, rng: Rng, dir: number): JumpEvents {
   const slowFactor = w.buffs.slow > 0 ? 0.55 : 1;
   const target = (dir === 2 ? MOVE_SPEED : 0) - (dir === 1 ? MOVE_SPEED : 0);
   w.vx += (target - w.vx) * 0.22 * factor;
-  if (w.buffs.jetpack > 0) { w.vy = Math.max(-17, w.vy - 0.36 * factor); ev.jet = true; }
+  if (w.buffs.jetpack > 0) { w.vy = Math.max(-6.8, w.vy - 0.15 * factor); ev.jet = true; }
   else w.vy += GRAVITY * factor;
   w.py += w.vy * factor; w.px += w.vx * factor;
   if (w.px < -16) w.px = W + 16;
