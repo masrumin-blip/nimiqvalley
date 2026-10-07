@@ -85,6 +85,7 @@ export interface SimState {
 export interface TickEvents {
   coins: { x: number; y: number }[];
   died: boolean;
+  coins?: number;
 }
 
 function randomGapY(rng: () => number, gap: number, amp: number) {
@@ -193,6 +194,7 @@ export interface SimResult {
   score: number;
   ticks: number;
   died: boolean;
+  coins?: number;
 }
 
 /**
