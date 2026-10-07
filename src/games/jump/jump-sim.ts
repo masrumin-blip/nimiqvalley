@@ -183,7 +183,7 @@ export function stepJump(w: JumpSim, rng: Rng, dir: number): JumpEvents {
     else sfx("powerup");
     if (item.type === "shield") w.buffs.shield = 1;
     if (item.type === "magnet") w.buffs.magnet = 600;
-    if (item.type === "jetpack") { w.buffs.jetpack = 180; w.vy = -8.32; }
+    if (item.type === "jetpack") { w.buffs.jetpack = 135; w.vy = -8.32; }
     if (item.type === "slow") w.buffs.slow = 520;
     if (item.type === "multiplier") w.buffs.multiplier = 600;
     if (item.type === "life") w.buffs.lives = Math.min(2, w.buffs.lives + 1);
