@@ -5,6 +5,9 @@ import * as THREE from "three";
 
 import { Runner } from "./Runner";
 import { playSfx } from "@/lib/sfx";
+import { isLowPowerDevice } from "@/lib/perf";
+
+const LOW = isLowPowerDevice();
 import {
   makeNext,
   obstaclePos,
@@ -255,7 +258,7 @@ function Building({ p, taken }: { p: Platform; taken: React.RefObject<Set<number
 function Skyline() {
   const blocks = useMemo(() => {
     const out: { x: number; z: number; h: number; w: number; c: string }[] = [];
-    for (let i = 0; i < 110; i++) {
+    for (let i = 0; i < (LOW ? 28 : 110); i++) {
       const side = Math.random() > 0.5 ? 1 : -1;
       out.push({
         x: side * (24 + Math.random() * 80),
@@ -499,13 +502,13 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
     <>
       <color attach="background" args={["#f7bd91"]} />
       <fog attach="fog" args={["#f3b48c", 110, 370]} />
-      <ambientLight intensity={0.72} color="#ffdcba" />
+      <ambientLight intensity={LOW ? 1.05 : 0.72} color="#ffdcba" />
       <hemisphereLight intensity={0.6} color="#ffe0bd" groundColor="#4a3b39" />
       <directionalLight
         ref={sun}
         intensity={2.5}
         color="#ffd6a8"
-        castShadow
+        castShadow={!LOW}
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
         shadow-camera-left={-40}
@@ -514,6 +517,7 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
         shadow-camera-bottom={-40}
         shadow-camera-far={160}
       />
+      {!LOW && (
       <Environment>
         <Lightformer intensity={2} position={[0, 8, 0]} scale={[14, 14, 1]} color="#ffe6cb" />
         <Lightformer
@@ -524,6 +528,7 @@ export function Scene({ playing, controls, onScore, onDead, runId }: Props) {
           scale={[24, 6, 1]}
         />
       </Environment>
+      )}
       <Sun />
       <Skyline />
       {platforms.map((p) => (

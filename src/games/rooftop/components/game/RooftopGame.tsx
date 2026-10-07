@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Scene, type Controls } from "./Scene";
 import { startGameRun, submitTelemetryRun } from "@/lib/game-runs.functions";
 import { currentLeagueId } from "@/lib/verification-info";
+import { isLowPowerDevice } from "@/lib/perf";
+
+const LOW = isLowPowerDevice();
 
 
 type Phase = "ready" | "playing" | "over";
@@ -149,7 +152,12 @@ export function RooftopGame() {
 
   return (
     <div className="relative h-full min-h-0 w-full select-none overflow-hidden bg-game-sky font-[family-name:var(--font-body)] text-game-ink">
-      <Canvas shadows camera={{ position: [0, 14, -26], fov: 58 }} dpr={[1, 2]}>
+      <Canvas
+        shadows={!LOW}
+        camera={{ position: [0, 14, -26], fov: 58 }}
+        dpr={LOW ? 1 : [1, 2]}
+        gl={{ antialias: !LOW, powerPreference: "high-performance" }}
+      >
         <Scene
           playing={phase === "playing"}
           controls={controls}
@@ -175,7 +183,7 @@ export function RooftopGame() {
 
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
-        <div className="rounded-2xl border border-game-gold/40 bg-game-panel/75 px-4 py-2.5 shadow-[var(--shadow-panel)] backdrop-blur-xl">
+        <div className="rounded-2xl border border-game-gold/40 bg-game-panel/85 px-4 py-2.5 shadow-[var(--shadow-panel)]">
           <div className="text-[10px] uppercase tracking-[0.3em] opacity-55">Distance</div>
           <div className="mt-0.5 font-[family-name:var(--font-display)] text-4xl leading-none tracking-wide">
             {meters}
@@ -186,7 +194,7 @@ export function RooftopGame() {
             <span className="text-[11px] uppercase tracking-[0.2em] opacity-60">{coins}</span>
           </div>
         </div>
-        <div className="rounded-2xl border border-game-gold/40 bg-game-panel/75 px-4 py-2.5 text-right shadow-[var(--shadow-panel)] backdrop-blur-xl">
+        <div className="rounded-2xl border border-game-gold/40 bg-game-panel/85 px-4 py-2.5 text-right shadow-[var(--shadow-panel)]">
           <div className="text-[10px] uppercase tracking-[0.3em] opacity-55">Best</div>
           <div className="font-[family-name:var(--font-display)] text-2xl leading-none">
             {best}m
@@ -211,14 +219,14 @@ export function RooftopGame() {
             <button
               aria-label="Move left"
               {...hold("left")}
-              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-game-gold/50 bg-game-panel/70 text-2xl shadow-[var(--shadow-panel)] backdrop-blur-xl transition active:scale-95 active:bg-game-panel"
+              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-game-gold/50 bg-game-panel/85 text-2xl shadow-[var(--shadow-panel)] transition active:scale-95 active:bg-game-panel"
             >
               ←
             </button>
             <button
               aria-label="Move right"
               {...hold("right")}
-              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-game-gold/50 bg-game-panel/70 text-2xl shadow-[var(--shadow-panel)] backdrop-blur-xl transition active:scale-95 active:bg-game-panel"
+              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-game-gold/50 bg-game-panel/85 text-2xl shadow-[var(--shadow-panel)] transition active:scale-95 active:bg-game-panel"
             >
               →
             </button>
@@ -234,7 +242,7 @@ export function RooftopGame() {
       )}
 
       {phase !== "playing" && (
-        <div className="absolute inset-0 flex items-center justify-center px-6 backdrop-blur-[3px]">
+        <div className="absolute inset-0 flex items-center justify-center px-6">
           <div className="w-full max-w-sm overflow-hidden rounded-[28px] border border-game-gold/50 bg-game-panel/90 text-center shadow-[var(--shadow-panel)]">
             <div className="h-1.5 w-full bg-gradient-to-r from-game-coin via-game-flame to-game-gold" />
             <div className="p-7">

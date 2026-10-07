@@ -40,7 +40,7 @@ function HoldButton({
     <Button
       type="button"
       aria-label={label}
-      className={`touch-none select-none rounded-sm border border-border bg-card/90 text-lg font-display text-foreground shadow-pop backdrop-blur active:scale-95 active:bg-primary active:text-primary-foreground ${className ?? ""}`}
+      className={`touch-none select-none rounded-sm border border-border bg-card/90 text-lg font-display text-foreground shadow-pop active:scale-95 active:bg-primary active:text-primary-foreground ${className ?? ""}`}
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -84,7 +84,7 @@ export function HUD() {
 
       {/* top stats */}
       <div className="flex items-start justify-between gap-2 p-3">
-        <div className="rounded-sm border-l-2 border-primary bg-card/90 px-4 py-2 shadow-pop backdrop-blur">
+        <div className="rounded-sm border-l-2 border-primary bg-card/90 px-4 py-2 shadow-pop">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Lap
           </p>
@@ -94,7 +94,7 @@ export function HUD() {
           </p>
         </div>
 
-        <div className="rounded-sm border-t-2 border-primary bg-card/90 px-4 py-2 text-center shadow-pop backdrop-blur">
+        <div className="rounded-sm border-t-2 border-primary bg-card/90 px-4 py-2 text-center shadow-pop">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Time
           </p>
@@ -108,7 +108,7 @@ export function HUD() {
           )}
         </div>
 
-        <div className="rounded-sm border-r-2 border-primary bg-card/90 px-4 py-2 text-right shadow-pop backdrop-blur">
+        <div className="rounded-sm border-r-2 border-primary bg-card/90 px-4 py-2 text-right shadow-pop">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Position
           </p>
@@ -122,7 +122,7 @@ export function HUD() {
       </div>
 
       {/* speed */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-sm border-b-2 border-primary bg-card/90 px-5 py-1.5 shadow-pop backdrop-blur">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-sm border-b-2 border-primary bg-card/90 px-5 py-1.5 shadow-pop">
         <span className="font-display text-2xl text-foreground">
           {Math.round(hud.speed)}
         </span>
@@ -187,7 +187,7 @@ export function HUD() {
 
       {showExit && (
         <div
-          className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-background/70 p-5 backdrop-blur-sm"
+          className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-background/70 p-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="exit-race-title"
