@@ -9,7 +9,43 @@ export interface Tier {
   houseBlurb: string;
 }
 
-/** Single source of truth for the USD thresholds. */
+/** Tiers for characters based on NIM coin count */
+export const CHARACTER_TIERS: Tier[] = [
+  {
+    id: "poor",
+    min: 0,
+    characterName: "Humble Villager",
+    houseName: "Wooden Hut",
+    characterBlurb: "Patched clothes, bare feet, big dreams.",
+    houseBlurb: "Straw roof and a crooked door.",
+  },
+  {
+    id: "normal",
+    min: 1000,
+    characterName: "Ordinary Villager",
+    houseName: "Simple House",
+    characterBlurb: "Neat everyday clothes and sturdy boots.",
+    houseBlurb: "Timber walls with clay roof tiles.",
+  },
+  {
+    id: "cool",
+    min: 10000,
+    characterName: "Cool Villager",
+    houseName: "Fine House",
+    characterBlurb: "Jacket, shades and a faint glow.",
+    houseBlurb: "Two floors, a fence and a garden.",
+  },
+  {
+    id: "sultan",
+    min: 100000,
+    characterName: "Sultan",
+    houseName: "Golden Palace",
+    characterBlurb: "Golden robe, crown and sparkles.",
+    houseBlurb: "Marble walls, gold dome, fountain.",
+  },
+];
+
+/** Tiers for houses based on USDT */
 export const TIERS: Tier[] = [
   {
     id: "poor",
@@ -45,16 +81,19 @@ export const TIERS: Tier[] = [
   },
 ];
 
+export function tierForNim(nim: number): Tier {
+  let match: Tier = CHARACTER_TIERS[0];
+  for (const tier of CHARACTER_TIERS) {
+    if (nim >= tier.min) match = tier;
+  }
+  return match;
+}
+
 export function tierForUsd(usd: number): Tier {
-  let match: Tier = TIERS[0] ?? {
-    id: "poor",
-    min: 0,
-    characterName: "Humble Villager",
-    houseName: "Wooden Hut",
-    characterBlurb: "Patched clothes, bare feet, big dreams.",
-    houseBlurb: "Straw roof and a crooked door.",
-  };
-  for (const tier of TIERS) if (usd >= tier.min) match = tier;
+  let match: Tier = TIERS[0];
+  for (const tier of TIERS) {
+    if (usd >= tier.min) match = tier;
+  }
   return match;
 }
 
@@ -76,5 +115,5 @@ export function formatUsd(value: number): string {
 }
 
 export function formatNim(value: number): string {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} NIM`;
+  return ;
 }

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
 import { connectPolygon, getConnectedPolygonAccount, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
-import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForUsd } from "@/lib/tiers";
+import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForNim, tierForUsd } from "@/lib/tiers";
 import type { Neighbor, RestSpot } from "@/lib/village";
 
 export const Route = createFileRoute("/village")({
@@ -166,7 +166,7 @@ function VillagePage() {
   const nim = demo ? demoNimUsd * 250 : (nimBalance.data?.nim ?? 0);
   const nimUsd = demo ? demoNimUsd : nim * (price.data?.usd ?? 0);
   const usdtValue = demo ? demoUsdt : (usdt.data ?? 0);
-  const realCharTier = useMemo(() => tierForUsd(nimUsd), [nimUsd]);
+  const realCharTier = useMemo(() => tierForNim(nim), [nim]);
   const realHouseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
   const charTier = demo ? (TIERS[demoTier] ?? realCharTier) : realCharTier;
   const houseTier = demo ? (TIERS[demoHouseTier] ?? realHouseTier) : realHouseTier;
