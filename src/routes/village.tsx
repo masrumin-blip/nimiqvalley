@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 
 import { getNimBalance, getNimPrice } from "@/lib/nimiq.functions";
 import { connectPolygon, getConnectedPolygonAccount, getEthereum, isInsideNimiqPay, readUsdtBalance, sendNim } from "@/lib/wallet";
-import { formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForNim, tierForUsd } from "@/lib/tiers";
+import { CHARACTER_TIERS, formatNim, formatUsd, MIN_NIM_RESERVE, TIERS, tierForNim, tierForUsd } from "@/lib/tiers";
 import type { Neighbor, RestSpot } from "@/lib/village";
 
 export const Route = createFileRoute("/village")({
@@ -160,15 +160,15 @@ function VillagePage() {
     refetchInterval: 60_000,
   });
 
-  const DEMO_USD = [2, 7, 25, 120];
-  const demoNimUsd = DEMO_USD[demoTier] ?? DEMO_USD[0] ?? 0;
-  const demoUsdt = DEMO_USD[demoHouseTier] ?? DEMO_USD[0] ?? 0;
-  const nim = demo ? demoNimUsd * 250 : (nimBalance.data?.nim ?? 0);
-  const nimUsd = demo ? demoNimUsd : nim * (price.data?.usd ?? 0);
+  const DEMO_NIM = [0, 1000, 10000, 100000];
+  const DEMO_USDT = [0, 5, 10, 50];
+  const demoNim = DEMO_NIM[demoTier] ?? 0;
+  const demoUsdt = DEMO_USDT[demoHouseTier] ?? 0;
+  const nim = demo ? demoNim : (nimBalance.data?.nim ?? 0);
   const usdtValue = demo ? demoUsdt : (usdt.data ?? 0);
   const realCharTier = useMemo(() => tierForNim(nim), [nim]);
   const realHouseTier = useMemo(() => tierForUsd(usdtValue), [usdtValue]);
-  const charTier = demo ? (TIERS[demoTier] ?? realCharTier) : realCharTier;
+  const charTier = demo ? (CHARACTER_TIERS[demoTier] ?? realCharTier) : realCharTier;
   const houseTier = demo ? (TIERS[demoHouseTier] ?? realHouseTier) : realHouseTier;
 
   const onNearbyChange = useCallback((n: Neighbor | null) => {
@@ -288,9 +288,9 @@ function VillagePage() {
               <p className="text-sm font-semibold text-card-foreground">{charTier.characterName}</p>
               <p className="text-xs text-muted-foreground">
                 {demo
-                  ? `Demo · ${formatUsd(nimUsd)}`
+                  ? `Demo · ${formatNim(demoNim)}`
                   : nimAddress
-                    ? `${formatNim(nim)} · ${formatUsd(nimUsd)}`
+                    ? formatNim(nim)
                     : "Loading balance…"}
               </p>
             </div>
