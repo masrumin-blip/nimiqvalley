@@ -230,7 +230,7 @@ function BuffBar({ buffs }: { buffs: Buffs }) {
   const active = [
     (buffs.shield > 0 || buffs.jetpack > 0) && { key: "shield", label: "SHIELD", icon: <Shield />, value: 1 },
     buffs.magnet > 0 && { key: "magnet", label: "MAGNET", icon: <span>∩</span>, value: buffs.magnet / 600 },
-    buffs.jetpack > 0 && { key: "jetpack", label: "JET", icon: <Zap />, value: buffs.jetpack / 120 },
+    buffs.jetpack > 0 && { key: "jetpack", label: "JET", icon: <Zap />, value: buffs.jetpack / 135 },
     buffs.slow > 0 && { key: "slow", label: "SLOW", icon: <span>◷</span>, value: buffs.slow / 520 },
     buffs.multiplier > 0 && { key: "multi", label: "×2", icon: <span>×2</span>, value: buffs.multiplier / 600 },
     buffs.lives > 0 && { key: "life", label: `LIFE ${buffs.lives}`, icon: <span>♥</span>, value: 1 },
