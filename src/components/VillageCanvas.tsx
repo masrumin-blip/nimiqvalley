@@ -609,8 +609,8 @@ export default function VillageCanvas({ characterTier, houseTier, moveRef, onNea
   onMonumentChangeRef.current = onMonumentChange;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef({
-    x: 1300,
-    y: 1030,
+    x: PLAYER_HOUSE.x,
+    y: PLAYER_HOUSE.y + 65,
     walking: false,
     direction: "down" as Direction,
     lastSide: "right" as "left" | "right",
