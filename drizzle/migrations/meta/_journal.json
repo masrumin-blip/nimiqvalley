@@ -218,6 +218,13 @@
       "when": 1790749185940,
       "tag": "0030_coin_redemptions",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791419958236,
+      "tag": "0031_split_free_and_owned_keys",
+      "breakpoints": true
     }
   ]
 }

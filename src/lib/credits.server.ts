@@ -19,51 +19,41 @@ type CreditRow = {
   wallet: string;
   chat_credits: number;
   room_credits: number;
+  /** Owned keys only (bought / reward bonus). Never expire. */
   match_keys: number;
   free_chats_date: string | null;
   free_chats_used: number;
   free_keys_date: string | null;
+  free_keys_used: number;
 };
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-
-/**
- * Every player starts each day with at least FREE_KEYS_PER_DAY match keys.
- * Keys bought or left over are kept, but the free grant does not stack.
- */
-async function topUpDailyKeys(row: CreditRow): Promise<CreditRow> {
-  if (row.free_keys_date === today()) return row;
-  const keys = Math.max(row.match_keys ?? 0, FREE_KEYS_PER_DAY);
-  await supabaseAdmin
-    .from("wallet_credits")
-    .update({ match_keys: keys, free_keys_date: today(), updated_at: new Date().toISOString() })
-    .eq("wallet", row.wallet);
-  return { ...row, match_keys: keys, free_keys_date: today() };
+/** Daily free keys left today. Owned keys are separate and never reset. */
+function freeKeysLeft(row: CreditRow) {
+  if (row.free_keys_date !== today()) return FREE_KEYS_PER_DAY;
+  return Math.max(0, FREE_KEYS_PER_DAY - (row.free_keys_used ?? 0));
 }
 
+function totalKeys(row: CreditRow) {
+  return freeKeysLeft(row) + Math.max(0, row.match_keys ?? 0);
+}
+
+const COLUMNS =
+  "wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used, free_keys_date, free_keys_used";
+
 async function loadRow(wallet: string): Promise<CreditRow> {
-  const { data } = await supabaseAdmin
+  const { data } = await supabaseAdmin.from("wallet_credits").select(COLUMNS).eq("wallet", wallet).maybeSingle();
+  if (data) return data as CreditRow;
+  // Never overwrite an existing row: insert only when missing.
+  await supabaseAdmin
     .from("wallet_credits")
-    .select(
-      "wallet, chat_credits, room_credits, match_keys, free_chats_date, free_chats_used, free_keys_date",
-    )
-    .eq("wallet", wallet)
-    .maybeSingle();
-  if (data) return topUpDailyKeys(data as CreditRow);
-  const fresh: CreditRow = {
-    wallet,
-    chat_credits: 0,
-    room_credits: 0,
-    match_keys: FREE_KEYS_PER_DAY,
-    free_chats_date: today(),
-    free_chats_used: 0,
-    free_keys_date: today(),
-  };
-  await supabaseAdmin.from("wallet_credits").upsert({ ...fresh, updated_at: new Date().toISOString() });
-  return fresh;
+    .upsert({ wallet, updated_at: new Date().toISOString() }, { onConflict: "wallet", ignoreDuplicates: true });
+  const { data: again } = await supabaseAdmin.from("wallet_credits").select(COLUMNS).eq("wallet", wallet).maybeSingle();
+  if (!again) throw new Error("Could not load your account. Please try again.");
+  return again as CreditRow;
 }
 
 
@@ -88,7 +78,7 @@ export async function getCredits(wallet: string): Promise<CreditState> {
     wallet,
     chatCredits: row.chat_credits,
     roomCredits: row.room_credits,
-    matchKeys: row.match_keys ?? 0,
+    matchKeys: totalKeys(row),
     freeChatsLeft: freeLeft(row),
     claimedToday: await claimedToday(wallet),
   };
@@ -127,21 +117,38 @@ export async function spendRoom(wallet: string): Promise<void> {
   await save(wallet, { room_credits: row.room_credits - 1 });
 }
 
+/** Uses a daily free key first, then an owned key. Returns false when none left. */
+async function takeKey(row: CreditRow): Promise<boolean> {
+  if (freeKeysLeft(row) > 0) {
+    const used = row.free_keys_date === today() ? row.free_keys_used ?? 0 : 0;
+    await save(row.wallet, { free_keys_date: today(), free_keys_used: used + 1 });
+    return true;
+  }
+  if ((row.match_keys ?? 0) > 0) {
+    await save(row.wallet, { match_keys: row.match_keys - 1 });
+    return true;
+  }
+  return false;
+}
+
 /** Spends one match key. Every online match entry needs one. */
 export async function spendKey(wallet: string): Promise<void> {
   const row = await loadRow(wallet);
-  if ((row.match_keys ?? 0) <= 0) {
+  if (!(await takeKey(row))) {
     throw new Error(
       `You used all of today's match keys. You get ${FREE_KEYS_PER_DAY} free keys again tomorrow, or buy one now for ${KEY_COST_NIM} NIM.`,
     );
   }
-  await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
 }
 
 /** Gives a match key back, e.g. when a matchmaking search is cancelled. */
 export async function refundKey(wallet: string): Promise<void> {
   const row = await loadRow(wallet);
-  await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
+  if (row.free_keys_date === today() && (row.free_keys_used ?? 0) > 0) {
+    await save(wallet, { free_keys_used: row.free_keys_used - 1 });
+  } else {
+    await save(wallet, { match_keys: (row.match_keys ?? 0) + 1 });
+  }
 }
 
 /** Gives a room pass back when the room was never actually played. */
@@ -155,10 +162,7 @@ export type RoomEntry = "key" | "room";
 /** Opening a room costs one match key OR one room pass — whichever the player has. */
 export async function spendRoomEntry(wallet: string): Promise<RoomEntry> {
   const row = await loadRow(wallet);
-  if ((row.match_keys ?? 0) > 0) {
-    await save(wallet, { match_keys: (row.match_keys ?? 0) - 1 });
-    return "key";
-  }
+  if (await takeKey(row)) return "key";
   if (row.room_credits > 0) {
     await save(wallet, { room_credits: row.room_credits - 1 });
     return "room";

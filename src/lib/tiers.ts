@@ -82,7 +82,7 @@ export const TIERS: Tier[] = [
 ];
 
 export function tierForNim(nim: number): Tier {
-  let match: Tier = CHARACTER_TIERS[0];
+  let match: Tier = CHARACTER_TIERS[0]!;
   for (const tier of CHARACTER_TIERS) {
     if (nim >= tier.min) match = tier;
   }
@@ -90,7 +90,7 @@ export function tierForNim(nim: number): Tier {
 }
 
 export function tierForUsd(usd: number): Tier {
-  let match: Tier = TIERS[0];
+  let match: Tier = TIERS[0]!;
   for (const tier of TIERS) {
     if (usd >= tier.min) match = tier;
   }
