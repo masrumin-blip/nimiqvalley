@@ -9,7 +9,7 @@ import { VerifyInfoButton } from "@/components/VerifyInfoButton";
 import { shortWallet } from "@/lib/leaderboard";
 import { claimPrize, deleteLeague, fundLeague, getLeague, getTreasury, recheckLeagueDeposit } from "@/lib/leagues.functions";
 import { LEAGUE_GAMES, PAYOUT_SHARES, VERIFY_METHODS, leaguePhase } from "@/lib/verification-info";
-import { payNim, sendUsdtPolygon } from "@/lib/wallet";
+import { payNim, sendUsdtPolygon, warmPolygonConnection } from "@/lib/wallet";
 
 const title = "League — NimiqValley";
 const description = "Live standings, countdown, and prize pool for a NimiqValley league.";
@@ -65,6 +65,13 @@ function LeagueDetail() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(false);
+
+  // Wake the EVM wallet as soon as a USDT league page opens, so the Fund
+  // approval popup appears faster when the user taps it.
+  const leagueToken = data?.league.token;
+  useEffect(() => {
+    if (leagueToken === "usdt") void warmPolygonConnection();
+  }, [leagueToken]);
 
   if (isLoading) return <main className="min-h-screen bg-background p-6 text-sm text-muted-foreground">Loading…</main>;
   if (!data) return <main className="min-h-screen bg-background p-6 text-sm text-muted-foreground">League not found.</main>;

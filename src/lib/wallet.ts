@@ -174,7 +174,6 @@ export async function payNim(
   kind: WalletKind = preferredWallet(),
 ): Promise<string> {
   const value = Math.round(nimAmount * 100_000);
-  recipient = recipient.replace(/\s+/g, "").toUpperCase();
   if (kind === "pay") {
     const { init } = await import("@nimiq/mini-app-sdk");
     const nimiq = (await init({ timeout: 5000 })) as unknown as {
@@ -220,11 +219,21 @@ export async function payNim(
 export async function connectPolygon(): Promise<string> {
   const eth = getEthereum();
   if (!eth) throw new Error("No Ethereum wallet found in this browser.");
-  await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: POLYGON_CHAIN_ID }] });
-  const chainId = await eth.request({ method: "eth_chainId" });
-  if (chainId !== POLYGON_CHAIN_ID) throw new Error("Switch your EVM wallet to Polygon first.");
-  const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-  const first = accounts?.[0];
+  // Fast path: read-only calls first (no popup). Only switch the chain or
+  // request accounts when actually needed, so a warm session skips ahead.
+  let [chainId, accounts] = await Promise.all([
+    eth.request({ method: "eth_chainId" }),
+    eth.request({ method: "eth_accounts" }),
+  ]);
+  if (chainId !== POLYGON_CHAIN_ID) {
+    await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: POLYGON_CHAIN_ID }] });
+    chainId = await eth.request({ method: "eth_chainId" });
+    if (chainId !== POLYGON_CHAIN_ID) throw new Error("Switch your EVM wallet to Polygon first.");
+  }
+  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !accounts[0]) {
+    accounts = await eth.request({ method: "eth_requestAccounts" });
+  }
+  const first = (accounts as string[])?.[0];
   if (!first) throw new Error("No Ethereum address was shared.");
   return first;
 }
@@ -239,6 +248,18 @@ export async function getConnectedPolygonAccount(): Promise<string | null> {
   ]);
   if (chainId !== POLYGON_CHAIN_ID || !Array.isArray(accounts)) return null;
   return typeof accounts[0] === "string" && accounts[0] ? accounts[0] : null;
+}
+
+/**
+ * Wake the EVM wallet and check the Polygon session in the background so the
+ * payment popup opens faster when the user later taps Fund. Best-effort only.
+ */
+export async function warmPolygonConnection(): Promise<void> {
+  try {
+    await getConnectedPolygonAccount();
+  } catch {
+    /* warm-up is best-effort */
+  }
 }
 
 /** Read the USDT (Polygon) balance for an address, in whole USDT. */
@@ -271,8 +292,11 @@ export async function sendUsdtPolygon(to: string, amount: number): Promise<{ has
     functionName: "transfer",
     args: [to as `0x${string}`, BigInt(Math.round(amount * 10 ** USDT_DECIMALS))],
   });
+  // A 100k gas limit lets the wallet skip its own eth_estimateGas round-trip,
+  // so the approval popup opens sooner. USDT transfers use ~46–65k gas and the
+  // wallet only ever charges the gas actually used.
   const hash = await withTimeout(
-    eth.request({ method: "eth_sendTransaction", params: [{ from, to: USDT_POLYGON, data }] }),
+    eth.request({ method: "eth_sendTransaction", params: [{ from, to: USDT_POLYGON, data, gas: "0x186A0" }] }),
     WALLET_TIMEOUT_MS,
     "The wallet did not answer in time. Please try again.",
   );
