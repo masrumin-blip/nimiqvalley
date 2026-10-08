@@ -234,7 +234,7 @@ export const fundLeague = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         amount: z.number().positive().max(10_000_000),
-        txHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+        txHash: z.string().trim().regex(/^(0x)?[0-9a-fA-F]{64}$/).optional(),
       })
       .parse(d),
   )
@@ -307,7 +307,7 @@ export const recheckLeagueDeposit = createServerFn({ method: "POST" })
     z.object({
       id: z.string().uuid(),
       amount: z.number().positive().max(10_000_000),
-      txHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
+      txHash: z.string().trim().regex(/^(0x)?[0-9a-fA-F]{64}$/).optional(),
     }).parse(d),
   )
   .handler(async ({ data }) => {
