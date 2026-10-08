@@ -216,6 +216,11 @@ function drawHouseSprite(
   const { crop, width: dw, height: dh, footprint } = HOUSE_SPRITES[tier];
   const [sx, sy, sw, sh] = crop;
   ctx.save();
+  // Soft ground shadow so the house sits on the grass instead of floating on it.
+  ctx.fillStyle = "rgba(30,60,40,0.20)";
+  ctx.beginPath();
+  ctx.ellipse(x + 5, y + 2, dw * 0.46, dw * 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, sx, sy, sw, sh, x - dw / 2, y - dh + 12, dw, dh);
   if (mine) {
@@ -475,6 +480,11 @@ function drawTreeSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, 
   const width = baseWidth * scale;
   const height = baseHeight * scale;
   ctx.save();
+  // Trunk shadow: a small, slightly offset ellipse grounds the tree.
+  ctx.fillStyle = "rgba(30,60,40,0.18)";
+  ctx.beginPath();
+  ctx.ellipse(x + width * 0.06, y - 2, width * 0.28, width * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, sx, sy, sw, sh, x - width / 2, y - height, width, height);
   ctx.restore();
@@ -483,6 +493,11 @@ function drawTreeSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, 
 function drawBuildingSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement, building: BuildingSpot) {
   const [sx, sy, sw, sh] = building.crop;
   ctx.save();
+  // Soft ground shadow so the building sits on the grass instead of floating on it.
+  ctx.fillStyle = "rgba(30,60,40,0.20)";
+  ctx.beginPath();
+  ctx.ellipse(building.x + 6, building.y + 6, building.width * 0.46, building.width * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, sx, sy, sw, sh, building.x - building.width / 2, building.y - building.height + 18, building.width, building.height);
   ctx.restore();
@@ -517,6 +532,13 @@ function drawAnimalSprite(ctx: CanvasRenderingContext2D, image: HTMLImageElement
   const sizes: Record<AnimalSpot["kind"], [number, number]> = { cow:[74,64], pig:[63,50], sheep:[62,56], chicken:[42,43], frog:[38,34], butterfly:[36,31] };
   const [dw, dh] = sizes[animal.kind];
   ctx.save();
+  // Small shadow under the animal; butterflies cast almost none (they fly).
+  if (animal.kind !== "butterfly") {
+    ctx.fillStyle = "rgba(30,60,40,0.18)";
+    ctx.beginPath();
+    ctx.ellipse(animal.x + ox, animal.y + 2, dw * 0.34, dw * 0.11, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.imageSmoothingEnabled = false;
   const drawX = animal.x + ox;
   if (animal.kind === "frog" && Math.cos((t + animal.phase) / 1250) < 0) {
