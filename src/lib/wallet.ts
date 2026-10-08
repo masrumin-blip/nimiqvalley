@@ -174,6 +174,7 @@ export async function payNim(
   kind: WalletKind = preferredWallet(),
 ): Promise<string> {
   const value = Math.round(nimAmount * 100_000);
+  recipient = recipient.replace(/\s+/g, "").toUpperCase();
   if (kind === "pay") {
     const { init } = await import("@nimiq/mini-app-sdk");
     const nimiq = (await init({ timeout: 5000 })) as unknown as {
