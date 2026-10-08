@@ -1,3 +1,4 @@
+import desaHtml from "@/sceneries/desa-siang-malam.html?raw";
 import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const SCENES: Record<SceneryId, string> = {
   rain: rainHtml,
   samudra: samudraHtml,
   bukit: bukitHtml,
+  desa: desaHtml,
 };
 
 const REDUCED_MOTION_STYLE = `<style>@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important}}</style>`;

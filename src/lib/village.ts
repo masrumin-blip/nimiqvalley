@@ -26,7 +26,7 @@ export interface VillageNpc {
   id: string; name: string; x: number; y: number; spriteRow: NpcSpriteRow;
   speed: number; idleMs: number; path: Array<{ x: number; y: number }>;
 }
-export type SceneryId = "ocean" | "hill" | "aurora" | "sunrise" | "sunset" | "rain" | "samudra" | "bukit";
+export type SceneryId = "ocean" | "hill" | "aurora" | "sunrise" | "sunset" | "rain" | "samudra" | "bukit" | "desa";
 export type RestSpotKind = "bench" | "gazebo" | "deck" | "picnic" | "campfire" | "swing";
 export interface RestSpot {
   id: SceneryId;
@@ -83,6 +83,7 @@ export const TREE_SPRITES: Record<Tree["kind"], { crop: [number, number, number,
 export const POND = { x: 2050, y: 1370, rx: 300, ry: 180 };
 
 export const REST_SPOTS: RestSpot[] = [
+  { id: "desa", name: "Home Yard", x: 1470, y: 1570, kind: "deck", radius: 130, hidden: true },
   { id: "ocean", name: "Open Ocean", x: 650, y: 275, kind: "bench", radius: 210 },
   { id: "hill", name: "Sunset Over the Hills", x: 1300, y: 210, kind: "gazebo", radius: 220 },
   { id: "aurora", name: "Aurora Night", x: 1990, y: 285, kind: "swing", radius: 210 },
